@@ -1,0 +1,11 @@
+models_path: "/home/raphael/dataspace/models/robust_speech/"
+
+hf_repo: speechbrain
+model_name: asr-crdnn-rnnlm-librispeech
+source: !ref <hf_repo>/<model_name>
+hparams_file: hyperparams.yaml
+savedir: !ref <models_path>/<model_name>
+
+input: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
+
+attack: null

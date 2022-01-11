@@ -5,6 +5,8 @@ model_name: asr-crdnn-rnnlm-librispeech
 source: !ref <hf_repo>/<model_name>
 hparams_file: hyperparams.yaml
 savedir: !ref <models_path>/<model_name>
+brain: robust_speech.brains.Seq2SeqASR
+train_hparams: recipes/natural/seq2seq/hparams/train.yaml
 
 input: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
 

@@ -138,13 +138,15 @@ if __name__ == "__main__":
     asr_brain.tokenizer = hparams["tokenizer"]
 
     if hparams["attack_target"] is not None:
-        assert attack_kwargs["targeted"], "Target cannot be specified for untargeted attack"
-        words, tokens =hparams["attack_target"]
+        assert hparams["attack_kwargs"]["targeted"], "Target cannot be specified for untargeted attack"
+        words = hparams["attack_target"]
+        tokens = hparams["tokenizer"].encode_as_ids(words)
     else:
+        assert not hparams["attack_kwargs"]["targeted"], "Attack is targeted but no target is specified"
         words, tokens = predict_words_from_wavs(
             hparams, wavs, rel_length
         )
-        print(words)
+    print(words)
 
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
     attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])

@@ -7,6 +7,7 @@ from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import L2PGDAttack
 from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
+from robust_speech.adversarial.metrics import snr, wer, cer
 from robust_speech.utils import make_batch_from_waveform, predict_words_from_wavs, load_audio
 
 # Define training procedure
@@ -148,10 +149,12 @@ if __name__ == "__main__":
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
     attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])
     adv_wavs = attack.perturb(batch)
-    print(wavs.norm())
-    print((wavs-adv_wavs).norm())
     adv_words, adv_tokens = predict_words_from_wavs(
             hparams, adv_wavs, rel_length
         )
     print(adv_words)
+    
+    print(snr(wavs,wavs-adv_wavs,rel_length))
+    print(wer(words,adv_words))
+    print(cer(words,adv_words))
 

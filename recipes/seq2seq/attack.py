@@ -2,17 +2,15 @@
 import os
 import sys
 import torch
-import logging
 import speechbrain as sb
-from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
-from pathlib import Path
-
-logger = logging.getLogger(__name__)
-
+from speechbrain.utils.distributed import run_on_main
+from advertorch.attacks import L2PGDAttack
+from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
+from robust_speech.utils import make_batch_from_waveform, predict_words_from_wavs, load_audio
 
 # Define training procedure
-class Seq2SeqASR(sb.Brain):
+class ASR(sb.Brain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
         batch = batch.to(self.device)
@@ -113,55 +111,47 @@ class Seq2SeqASR(sb.Brain):
 
         return loss
 
-    def fit_batch(self, batch):
-        """Train the parameters given a single batch in input"""
-        predictions = self.compute_forward(batch, sb.Stage.TRAIN)
-        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
-        loss.backward()
-        if self.check_gradients(loss):
-            self.optimizer.step()
-        self.optimizer.zero_grad()
-        return loss.detach()
+if __name__ == "__main__":
 
-    def evaluate_batch(self, batch, stage):
-        """Computations needed for validation/test batches"""
-        predictions = self.compute_forward(batch, stage=stage)
-        with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage)
-        return loss.detach()
+    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
-    def on_stage_start(self, stage, epoch):
-        """Gets called at the beginning of each epoch"""
-        if stage != sb.Stage.TRAIN:
-            self.cer_metric = self.hparams.cer_computer()
-            self.wer_metric = self.hparams.error_rate_computer()
+    with open(hparams_file) as fin:
+        hparams = load_hyperpyyaml(fin, overrides)
 
-    def on_stage_end(self, stage, stage_loss, epoch):
-        """Gets called at the end of a epoch."""
-        # Compute/store important stats
-        stage_stats = {"loss": stage_loss}
-        if stage == sb.Stage.TRAIN:
-            self.train_stats = stage_stats
-        else:
-            stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+    
+    audio_file = hparams["attack_input_file"]
+    waveform = load_audio(audio_file, hparams)
+        # Fake a batch:
+    wavs = waveform.unsqueeze(0)
+    rel_length = torch.tensor([1.0])
+    run_on_main(hparams["pretrainer"].collect_files)
+    hparams["pretrainer"].load_collected(device=run_opts["device"])
 
-        # Perform end-of-iteration things, like annealing, logging, etc.
-        if stage == sb.Stage.VALID:
-            old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
-            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
-            self.hparams.train_logger.log_stats(
-                stats_meta={"epoch": epoch, "lr": old_lr},
-                train_stats=self.train_stats,
-                valid_stats=stage_stats,
-            )
-            self.checkpointer.save_and_keep_only(
-                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
-            )
-        elif stage == sb.Stage.TEST:
-            self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
-                test_stats=stage_stats,
-            )
-            with open(self.hparams.wer_file, "w") as w:
-                self.wer_metric.write_stats(w)
+    asr_brain = ASR(
+        modules=hparams["modules"],
+        opt_class=hparams["opt_class"],
+        hparams=hparams,
+        run_opts=run_opts,
+        checkpointer=hparams["checkpointer"],
+    )
+    asr_brain.tokenizer = hparams["tokenizer"]
+
+    if hparams["attack_target"] is not None:
+        assert attack_kwargs["targeted"], "Target cannot be specified for untargeted attack"
+        words, tokens =hparams["attack_target"]
+    else:
+        words, tokens = predict_words_from_wavs(
+            hparams, wavs, rel_length
+        )
+        print(words)
+
+    batch = make_batch_from_waveform(waveform,words, tokens, hparams)
+    attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])
+    adv_wavs = attack.perturb(batch)
+    print(wavs.norm())
+    print((wavs-adv_wavs).norm())
+    adv_words, adv_tokens = predict_words_from_wavs(
+            hparams, adv_wavs, rel_length
+        )
+    print(adv_words)
+

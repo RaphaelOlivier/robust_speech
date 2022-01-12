@@ -18,6 +18,16 @@ save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 saved_model_folder: !ref <output_folder>
 
+attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
+attack_target: null
+attack_class: !name:robust_speech.adversarial.attacks.pgd.ASRL2PGDAttack
+attack_kwargs:
+   eps: 0.05
+   nb_iter: 50
+   eps_iter: 0.005
+   rand_init: False
+   targeted: False
+
 # Language model (LM) pretraining
 # NB: To avoid mismatch, the speech recognizer must be trained with the same
 # tokenizer used for LM training. Here, we download everything from the
@@ -25,7 +35,7 @@ saved_model_folder: !ref <output_folder>
 # directory containing the lm.ckpt and tokenizer.ckpt may also be specified
 # instead. E.g if you want to use your own LM / tokenizer.
 pretrained_model_path: speechbrain/asr-crdnn-rnnlm-librispeech
-
+pretrained_model_hparams_file: hyperparams.yaml
 # Data files
 #data_folder: /home/raphael/dataspace/datasets/LibriSpeech # e,g./path/to/LibriSpeech
 # noise/ris dataset will automatically be downloaded

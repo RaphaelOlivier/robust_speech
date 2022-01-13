@@ -20,11 +20,11 @@ saved_model_folder: !ref <output_folder>
 
 attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
 attack_target: null
-attack_class: !name:robust_speech.adversarial.attacks.pgd.ASRL2PGDAttack
+attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
 attack_kwargs:
-   eps: 0.05
+   snr: 40
    nb_iter: 50
-   eps_iter: 0.005
+   rel_eps_iter: 0.1
    rand_init: False
    targeted: False
 

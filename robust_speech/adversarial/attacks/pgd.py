@@ -17,6 +17,19 @@ from advertorch.utils import replicate_input
 from advertorch.utils import batch_l1_proj
 from advertorch.attacks.utils import rand_init_delta
 
+import robust_speech as rs
+
+
+def reverse_bound_from_rel_bound(batch,rel):
+    wavs, wav_lens = batch.sig
+    wav_lens = [int(wavs.size(1)*r) for r in wav_lens]
+    epss = []
+    for i in range(len(wavs)):
+        eps = torch.norm(wavs[i,:wav_lens[i]])/rel
+        epss.append(eps)
+    return torch.tensor(epss).to(wavs.device)
+
+
 def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
                       delta_init=None, minimize=False, ord=np.inf,
                       clip_min=None, clip_max=None,
@@ -51,8 +64,8 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
     delta.requires_grad_()
     for ii in range(nb_iter):
         batch.sig = wav_init+delta, wav_lens
-        predictions = asr_brain.compute_forward(batch, sb.Stage.TRAIN)
-        loss = asr_brain.compute_objectives(predictions,batch,sb.Stage.TRAIN)
+        predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
+        loss = asr_brain.compute_objectives(predictions,batch,rs.Stage.ATTACK)
         if minimize:
             loss = -loss
         loss.backward()
@@ -91,7 +104,7 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
             delta.data = delta.data + batch_multiply(eps_iter, grad)
 
             delta.data = batch_l1_proj(delta.data.cpu(), eps)
-            delta.data = delta.data.to(batch.device)
+            delta.data = delta.data.to(wav_init.device)
             delta.data = clamp(wav_init.data + delta.data, clip_min, clip_max
                                ) - wav_init.data
         else:
@@ -123,7 +136,7 @@ class ASRPGDAttack(Attack, LabelMixin):
 
     def __init__(
             self, asr_brain, eps=0.3, nb_iter=40,
-            eps_iter=0.01, rand_init=True, clip_min=None, clip_max=None,
+            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
             ord=np.inf, l1_sparsity=None, targeted=False):
         """
         Create an instance of the PGDAttack.
@@ -132,13 +145,13 @@ class ASRPGDAttack(Attack, LabelMixin):
         self.clip_max = clip_max
         self.eps = eps
         self.nb_iter = nb_iter
-        self.eps_iter = eps_iter
+        self.rel_eps_iter = rel_eps_iter
         self.rand_init = rand_init
         self.ord = ord
         self.targeted = targeted
         self.asr_brain=asr_brain
         self.l1_sparsity = l1_sparsity
-        assert is_float_or_torch_tensor(self.eps_iter)
+        assert is_float_or_torch_tensor(self.rel_eps_iter)
         assert is_float_or_torch_tensor(self.eps)
 
     def perturb(self, batch):
@@ -156,14 +169,16 @@ class ASRPGDAttack(Attack, LabelMixin):
         delta = torch.zeros_like(x)
         delta = nn.Parameter(delta)
         if self.rand_init:
+            clip_min = self.clip_min if self.clip_min is not None else -0.1
+            clip_max = self.clip_max if self.clip_max is not None else 0.1
             rand_init_delta(
-                delta, x, self.ord, self.eps, self.clip_min, self.clip_max)
+                delta, x, self.ord, self.eps, clip_min, clip_max)
             delta.data = clamp(
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
         wav_adv = perturb_iterative(
             batch, self.asr_brain, nb_iter=self.nb_iter,
-            eps=self.eps, eps_iter=self.eps_iter,
+            eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
             minimize=self.targeted, ord=self.ord, 
             clip_min=self.clip_min, clip_max=self.clip_max, 
             delta_init=delta, l1_sparsity=self.l1_sparsity
@@ -189,11 +204,69 @@ class ASRL2PGDAttack(ASRPGDAttack):
 
     def __init__(
             self, asr_brain, eps=0.3, nb_iter=40,
-            eps_iter=0.01, rand_init=True, clip_min=None, clip_max=None,
+            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
             targeted=False):
         ord = 2
         super(ASRL2PGDAttack, self).__init__(
             asr_brain=asr_brain, eps=eps, nb_iter=nb_iter,
-            eps_iter=eps_iter, rand_init=rand_init, clip_min=clip_min,
+            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
             clip_max=clip_max, targeted=targeted,
             ord=ord)
+
+
+class ASRLinfPGDAttack(ASRPGDAttack):
+    """
+    PGD Attack with order=Linf
+    :param predict: forward pass function.
+    :param loss_fn: loss function.
+    :param eps: maximum distortion.
+    :param nb_iter: number of iterations.
+    :param rel_eps_iter: relative attack step size.
+    :param rand_init: (optional bool) random initialization.
+    :param clip_min: mininum value per input dimension.
+    :param clip_max: maximum value per input dimension.
+    :param targeted: if the attack is targeted.
+    """
+
+    def __init__(
+            self, asr_brain, eps=0.001, nb_iter=40,
+            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
+            targeted=False):
+        ord = np.inf
+        super(ASRLinfPGDAttack, self).__init__(
+            asr_brain, eps=eps, nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
+            clip_max=clip_max, targeted=targeted,
+            ord=ord)
+
+
+class SNRPGDAttack(ASRL2PGDAttack):
+    def __init__(
+            self, asr_brain, snr=40, nb_iter=40,
+            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
+            targeted=False):
+        super(SNRPGDAttack, self).__init__(
+            asr_brain=asr_brain, eps=1.0, nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
+            clip_max=clip_max, targeted=targeted)
+        assert isinstance(snr,int)
+        self.rel_eps=torch.pow(torch.tensor(10.),float(snr)/20)
+
+    def perturb(self, batch):
+        """
+        Given examples (x, y), returns their adversarial counterparts with
+        an attack length of eps.
+        :param x: input tensor.
+        :param y: label tensor.
+                  - if None and self.targeted=False, compute y as predicted
+                    labels.
+                  - if self.targeted=True, then y must be the targeted labels.
+        :return: tensor containing perturbed inputs.
+        """
+
+        
+        self.eps = reverse_bound_from_rel_bound(batch,self.rel_eps)
+        res = super(SNRPGDAttack, self).perturb(batch)
+        self.eps=1.0
+        return res
+

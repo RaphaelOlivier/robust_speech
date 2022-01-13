@@ -9,7 +9,7 @@ from advertorch.attacks import L2PGDAttack
 from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
 from robust_speech.adversarial.metrics import snr, wer, cer
 from robust_speech.utils import make_batch_from_waveform, predict_words_from_wavs, load_audio
-
+import robust_speech as rs
 # Define training procedure
 class ASR(sb.Brain):
     def compute_forward(self, batch, stage):
@@ -19,7 +19,6 @@ class ASR(sb.Brain):
         tokens_bos, _ = batch.tokens_bos
         #wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Add augmentation if specified
-        """
         if stage == sb.Stage.TRAIN:
             if hasattr(self.modules, "env_corrupt"):
                 wavs_noise = self.modules.env_corrupt(wavs, wav_lens)
@@ -29,11 +28,13 @@ class ASR(sb.Brain):
 
             if hasattr(self.hparams, "augmentation"):
                 wavs = self.hparams.augmentation(wavs, wav_lens)
-        """
         # Forward pass
         feats = self.hparams.compute_features(wavs)
         feats = self.modules.normalize(feats, wav_lens)
-        x = self.modules.enc(feats)
+        if stage == rs.Stage.ATTACK:
+            x = self.modules.enc(feats)
+        else:
+            x = self.modules.enc(feats.detach())
         e_in = self.modules.emb(tokens_bos)  # y_in bos + tokens
         h, _ = self.modules.dec(e_in, x, wav_lens)
 
@@ -42,7 +43,7 @@ class ASR(sb.Brain):
         p_seq = self.hparams.log_softmax(logits)
 
         # Compute outputs
-        if stage == sb.Stage.TRAIN:
+        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
             if current_epoch <= self.hparams.number_of_ctc_epochs:
                 # Output layer for ctc log-probabilities
@@ -63,7 +64,7 @@ class ASR(sb.Brain):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         current_epoch = self.hparams.epoch_counter.current
-        if stage == sb.Stage.TRAIN:
+        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             if current_epoch <= self.hparams.number_of_ctc_epochs:
                 p_ctc, p_seq, wav_lens = predictions
             else:
@@ -74,7 +75,7 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
         tokens, tokens_lens = batch.tokens
-        """
+        
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
             tokens_eos_lens = torch.cat(
@@ -82,14 +83,14 @@ class ASR(sb.Brain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-        """
+        
         loss_seq = self.hparams.seq_cost(
             p_seq, tokens_eos, length=tokens_eos_lens
         )
 
         # Add ctc loss if necessary
         if (
-            stage == sb.Stage.TRAIN
+            (stage == sb.Stage.TRAIN  or stage == rs.Stage.ATTACK)
             and current_epoch <= self.hparams.number_of_ctc_epochs
         ):
             loss_ctc = self.hparams.ctc_cost(
@@ -100,7 +101,7 @@ class ASR(sb.Brain):
         else:
             loss = loss_seq
 
-        if stage != sb.Stage.TRAIN:
+        if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             # Decode token terms to words
             predicted_words = [
                 self.tokenizer.decode_ids(utt_seq).split(" ")
@@ -146,8 +147,8 @@ if __name__ == "__main__":
         words, tokens = predict_words_from_wavs(
             hparams, wavs, rel_length
         )
-    print(words)
 
+    print(words)
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
     attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])
     adv_wavs = attack.perturb(batch)

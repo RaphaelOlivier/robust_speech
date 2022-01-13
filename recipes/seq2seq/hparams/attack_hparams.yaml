@@ -19,14 +19,15 @@ train_log: !ref <output_folder>/train_log.txt
 saved_model_folder: !ref <output_folder>
 
 attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
-attack_target: null
-attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
+attack_target: HERE IS SOME TEST STRING AS TARGET
+attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
 attack_kwargs:
-   snr: 40
-   nb_iter: 50
-   rel_eps_iter: 0.1
-   rand_init: False
-   targeted: False
+   learning_rate: 0.001
+   max_iterations: 50000
+   binary_search_steps: 10
+   targeted: TRUE
+   abort_early: FALSE
+   success_only: FALSE
 
 # Language model (LM) pretraining
 # NB: To avoid mismatch, the speech recognizer must be trained with the same

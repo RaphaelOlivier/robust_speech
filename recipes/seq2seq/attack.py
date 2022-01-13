@@ -8,13 +8,15 @@ from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import L2PGDAttack
 from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
 from robust_speech.adversarial.metrics import snr, wer, cer
-from robust_speech.utils import make_batch_from_waveform, predict_words_from_wavs, load_audio
+from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
 # Define training procedure
 class ASR(sb.Brain):
+
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
-        batch = batch.to(self.device)
+        if not stage == rs.Stage.ATTACK:
+            batch = batch.to(self.device)
         wavs, wav_lens = batch.sig
         tokens_bos, _ = batch.tokens_bos
         #wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
@@ -30,18 +32,20 @@ class ASR(sb.Brain):
                 wavs = self.hparams.augmentation(wavs, wav_lens)
         # Forward pass
         feats = self.hparams.compute_features(wavs)
-        feats = self.modules.normalize(feats, wav_lens)
+        if stage == sb.Stage.TRAIN:
+            feats = self.modules.normalize(feats, wav_lens)
+        else:
+            feats = self.modules.normalize(feats, wav_lens,epoch=self.modules.normalize.update_until_epoch+1) # don't update normalization outside of training!
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
             x = self.modules.enc(feats.detach())
         e_in = self.modules.emb(tokens_bos)  # y_in bos + tokens
         h, _ = self.modules.dec(e_in, x, wav_lens)
-
         # Output layer for seq2seq log-probabilities
         logits = self.modules.seq_lin(h)
         p_seq = self.hparams.log_softmax(logits)
-
+        
         # Compute outputs
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
@@ -57,7 +61,6 @@ class ASR(sb.Brain):
                 p_tokens, scores = self.hparams.valid_search(x, wav_lens)
             else:
                 p_tokens, scores = self.hparams.test_search(x, wav_lens)
-
             return p_seq, wav_lens, p_tokens
 
     def compute_objectives(self, predictions, batch, stage):
@@ -137,23 +140,25 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
     asr_brain.tokenizer = hparams["tokenizer"]
-
     if hparams["attack_target"] is not None:
         assert hparams["attack_kwargs"]["targeted"], "Target cannot be specified for untargeted attack"
         words = hparams["attack_target"]
         tokens = hparams["tokenizer"].encode_as_ids(words)
     else:
         assert not hparams["attack_kwargs"]["targeted"], "Attack is targeted but no target is specified"
-        words, tokens = predict_words_from_wavs(
-            hparams, wavs, rel_length
-        )
+        batch = make_batch_from_waveform(waveform,"", [], hparams)
+        asr_brain.modules.eval()
+        words, tokens = transcribe_batch(asr_brain,batch)
 
     print(words)
+    asr_brain.modules.train()
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
     attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])
     adv_wavs = attack.perturb(batch)
-    adv_words, adv_tokens = predict_words_from_wavs(
-            hparams, adv_wavs, rel_length
+    batch.sig=adv_wavs,batch.sig[1]
+    asr_brain.modules.eval()
+    adv_words, adv_tokens = transcribe_batch(
+            asr_brain, batch
         )
     print(adv_words)
     

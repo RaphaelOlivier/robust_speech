@@ -165,6 +165,7 @@ class ASRPGDAttack(Attack, LabelMixin):
                   - if self.targeted=True, then y must be the targeted labels.
         :return: tensor containing perturbed inputs.
         """
+        batch = batch.to(self.asr_brain.device)
         x = batch.sig[0]
         delta = torch.zeros_like(x)
         delta = nn.Parameter(delta)

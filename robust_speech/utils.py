@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import torch
 import torchaudio
+import speechbrain as sb
 from speechbrain.dataio.batch import PaddedBatch  # noqa
 from speechbrain.utils.data_utils import split_path
 from speechbrain.pretrained.fetching import fetch
@@ -31,6 +32,14 @@ def make_batch_from_waveform(wavform, wrd, tokens,hparams):
 
     return PaddedBatch([dic])
 
+def transcribe_batch(asr_brain, batch):
+    out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST) 
+    p_seq, wav_lens, predicted_tokens = out
+    predicted_words = [
+                asr_brain.tokenizer.decode_ids(utt_seq)
+                for utt_seq in predicted_tokens
+            ]
+    return predicted_words[0], predicted_tokens[0]
 
 def predict_words_from_wavs(hparams, wavs, rel_length):
     asr_model = EncoderDecoderASR.from_hparams(

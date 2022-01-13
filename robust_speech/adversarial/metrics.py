@@ -1,5 +1,6 @@
 import torch
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
+
 def snr(audio,perturbation, rel_length):
     length = (audio.size(1)*rel_length).long()
     num = torch.sum(torch.tensor([torch.square(audio[i,:length[i]]).sum() for i in range(audio.size(0))]))

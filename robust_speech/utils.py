@@ -1,3 +1,4 @@
+from enum import Enum, auto
 import torch
 import torchaudio
 from speechbrain.dataio.batch import PaddedBatch  # noqa
@@ -5,6 +6,11 @@ from speechbrain.utils.data_utils import split_path
 from speechbrain.pretrained.fetching import fetch
 from speechbrain.dataio.preprocess import AudioNormalizer
 from speechbrain.pretrained import EncoderDecoderASR
+
+class Stage(Enum):
+    """Completes the sb.Stage enum with an attack stage"""
+
+    ATTACK=auto()
 
 def make_batch_from_waveform(wavform, wrd, tokens,hparams):
 

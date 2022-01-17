@@ -24,3 +24,5 @@ Adversarial attacks and defenses on Speech Recognition  -powered by SpeechBrain.
 * Adversarial Training
 * Randomized Smoothing
 * Data augmentation
+* Data poisoning
+* ASR attacks on video

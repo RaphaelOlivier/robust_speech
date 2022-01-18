@@ -153,7 +153,8 @@ if __name__ == "__main__":
     print(words)
     asr_brain.modules.train()
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
-    attack = hparams["attack_class"](asr_brain, **hparams["attack_kwargs"])
+    attack_class = hparams["attack_class"]
+    attack = attack_class(asr_brain)
     adv_wavs = attack.perturb(batch)
     batch.sig=adv_wavs,batch.sig[1]
     asr_brain.modules.eval()

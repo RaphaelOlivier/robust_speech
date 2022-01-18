@@ -110,15 +110,10 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
             cur_l2distsqs, cur_labels,
             final_l2distsqs, final_labels, final_advs):
         print(adv.norm())
-        self.asr_brain.modules.eval()
+        self.asr_brain.module_eval()
         predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
-        self.asr_brain.modules.train()
-        predicted_tokens = predictions[-1]
-        predicted_words = [
-            self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
-            for utt_seq in predicted_tokens
-        ]
-        print(" ".join(predicted_words[0]))
+        predicted_tokens = self.asr_brain.get_tokens(predictions)
+        self.asr_brain.module_train()
         tokens = batch.tokens
         success = is_successful(predicted_tokens, tokens, self.targeted)
 

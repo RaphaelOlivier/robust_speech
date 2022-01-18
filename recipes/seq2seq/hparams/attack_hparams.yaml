@@ -21,7 +21,6 @@ saved_model_folder: !ref <output_folder>
 attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
 attack_target: HERE IS SOME TEST STRING AS TARGET
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
-attack_kwargs:
    learning_rate: 0.001
    max_iterations: 50000
    binary_search_steps: 10

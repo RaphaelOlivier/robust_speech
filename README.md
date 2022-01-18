@@ -26,3 +26,4 @@ Adversarial attacks and defenses on Speech Recognition  -powered by SpeechBrain.
 * Data augmentation
 * Data poisoning
 * ASR attacks on video
+* ROVER in python (?)

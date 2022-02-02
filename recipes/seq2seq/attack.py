@@ -8,10 +8,11 @@ from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import L2PGDAttack
 from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
 from robust_speech.adversarial.metrics import snr, wer, cer
+from robust_speech.brain import ASRBrain
 from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
 # Define training procedure
-class ASR(sb.Brain):
+class ASR(ASRBrain):
 
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
@@ -141,11 +142,11 @@ if __name__ == "__main__":
     )
     asr_brain.tokenizer = hparams["tokenizer"]
     if hparams["attack_target"] is not None:
-        assert hparams["attack_kwargs"]["targeted"], "Target cannot be specified for untargeted attack"
+        #assert hparams["attack_class"]["targeted"], "Target cannot be specified for untargeted attack"
         words = hparams["attack_target"]
         tokens = hparams["tokenizer"].encode_as_ids(words)
     else:
-        assert not hparams["attack_kwargs"]["targeted"], "Attack is targeted but no target is specified"
+        #assert not hparams["attack_class"]["targeted"], "Attack is targeted but no target is specified"
         batch = make_batch_from_waveform(waveform,"", [], hparams)
         asr_brain.modules.eval()
         words, tokens = transcribe_batch(asr_brain,batch)

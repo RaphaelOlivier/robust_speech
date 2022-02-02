@@ -27,12 +27,17 @@ TARGET_MULT = 10000.0
 NUM_CHECKS = 10
 
 def is_successful(y1, y2, targeted):
-    equal = type(y1) == type(y2)
-    if equal:
-        if isinstance(y1,torch.Tensor):
-            equal = y1.size()==y2.size() and (y1==y2).all()
-        else:
-            equal = y1 == y2
+    if isinstance(y2,sb.dataio.batch.PaddedData):
+        y2 = y2[0]
+    if isinstance(y1,list):
+        y1 = torch.tensor(y1)
+
+    if isinstance(y1,torch.Tensor):
+        y2=y2.to(y1.device)
+        equal = y1.size()==y2.size() and (y1==y2).all()
+    else:
+        equal = y1 == y2
+    
     return targeted == equal
 
 def calc_l2distsq(x, y, mask):
@@ -40,8 +45,8 @@ def calc_l2distsq(x, y, mask):
     return d.view(d.shape[0], -1).sum(dim=1) #/ mask.view(mask.shape[0], -1).sum(dim=1)
 
 def tanh_rescale(x, x_min=-1., x_max=1.):
-    return (torch.tanh(x)) * 0.5 * (x_max - x_min) + (x_max + x_min) * 0.5
-    #return x
+    #return (torch.tanh(x)) * 0.5 * (x_max - x_min) + (x_max + x_min) * 0.5
+    return x
 
 
 class ASRCarliniWagnerAttack(Attack, LabelMixin):
@@ -64,8 +69,8 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
     def __init__(self, asr_brain, success_only=True,
                  targeted=True, learning_rate=0.01,
                  binary_search_steps=9, max_iterations=1000,
-                 abort_early=True, initial_const=1e10,
-                 clip_min=-1., clip_max=1.):
+                 abort_early=True, initial_const=1e0,
+                 clip_min=-1., clip_max=1., train_mode_for_backward=True):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         self.clip_min = clip_min
@@ -75,6 +80,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         self.binary_search_steps = binary_search_steps
         self.abort_early = abort_early
         self.initial_const = initial_const
+        self.train_mode_for_backward=train_mode_for_backward
         # The last iteration (if we run many steps) repeat the search once.
         self.repeat = binary_search_steps >= REPEAT_STEP
         assert targeted, "CW attack only available for targeted outputs"
@@ -87,12 +93,10 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         adv = tanh_rescale(delta + x_atanh, self.clip_min, self.clip_max)
         transimgs_rescale = tanh_rescale(x_atanh, self.clip_min, self.clip_max)
         batch.sig = adv,batch.sig[1]
-
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
         loss1 = self.asr_brain.compute_objectives(predictions,batch,rs.Stage.ATTACK)
         l2distsq = calc_l2distsq(adv, transimgs_rescale, lens_mask)
         loss = (loss_coeffs * loss1).sum() + l2distsq.sum()
-        print(loss1)
         loss.backward()
         optimizer.step()
 
@@ -100,23 +104,22 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
 
     def _get_arctanh_x(self, x):
 
-        result = clamp((x - self.clip_min) / (self.clip_max - self.clip_min),
-                       min=0., max=1.) * 2 - 1
-        return torch_arctanh(result * ONE_MINUS_EPS)
-        #return x
+        #result = clamp((x - self.clip_min) / (self.clip_max - self.clip_min),
+        #               min=0., max=1.) * 2 - 1
+        #return torch_arctanh(result * ONE_MINUS_EPS)
+        return x
 
     def _update_if_smaller_dist_succeed(
             self, adv, batch, l2distsq, batch_size,
             cur_l2distsqs, cur_labels,
             final_l2distsqs, final_labels, final_advs):
-        print(adv.norm())
         self.asr_brain.module_eval()
         predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         predicted_tokens = self.asr_brain.get_tokens(predictions)
-        self.asr_brain.module_train()
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
         tokens = batch.tokens
         success = is_successful(predicted_tokens, tokens, self.targeted)
-
         mask = (l2distsq < cur_l2distsqs) & success
         cur_l2distsqs[mask] = l2distsq[mask]  # redundant
         for i in range(batch_size):
@@ -146,6 +149,10 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         for ii in range(batch_size):
             #cur_labels[ii] = int(cur_labels[ii])
             #print(cur_labels[ii], labs[ii])
+            print("loss")
+            print(is_successful(cur_labels[ii], labs[ii], self.targeted))
+            print(cur_labels[ii])
+            print(labs[ii])
             if is_successful(cur_labels[ii], labs[ii], self.targeted):
                 coeff_upper_bound[ii] = min(
                     coeff_upper_bound[ii], loss_coeffs[ii])
@@ -163,8 +170,14 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
 
                 else:
                     loss_coeffs[ii] *= 10
-
+        print(loss_coeffs)
     def perturb(self, batch):
+        
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
+        else:
+            self.asr_brain.module_eval()
+
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         wavs_init, rel_lengths = batch.sig 
@@ -204,6 +217,8 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
                         if loss > prevloss * ONE_MINUS_EPS:
                             break
                         prevloss = loss
+                if ii % 100 == 0:
+                    print(loss)
                 self._update_if_smaller_dist_succeed(
                     adv, batch, l2distsq, batch_size,
                     cur_l2distsqs, cur_labels,

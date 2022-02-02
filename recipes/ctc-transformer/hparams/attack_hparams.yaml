@@ -17,7 +17,7 @@ attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_sample
 attack_target: HERE IS SOME TEST STRING AS TARGET
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    learning_rate: 0.001
-   max_iterations: 1000
+   max_iterations: 3000
    binary_search_steps: 10
    targeted: TRUE
    abort_early: FALSE

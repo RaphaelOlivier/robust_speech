@@ -73,6 +73,33 @@ class ASRBrain(sb.Brain):
     def get_tokens(self,predictions):
         return predictions[-1]
 
+class EnsembleASRBrain(ASRBrain):
+    def __init__(self,asr_brains, ref_tokens = 0):
+        self.nmodels=len(asr_brains)
+        self.asr_brains=asr_brains
+        self.ref_tokens=ref_tokens # use this model to return tokens
+    def compute_forward(self, batch, stage):
+        # concatenate predictions 
+        predictions = [] 
+        for ab in self.asr_brains:
+            pred = ab.compute_forward(batch, stage)
+            predictions.append(pred) 
+    def get_tokens(self,predictions, all=False): 
+        # all or ref
+        if all:
+            return [pred[-1] for pred in predictions]
+        return predictions[self.ref_tokens][-1]
+    def compute_objectives(self,predictions, batch, stage, average=True):
+        # concatenate of average objectives
+        losses = []
+        for i in range(self.nmodels):
+            loss = self.asr_brains[i].compute_objectives(predictions[i], batch, stage)
+            losses.append(loss)
+        losses = torch.stack(losses,dim=0)
+        if average:
+            return torch.mean(loss,dim=0)
+
+    
 class AdvASRBrain(ASRBrain):
     """
     Intermediate abstract class that specifies some methods for ASR models that can be trained adversarially.

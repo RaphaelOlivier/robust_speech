@@ -5,33 +5,33 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 1986
+seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /home/raphael/dataspace/outputs/robust_speech/trainings/train_wav2vec2_char/<seed>
+output_folder: !ref /home/rolivier/outputs/robust_speech/trainings/train_wav2vec2_char/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
-# URL for the biggest Fairseq english wav2vec2 model.
-wav2vec2_hub: facebook/wav2vec2-large-960h-lv60-self
+# URL for the base english wav2vec2 model.
+wav2vec2_hub: facebook/wav2vec2-base-960h
 
 # Data files
-data_folder: !PLACEHOLDER # e,g./path/to/LibriSpeech
+data_folder: /home/rolivier/workhorse1/data/LibriSpeech
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
-train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
+train_splits: ["dev-clean"]
 dev_splits: ["dev-clean"]
-test_splits: ["test-clean", "test-other"]
+test_splits: ["test-clean"]
 skip_prep: False
 ckpt_interval_minutes: 25 # save checkpoint every N min
 train_csv: !ref <output_folder>/train.csv
 valid_csv: !ref <output_folder>/dev-clean.csv
 test_csv:
    - !ref <output_folder>/test-clean.csv
-   - !ref <output_folder>/test-other.csv
+
 
 # Training parameters
-number_of_epochs: 1
+number_of_epochs: 2
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
@@ -42,8 +42,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 6
-test_batch_size: 8
+batch_size: 16
+test_batch_size: 16
 
 # Dataloader options
 train_dataloader_opts:
@@ -58,7 +58,7 @@ test_dataloader_opts:
 # Model parameters
 activation: !name:torch.nn.LeakyReLU
 dnn_layers: 2
-dnn_neurons: 1024
+dnn_neurons: 768
 freeze_wav2vec: True
 
 # Outputs
@@ -80,7 +80,7 @@ augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
    speeds: [95, 100, 105]
 
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, null, 1024]
+   input_shape: [null, null, 768]
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
@@ -121,6 +121,8 @@ modules:
 model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
 
+tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
+
 model_opt_class: !name:torch.optim.Adadelta
    lr: !ref <lr>
    rho: 0.95
@@ -150,6 +152,7 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
       scheduler_model: !ref <lr_annealing_model>
       scheduler_wav2vec: !ref <lr_annealing_wav2vec>
       counter: !ref <epoch_counter>
+      tokenizer: !ref <tokenizer>
 
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>

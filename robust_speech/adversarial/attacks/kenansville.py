@@ -31,14 +31,14 @@ class KenansvilleAttack(Attack, LabelMixin):
     The Kenansville Attack, https://arxiv.org/abs/1910.05262
     """
 
-    def __init__(self, asr_brain, targeted=False,sample_rate=16000,snr_db=100,):
+    def __init__(self, asr_brain, targeted=False,snr_db=100,train_mode_for_backward=False):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
-        self.sample_rate = sample_rate
         # The last iteration (if we run many steps) repeat the search once.
         assert not targeted, "Kenansville is an untargeted attack"
         self.snr_db = snr_db
         self.threshold = 10 ** (-self.snr_db / 10)
+        self.train_mode_for_backward=train_mode_for_backward # not used, for compatibility only
 
     def perturb(self, batch):
         #save_device = batch.sig[0].device
@@ -62,13 +62,13 @@ class KenansvilleAttack(Attack, LabelMixin):
             #     Sort frequencies by power density in ascending order
             x_psd_index = torch.argsort(x_psd)
             reordered = x_psd[x_psd_index]
-            cumulative = torch.cumsum(reordered)
+            cumulative = torch.cumsum(reordered,dim=0)
             norm_threshold = self.threshold * cumulative[-1]
-            j = torch.searchsorted(cumulative, norm_threshold, side="right")[0][-1]
+            j = torch.searchsorted(cumulative, norm_threshold, right=True)
 
             # Zero out low power frequencies and invert to time domain
             x_rfft[x_psd_index[:j]] = 0
-            x = torch.fft.irfft(x_rfft, len(x)).astype(x.dtype)
+            x = torch.fft.irfft(x_rfft, len(x)).type(x.dtype)
             wavs[i,:n]=x
 
 

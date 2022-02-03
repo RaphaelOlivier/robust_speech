@@ -210,7 +210,6 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
             self._update_loss_coeffs(
                 tokens, cur_labels, batch_size,
                 loss_coeffs, coeff_upper_bound, coeff_lower_bound)
-            print(loss_coeffs)
         if not self.success_only:
             self._update_unsuccessful(
                 adv, batch, l2distsq, batch_size,

@@ -63,7 +63,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         self.max_iterations_2 = max_iterations_phase_2
         self.binary_search_steps_2 = binary_search_steps_phase_2
         self.initial_const_2 = initial_const_phase_2
-        self.repeat_phase_2 = binary_search_steps_phase_2 >= REPEAT_STEP
+        self.repeat_2 = binary_search_steps_phase_2 >= REPEAT_STEP
 
     def _forward_and_update_delta_phase_2(
             self, optimizer, batch, wavs_init, wav_lengths, delta, loss_coeffs, theta, max_psd_init):
@@ -86,7 +86,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         delta: "torch.Tensor",
         theta: List[np.ndarray],
         max_psd_init: List[np.ndarray],
-        lens_mask,
+        wav_lengths,
     ) -> "torch.Tensor":
         """
         The forward pass of the second stage of the attack.
@@ -103,10 +103,9 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
 
         for i, _ in enumerate(theta):
             psd_transform_delta = self._psd_transform(
-                delta=delta[i, : lens_mask[i]], original_max_psd=max_psd_init[i]
+                delta=delta[i, : wav_lengths[i]], max_psd_init=max_psd_init[i]
             )
-
-            loss = torch.mean(relu(psd_transform_delta - torch.tensor(theta[i]).to(self.asr_brain.device)))
+            loss = torch.mean(relu(psd_transform_delta -theta[i].to(self.asr_brain.device)))
             losses.append(loss)
 
         losses_stack = torch.stack(losses)
@@ -137,11 +136,11 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         psd = 96 - torch.max(psd) + psd
 
         # Compute freqs and barks
-        freqs = torch.fft.fftfreq(n=self.n_fft, d = 1./16000)
+        freqs = torch.fft.rfftfreq(n=self.n_fft, d = 1./16000)
         barks = 13 * torch.arctan(0.00076 * freqs) + 3.5 * torch.arctan(torch.pow(freqs / 7500.0, 2))
-
+        
         # Compute quiet threshold
-        ath = torch.zeros(len(barks), dtype=torch.float64) - np.inf
+        ath = torch.zeros(len(barks), dtype=torch.float32) - np.inf
         bark_idx = torch.argmax((barks > 1).long())
         ath[bark_idx:] = (
             3.64 * torch.pow(freqs[bark_idx:] * 0.001, -0.8)
@@ -159,7 +158,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
                 masker_idx = np.delete(masker_idx, 0)
             if len(psd[:, i]) - 1 in masker_idx:
                 masker_idx = np.delete(masker_idx, len(psd[:, i].numpy() - 1))
-            barks_psd = torch.zeros([len(masker_idx), 3], dtype=torch.float64)
+            barks_psd = torch.zeros([len(masker_idx), 3], dtype=torch.float32)
             barks_psd[:, 0] = barks[masker_idx]
             barks_psd[:, 1] = 10 * torch.log10(
                 torch.pow(10, psd[:, i][masker_idx - 1] / 10.0)
@@ -197,21 +196,18 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             delta = 1 * (-6.025 - 0.275 * barks_psd[:, 0])
 
             t_s = []
-
             for m in range(barks_psd.shape[0]):
                 d_z = barks - barks_psd[m, 0]
                 zero_idx = np.argmax(d_z > 0)
-                s_f = np.zeros(len(d_z), dtype=np.float64)
+                s_f = np.zeros(len(d_z), dtype=np.float32)
                 s_f[:zero_idx] = 27 * d_z[:zero_idx]
                 s_f[zero_idx:] = (-27 + 0.37 * max(barks_psd[m, 1] - 40, 0)) * d_z[zero_idx:]
                 t_s.append(barks_psd[m, 1] + delta[m] + s_f)
 
             t_s_array = torch.stack(t_s,dim=0)
-
-            theta.append(torch.sum(torch.pow(10, t_s_array / 10.0), axis=0) + torch.pow(10, ath / 10.0))
+            theta.append(torch.sum(torch.pow(10, t_s_array / 10.0), dim=0) + torch.pow(10, ath / 10.0))
 
         theta = torch.stack(theta,dim=0)
-
         return theta, original_max_psd
 
     def _psd_transform(self, delta: "torch.Tensor", max_psd_init: "torch.Tensor") -> "torch.Tensor":
@@ -232,21 +228,21 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             hop_length=self.hop_length,
             win_length=self.win_length,
             center=False,
-            window=window_fn(self.win_length).to(self.estimator.device),
-        ).to(self.estimator.device)
+            window=window_fn(self.win_length).to(self.asr_brain.device),
+            return_complex=False
+        ).to(self.asr_brain.device)
 
         # Take abs of complex STFT results
         transformed_delta = torch.sqrt(torch.sum(torch.square(delta_stft), -1))
-
         # Compute the psd matrix
         psd = (8.0 / 3.0) * transformed_delta / self.win_length
         psd = psd ** 2
         psd = (
-            torch.pow(torch.tensor(10.0).type(torch.float64), torch.tensor(9.6).type(torch.float64)).to(
-                self.estimator.device
+            torch.pow(torch.tensor(10.0).type(torch.float32), torch.tensor(9.6).type(torch.float32)).to(
+                self.asr_brain.device
             )
-            / torch.reshape(torch.tensor(max_psd_init).to(self.asr_brain.device), [-1, 1, 1])
-            * psd.type(torch.float64)
+            / torch.reshape(max_psd_init.to(self.asr_brain.device), [-1, 1, 1])
+            * psd.type(torch.float32)
         )
 
         return psd
@@ -314,6 +310,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
                         adv, batch, l2distsq, batch_size,
                         cur_l2distsqs, cur_labels,tokens,
                         final_l2distsqs, final_labels, final_advs)
+                    print(loss, l2distsq)
             self._update_if_smaller_dist_succeed(
                 adv, batch, l2distsq, batch_size,
                 cur_l2distsqs, cur_labels,tokens,
@@ -321,7 +318,6 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             self._update_loss_coeffs(
                 tokens, cur_labels, batch_size,
                 loss_coeffs, coeff_upper_bound, coeff_lower_bound)
-            print(loss_coeffs)
         if not self.success_only:
             self._update_unsuccessful(
                 adv, batch, l2distsq, batch_size,

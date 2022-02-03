@@ -18,12 +18,12 @@ attack_target: HERE IS SOME TEST STRING AS TARGET
 
 attack_class: !name:robust_speech.adversarial.attacks.imperceptible.ImperceptibleASRAttack
    learning_rate_phase_1: 0.001
-   max_iterations_phase_1: 300
-   learning_rate_phase_2: 0.0001
-   max_iterations_phase_2: 1000
-   binary_search_steps_phase_2: 3
+   max_iterations_phase_1: 1000
+   learning_rate_phase_2: 0.0005
+   max_iterations_phase_2: 4000
+   binary_search_steps_phase_2: 10
    initial_const_phase_2: 1
-   eps: 0.01
+   eps: 0.02
    targeted: TRUE
    abort_early: FALSE
    success_only: FALSE

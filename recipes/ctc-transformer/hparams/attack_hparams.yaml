@@ -15,6 +15,7 @@ train_log: !ref <output_folder>/train_log.txt
 
 attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
 attack_target: HERE IS SOME TEST STRING AS TARGET
+
 attack_class: !name:robust_speech.adversarial.attacks.imperceptible.ImperceptibleASRAttack
    learning_rate_phase_1: 0.001
    max_iterations_phase_1: 300

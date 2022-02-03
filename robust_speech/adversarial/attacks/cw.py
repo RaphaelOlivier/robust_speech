@@ -9,11 +9,11 @@ from advertorch.utils import to_one_hot
 from advertorch.utils import replicate_input
 from advertorch.attacks.base import Attack
 from advertorch.attacks.base import LabelMixin
-from advertorch.attacks.utils import is_successful
 
 import speechbrain as sb
 
 import robust_speech as rs
+
 
 CARLINI_L2DIST_UPPER = 1e10
 CARLINI_COEFF_UPPER = 1e10
@@ -62,12 +62,13 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
     def __init__(self, asr_brain, success_only=True,
                  targeted=True, learning_rate=0.01,
                  binary_search_steps=9, max_iterations=1000,
-                 abort_early=True, initial_const=1e0,
+                 abort_early=True, initial_const=1e0, eps=0.05,
                  clip_min=-1., clip_max=1., train_mode_for_backward=True):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         self.clip_min = clip_min # ignored
         self.clip_max = clip_max # ignored
+        self.eps=eps
         self.learning_rate = learning_rate
         self.max_iterations = max_iterations
         self.binary_search_steps = binary_search_steps
@@ -83,6 +84,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
     def _forward_and_update_delta(
             self, optimizer, batch, wavs_init, lens_mask, delta, loss_coeffs):
         optimizer.zero_grad()
+        delta = torch.clamp(delta,-self.eps,self.eps)
         adv = delta + wavs_init
         batch.sig = adv,batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
@@ -171,7 +173,6 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         final_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size
         final_labels = [INVALID_LABEL] * batch_size
         final_advs = replicate_input(wavs_init)
-
         final_l2distsqs = torch.FloatTensor(final_l2distsqs).to(wavs_init.device)
         # Start binary search
         delta = nn.Parameter(torch.zeros_like(wavs_init))
@@ -196,6 +197,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
                         if loss > prevloss * ONE_MINUS_EPS:
                             break
                         prevloss = loss
+                adv = torch.clamp(adv - wavs_init,-self.eps,self.eps) + wavs_init
                 if ii % 100 == 0:
                     self._update_if_smaller_dist_succeed(
                         adv, batch, l2distsq, batch_size,

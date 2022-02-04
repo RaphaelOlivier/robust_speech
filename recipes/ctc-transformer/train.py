@@ -65,7 +65,7 @@ class ASR(sb.Brain):
         return p_ctc, wav_lens, p_tokens
 
     def compute_objectives(self, predictions, batch, stage):
-        """Computes the loss (CTC+NLL) given predictions and targets."""
+        """Computes the loss (CTC) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
 
@@ -239,7 +239,7 @@ def dataio_prepare(hparams):
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
-    label_encoder = sb.dataio.encoder.CTCTextEncoder()
+    label_encoder = hparams["tokenizer"]
 
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("wrd")

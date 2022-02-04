@@ -35,10 +35,16 @@ def make_batch_from_waveform(wavform, wrd, tokens,hparams):
 def transcribe_batch(asr_brain, batch):
     out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST) 
     p_seq, wav_lens, predicted_tokens = out
-    predicted_words = [
-                asr_brain.tokenizer.decode_ids(utt_seq)
-                for utt_seq in predicted_tokens
-            ]
+    try:
+        predicted_words = [
+                    " ".join(asr_brain.tokenizer.decode_ids(utt_seq))
+                    for utt_seq in predicted_tokens
+                ]
+    except AttributeError:
+        predicted_words = [
+                    "".join(asr_brain.tokenizer.decode_ndim(utt_seq))
+                    for utt_seq in predicted_tokens
+                ]
     return predicted_words[0], predicted_tokens[0]
 
 def predict_words_from_wavs(hparams, wavs, rel_length):

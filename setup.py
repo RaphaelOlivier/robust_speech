@@ -30,8 +30,9 @@ setup(
         "torch>=1.7,<=1.11",
         "speechbrain",
         "transformers",
+        "torchvision",
+        "advertorch @ git+https://github.com/BorealisAI/advertorch.git"
     ],
-    dependency_links = ['https://github.com/BorealisAI/advertorch/tarball/master#egg=advertorch-2.0'],
     python_requires=">=3.7",
     url="https://github.com/RaphaelOlivier/robust_speech",
 )

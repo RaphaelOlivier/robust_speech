@@ -32,49 +32,26 @@ class ASR(ASRBrain):
             if hasattr(self.hparams, "augmentation"):
                 wavs = self.hparams.augmentation(wavs, wav_lens)
         # Forward pass
-        feats = self.hparams.compute_features(wavs)
-        if stage == sb.Stage.TRAIN:
-            feats = self.modules.normalize(feats, wav_lens)
-        else:
-            feats = self.modules.normalize(feats, wav_lens,epoch=self.modules.normalize.update_until_epoch+1) # don't update normalization outside of training!
+        feats = self.modules.wav2vec2(wavs)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
             x = self.modules.enc(feats.detach())
-        e_in = self.modules.emb(tokens_bos)  # y_in bos + tokens
-        h, _ = self.modules.dec(e_in, x, wav_lens)
-        # Output layer for seq2seq log-probabilities
-        logits = self.modules.seq_lin(h)
-        p_seq = self.hparams.log_softmax(logits)
+         # Compute outputs
+        p_tokens = None
+        logits = self.modules.ctc_lin(x)
+        p_ctc = self.hparams.log_softmax(logits)
         
-        # Compute outputs
-        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
-            current_epoch = self.hparams.epoch_counter.current
-            if current_epoch <= self.hparams.number_of_ctc_epochs:
-                # Output layer for ctc log-probabilities
-                logits = self.modules.ctc_lin(x)
-                p_ctc = self.hparams.log_softmax(logits)
-                return p_ctc, p_seq, wav_lens
-            else:
-                return p_seq, wav_lens
-        else:
-            if stage == sb.Stage.VALID:
-                p_tokens, scores = self.hparams.valid_search(x, wav_lens)
-            else:
-                p_tokens, scores = self.hparams.test_search(x, wav_lens)
-            return p_seq, wav_lens, p_tokens
+        if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK] :
+            p_tokens = sb.decoders.ctc_greedy_decode(
+                p_ctc, wav_lens, blank_id=self.hparams.blank_index
+            )
+        return p_ctc, wav_lens, p_tokens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
-        current_epoch = self.hparams.epoch_counter.current
-        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
-            if current_epoch <= self.hparams.number_of_ctc_epochs:
-                p_ctc, p_seq, wav_lens = predictions
-            else:
-                p_seq, wav_lens = predictions
-        else:
-            p_seq, wav_lens, predicted_tokens = predictions
+        p_ctc, wav_lens, predicted_tokens = predictions
 
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
@@ -88,27 +65,13 @@ class ASR(ASRBrain):
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
         
-        loss_seq = self.hparams.seq_cost(
-            p_seq, tokens_eos, length=tokens_eos_lens
-        )
-
-        # Add ctc loss if necessary
-        if (
-            (stage == sb.Stage.TRAIN  or stage == rs.Stage.ATTACK)
-            and current_epoch <= self.hparams.number_of_ctc_epochs
-        ):
-            loss_ctc = self.hparams.ctc_cost(
-                p_ctc, tokens, wav_lens, tokens_lens
-            )
-            loss = self.hparams.ctc_weight * loss_ctc
-            loss += (1 - self.hparams.ctc_weight) * loss_seq
-        else:
-            loss = loss_seq
+        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+        loss = loss_ctc
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             # Decode token terms to words
             predicted_words = [
-                self.tokenizer.decode_ids(utt_seq).split(" ")
+                self.tokenizer.decode_ndim(utt_seq).split(" ")
                 for utt_seq in predicted_tokens
             ]
             target_words = [wrd.split(" ") for wrd in batch.wrd]
@@ -135,23 +98,23 @@ if __name__ == "__main__":
 
     asr_brain = ASR(
         modules=hparams["modules"],
-        opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
     )
     asr_brain.tokenizer = hparams["tokenizer"]
+
+    batch = make_batch_from_waveform(waveform,"", [], hparams)
+    asr_brain.modules.eval()
+    words, tokens = transcribe_batch(asr_brain,batch)
+    print(words)
+
     if hparams["attack_target"] is not None:
         #assert hparams["attack_class"]["targeted"], "Target cannot be specified for untargeted attack"
         words = hparams["attack_target"]
-        tokens = hparams["tokenizer"].encode_as_ids(words)
-    else:
-        #assert not hparams["attack_class"]["targeted"], "Attack is targeted but no target is specified"
-        batch = make_batch_from_waveform(waveform,"", [], hparams)
-        asr_brain.modules.eval()
-        words, tokens = transcribe_batch(asr_brain,batch)
-
-    print(words)
+        tokens = hparams["tokenizer"].encode_sequence(words)
+        print(words)
+        
     asr_brain.modules.train()
     batch = make_batch_from_waveform(waveform,words, tokens, hparams)
     attack_class = hparams["attack_class"]

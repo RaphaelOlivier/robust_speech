@@ -137,7 +137,7 @@ class ASRPGDAttack(Attack, LabelMixin):
     def __init__(
             self, asr_brain, eps=0.3, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            ord=np.inf, l1_sparsity=None, targeted=False):
+            ord=np.inf, l1_sparsity=None, targeted=False, train_mode_for_backward=True):
         """
         Create an instance of the PGDAttack.
         """
@@ -151,10 +151,15 @@ class ASRPGDAttack(Attack, LabelMixin):
         self.targeted = targeted
         self.asr_brain=asr_brain
         self.l1_sparsity = l1_sparsity
+        self.train_mode_for_backward=train_mode_for_backward
         assert is_float_or_torch_tensor(self.rel_eps_iter)
         assert is_float_or_torch_tensor(self.eps)
 
     def perturb(self, batch):
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
+        else:
+            self.asr_brain.module_eval()
         """
         Given examples (x, y), returns their adversarial counterparts with
         an attack length of eps.
@@ -165,8 +170,11 @@ class ASRPGDAttack(Attack, LabelMixin):
                   - if self.targeted=True, then y must be the targeted labels.
         :return: tensor containing perturbed inputs.
         """
+        
+        save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        x = batch.sig[0]
+        save_input = batch.sig[0]
+        x = torch.clone(save_input)
         delta = torch.zeros_like(x)
         delta = nn.Parameter(delta)
         if self.rand_init:
@@ -185,7 +193,9 @@ class ASRPGDAttack(Attack, LabelMixin):
             delta_init=delta, l1_sparsity=self.l1_sparsity
         )
 
-        return wav_adv.data
+        batch.sig = save_input, batch.sig[1]
+        batch = batch.to(save_device)
+        return wav_adv.data.to(save_device)
 
 
 
@@ -206,12 +216,12 @@ class ASRL2PGDAttack(ASRPGDAttack):
     def __init__(
             self, asr_brain, eps=0.3, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False):
+            targeted=False, train_mode_for_backward=True):
         ord = 2
         super(ASRL2PGDAttack, self).__init__(
             asr_brain=asr_brain, eps=eps, nb_iter=nb_iter,
             rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted,
+            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward,
             ord=ord)
 
 
@@ -232,12 +242,12 @@ class ASRLinfPGDAttack(ASRPGDAttack):
     def __init__(
             self, asr_brain, eps=0.001, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False):
+            targeted=False, train_mode_for_backward=True):
         ord = np.inf
         super(ASRLinfPGDAttack, self).__init__(
             asr_brain, eps=eps, nb_iter=nb_iter,
             rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted,
+            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward,
             ord=ord)
 
 
@@ -245,11 +255,11 @@ class SNRPGDAttack(ASRL2PGDAttack):
     def __init__(
             self, asr_brain, snr=40, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False):
+            targeted=False, train_mode_for_backward=True):
         super(SNRPGDAttack, self).__init__(
             asr_brain=asr_brain, eps=1.0, nb_iter=nb_iter,
             rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted)
+            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward)
         assert isinstance(snr,int)
         self.rel_eps=torch.pow(torch.tensor(10.),float(snr)/20)
 
@@ -265,9 +275,11 @@ class SNRPGDAttack(ASRL2PGDAttack):
         :return: tensor containing perturbed inputs.
         """
 
-        
+        save_device = batch.sig[0].device
+        batch = batch.to(self.asr_brain.device)
         self.eps = reverse_bound_from_rel_bound(batch,self.rel_eps)
         res = super(SNRPGDAttack, self).perturb(batch)
         self.eps=1.0
-        return res
+        batch.to(save_device)
+        return res.to(save_device)
 

@@ -16,6 +16,8 @@ class Stage(Enum):
 def make_batch_from_waveform(wavform, wrd, tokens,hparams):
 
     sig = wavform
+    if len(tokens)==0: # dummy tokens
+        tokens = [3,4]
     tokens_list = tokens
     tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
     tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
@@ -29,7 +31,6 @@ def make_batch_from_waveform(wavform, wrd, tokens,hparams):
         "tokens":tokens,
         "wrd":wrd
     }
-
     return PaddedBatch([dic])
 
 def transcribe_batch(asr_brain, batch):

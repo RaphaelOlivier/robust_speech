@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import logging
+from typing import List
 import tqdm
 import torch
 from torch.utils.data import DataLoader
@@ -73,31 +74,55 @@ class ASRBrain(sb.Brain):
     def get_tokens(self,predictions):
         return predictions[-1]
 
+class PredictionEnsemble:
+    def __init__(self,predictions):
+        self.predictions=predictions
+    def __iter__(self,i):
+        return self.predictions[i]
+    def __len__(self):
+        return len(self.predictions)
+
 class EnsembleASRBrain(ASRBrain):
     def __init__(self,asr_brains, ref_tokens = 0):
         self.nmodels=len(asr_brains)
         self.asr_brains=asr_brains
         self.ref_tokens=ref_tokens # use this model to return tokens
-    def compute_forward(self, batch, stage):
+    def compute_forward(self, batch, stage, model_idx=None):
         # concatenate predictions 
+        if model_idx is not None:
+            return self.asr_brains[model_idx].compute_forward(batch, stage)
         predictions = [] 
         for ab in self.asr_brains:
             pred = ab.compute_forward(batch, stage)
             predictions.append(pred) 
-    def get_tokens(self,predictions, all=False): 
+        return PredictionEnsemble(predictions)
+
+    def get_tokens(self,predictions, all=False, model_idx=None): 
         # all or ref
-        if all:
-            return [pred[-1] for pred in predictions]
-        return predictions[self.ref_tokens][-1]
-    def compute_objectives(self,predictions, batch, stage, average=True):
+        if isinstance(predictions,PredictionEnsemble):
+            assert len(predictions)==self.nmodels
+            if all:
+                return [self.asr_brains[i].get_tokens(pred) for i,pred in enumerate(predictions)]
+            if model_idx is not None:
+                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
+            return self.asr_brains[self.ref_tokens].get_tokens(predictions[self.ref_tokens])
+        return self.asr_brains[self.ref_tokens].get_tokens(predictions)
+
+    def compute_objectives(self,predictions, batch, stage, average=True, model_idx=None):
         # concatenate of average objectives
-        losses = []
-        for i in range(self.nmodels):
-            loss = self.asr_brains[i].compute_objectives(predictions[i], batch, stage)
-            losses.append(loss)
-        losses = torch.stack(losses,dim=0)
-        if average:
-            return torch.mean(loss,dim=0)
+        if isinstance(predictions,PredictionEnsemble) or model_idx is None: # many predictions
+            assert len(predictions)==self.nmodels
+            losses = []
+            for i in range(self.nmodels):
+                ab = self.asr_brains[i] if model_idx is None else self.asr_brains[model_idx] # one pred per model or n pred per model
+                pred = predictions[i] if isinstance(predictions,PredictionEnsemble) else predictions
+                loss = ab.compute_objectives(pred, batch, stage)
+                losses.append(loss)
+            losses = torch.stack(losses,dim=0)
+            if average:
+                return torch.mean(loss,dim=0)
+            return losses
+        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage)
 
     
 class AdvASRBrain(ASRBrain):
@@ -464,7 +489,7 @@ class AdvASRBrain(ASRBrain):
                 loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                 avg_test_loss = self.update_average(loss, avg_test_loss)
 
-                adv_loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
                 avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
 
                 # Debug mode only runs a few batches

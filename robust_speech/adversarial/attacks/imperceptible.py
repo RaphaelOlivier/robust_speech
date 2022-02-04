@@ -255,7 +255,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         wavs_init, rel_lengths = batch.sig 
-        wavs_init = replicate_input(wavs_init)
+        wavs_init = torch.clone(wavs_init)
         batch_size = wavs_init.size(0)
 
         for _, x_i in enumerate(wavs_init):
@@ -276,13 +276,14 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         loss_coeffs = torch.ones_like(rel_lengths).float() * self.initial_const_2
         final_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size
         final_labels = [INVALID_LABEL] * batch_size
-        final_advs = replicate_input(wavs_init)
+        final_advs = torch.clone(wavs_init)
 
         final_l2distsqs = torch.FloatTensor(final_l2distsqs).to(wavs_init.device)
 
         
         # Start binary search
-        delta = nn.Parameter(replicate_input(advs_phase_1-wavs_init))
+        delta = nn.Parameter(torch.clone(advs_phase_1-wavs_init))
+        print(torch.norm(delta))
         for outer_step in range(self.binary_search_steps_2):
             optimizer = optim.Adam([delta], lr=self.learning_rate_2)
             cur_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size

@@ -160,7 +160,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         wavs_init, rel_lengths = batch.sig 
-        wavs_init = replicate_input(wavs_init)
+        wavs_init = torch.clone(wavs_init)
         batch_size = wavs_init.size(0)
         if batch_size > 1:
             raise NotImplementedError("CW attack currently supports only batch size 1")
@@ -172,7 +172,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         loss_coeffs = torch.ones_like(rel_lengths).float() * self.initial_const
         final_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size
         final_labels = [INVALID_LABEL] * batch_size
-        final_advs = replicate_input(wavs_init)
+        final_advs = torch.clone(wavs_init)
         final_l2distsqs = torch.FloatTensor(final_l2distsqs).to(wavs_init.device)
         # Start binary search
         delta = nn.Parameter(torch.zeros_like(wavs_init))

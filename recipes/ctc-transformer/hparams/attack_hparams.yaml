@@ -14,20 +14,15 @@ train_log: !ref <output_folder>/train_log.txt
 
 
 attack_input_file: /home/raphael/workspace/libs/speechbrain/samples/audio_samples/example1.wav
-attack_target: HERE IS SOME TEST STRING AS TARGET
+attack_target: null
 
-attack_class: !name:robust_speech.adversarial.attacks.imperceptible.ImperceptibleASRAttack
-   learning_rate_phase_1: 0.001
-   max_iterations_phase_1: 1000
-   learning_rate_phase_2: 0.0002
-   max_iterations_phase_2: 3000
-   binary_search_steps_phase_2: 5
-   initial_const_phase_2: 0.5
-   eps: 0.05
-   targeted: TRUE
-   abort_early: FALSE
-   success_only: FALSE
+attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
+   snr: 30
+   nb_iter: 40
+   rel_eps_iter: 0.1
+   rand_init: FALSE
    train_mode_for_backward: FALSE # Required only for RNN models
+
 
 wav2vec2_hub: facebook/wav2vec2-base-960h
 

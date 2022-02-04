@@ -4,7 +4,7 @@ import sys
 import time
 import logging
 from typing import List
-import tqdm
+from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from speechbrain.dataio.dataloader import LoopedLoader
@@ -45,7 +45,7 @@ class ASRBrain(sb.Brain):
         """
         raise NotImplementedError
 
-    def compute_objectives(self, predictions, batch, stage):
+    def compute_objectives(self, predictions, batch, stage, adv=False):
         """Compute loss, to be overridden by sub-classes.
 
         Arguments
@@ -155,6 +155,11 @@ class AdvASRBrain(ASRBrain):
             attack_class=attack_class
         )
 
+    def __setattr__(self,name,value, attacker_brain=True):
+        if hasattr(self,"attacker") and name != "attacker" and attacker_brain:
+            super(AdvASRBrain,self.attacker.asr_brain).__setattr__(name,value)
+        super(AdvASRBrain,self).__setattr__(name,value)
+
     def init_attacker(
         self, 
         modules=None,
@@ -174,12 +179,16 @@ class AdvASRBrain(ASRBrain):
             )
             self.attacker = attack_class(brain_to_attack)
 
-    def compute_forward_adversarial(self,batch, stage):
+    def compute_forward_adversarial(self, batch, stage):
         assert stage != rs.Stage.ATTACK
+        wavs = batch.sig[0]
         if self.attacker is not None:
             adv_wavs = self.attacker.perturb(batch)
             batch.sig = adv_wavs, batch.sig[1]
-        self.compute_forward(self,batch,stage)
+        res = self.compute_forward(batch,stage)
+        batch.sig = wavs, batch.sig[1]
+        del adv_wavs
+        return res
     
 
     def fit_batch_adversarial(self, batch):
@@ -203,29 +212,24 @@ class AdvASRBrain(ASRBrain):
         -------
         detached loss
         """
-        should_step = self.step % self.grad_accumulation_factor == 0
         # Managing automatic mixed precision
         if self.auto_mix_prec:
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast():
                 outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            self.scaler.scale(loss / self.grad_accumulation_factor).backward()
-            if should_step:
-                self.scaler.unscale_(self.optimizer)
-                if self.check_gradients(loss):
-                    self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.optimizer_step += 1
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            if self.check_gradients(loss):
+                self.scaler.step(self.optimizer)
+            self.scaler.update()
         else:
             outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
             loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            (loss / self.grad_accumulation_factor).backward()
-            if should_step:
-                if self.check_gradients(loss):
-                    self.optimizer.step()
-                self.optimizer.zero_grad()
-                self.optimizer_step += 1
+            loss.backward()
+            if self.check_gradients(loss):
+                self.optimizer.step()
+            self.optimizer.zero_grad()
 
         return loss.detach().cpu()
 
@@ -252,7 +256,7 @@ class AdvASRBrain(ASRBrain):
         """
 
         out = self.compute_forward_adversarial(batch, stage=stage)
-        loss = self.compute_objectives(out, batch, stage=stage)
+        loss = self.compute_objectives(out, batch, stage=stage, adv=True)
         return loss.detach().cpu()
 
     def fit(
@@ -356,15 +360,12 @@ class AdvASRBrain(ASRBrain):
                 disable=not enable,
             ) as t:
                 for batch in t:
-                    if self._optimizer_step_limit_exceeded:
-                        logger.info("Train iteration limit exceeded")
-                        break
                     self.step += 1
                     loss = self.fit_batch_adversarial(batch)
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss
                     )
-                    t.set_postfix(train_loss=self.avg_train_loss)
+                    t.set_postfix(adv_train_loss=self.avg_train_loss)
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
@@ -397,37 +398,36 @@ class AdvASRBrain(ASRBrain):
                 self.modules.eval()
                 avg_valid_loss = 0.0
                 avg_valid_adv_loss = 0.0
-                with torch.no_grad():
-                    for batch in tqdm(
-                        valid_set, dynamic_ncols=True, disable=not enable
-                    ):
-                        self.step += 1
-                        loss = self.evaluate_batch(batch, stage=sb.Stage.VALID)
-                        avg_valid_loss = self.update_average(
-                            loss, avg_valid_loss
-                        )
-
-                        adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.VALID)
-                        avg_valid_adv_loss = self.update_average(
-                            adv_loss, avg_valid_adv_loss
-                        )
-
-                        # Debug mode only runs a few batches
-                        if self.debug and self.step == self.debug_batches:
-                            break
-
-                    # Only run validation "on_stage_end" on main process
-                    self.step = 0
-                    run_on_main(
-                        self.on_stage_end,
-                        args=[sb.Stage.VALID, avg_valid_loss, epoch],
+                for batch in tqdm(
+                    valid_set, dynamic_ncols=True, disable=not enable
+                ):
+                    self.step += 1
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.VALID)
+                    avg_valid_loss = self.update_average(
+                        loss, avg_valid_loss
                     )
+
+                    adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.VALID)
+                    avg_valid_adv_loss = self.update_average(
+                        adv_loss, avg_valid_adv_loss
+                    )
+
+                    # Debug mode only runs a few batches
+                    if self.debug and self.step == self.debug_batches:
+                        break
+
+                # Only run validation "on_stage_end" on main process
+                self.step = 0
+                run_on_main(
+                    self.on_stage_end,
+                    args=[sb.Stage.VALID, avg_valid_loss, epoch],
+                    kwargs={"stage_adv_loss":avg_valid_adv_loss}
+                )
 
             # Debug mode only runs a few epochs
             if (
                 self.debug
                 and epoch == self.debug_epochs
-                or self._optimizer_step_limit_exceeded
             ):
                 break
 
@@ -481,23 +481,25 @@ class AdvASRBrain(ASRBrain):
         self.modules.eval()
         avg_test_loss = 0.0
         avg_test_adv_loss = 0.0
-        with torch.no_grad():
-            for batch in tqdm(
-                test_set, dynamic_ncols=True, disable=not progressbar
-            ):
-                self.step += 1
-                loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
-                avg_test_loss = self.update_average(loss, avg_test_loss)
 
-                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
-                avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+        for batch in tqdm(
+            test_set, dynamic_ncols=True, disable=not progressbar
+        ):
+            self.step += 1
+            loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+            avg_test_loss = self.update_average(loss, avg_test_loss)
 
-                # Debug mode only runs a few batches
-                if self.debug and self.step == self.debug_batches:
-                    break
+            adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
+            avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+
+            # Debug mode only runs a few batches
+            if self.debug and self.step == self.debug_batches:
+                break
 
             # Only run evaluation "on_stage_end" on main process
-            run_on_main(
-                self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None]
-            )
+        run_on_main(
+            self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None],
+                kwargs={"stage_adv_loss":avg_test_adv_loss}
+        )
         self.step = 0
+        return avg_test_loss

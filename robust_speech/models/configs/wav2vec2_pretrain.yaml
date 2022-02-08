@@ -16,7 +16,10 @@ train_log: !ref <output_folder>/train_log.txt
 wav2vec2_hub: facebook/wav2vec2-base-960h
 
 brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VBrain
-data_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
+dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+
+attack_class: null
 
 # URL for the HuggingFace model we want to pretrain (BASE here)
 wav2vec2_hub: facebook/wav2vec2-base

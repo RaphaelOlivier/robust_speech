@@ -23,8 +23,11 @@ train_log: !ref <output_folder>/train_log.txt
 # directory containing the lm.ckpt and tokenizer.ckpt may also be specified
 # instead. E.g if you want to use your own LM / tokenizer.
 
+attack_class: null
+
 brain_class: !name:robust_speech.models.transformer.ASR
-data_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
+dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
 pretrained_lm_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
 

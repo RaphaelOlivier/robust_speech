@@ -7,6 +7,7 @@ import torch
 import speechbrain as sb
 from pathlib import Path
 import torchaudio
+import sentencepiece
 from speechbrain.utils.data_utils import download_file, get_all_files
 from speechbrain.dataio.dataio import (
     load_pkl,
@@ -491,26 +492,67 @@ def dataio_prepare(hparams):
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
     # 3. Define text pipeline:
-    @sb.utils.data_pipeline.takes("wrd")
-    @sb.utils.data_pipeline.provides(
-        "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
-    )
-    def text_pipeline(wrd):
-        yield wrd
-        tokens_list = tokenizer.encode_as_ids(wrd)
-        yield tokens_list
-        tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
-        yield tokens_bos
-        tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
-        yield tokens_eos
-        tokens = torch.LongTensor(tokens_list)
-        yield tokens
+    if isinstance(tokenizer,sb.dataio.encoder.CTCTextEncoder): # char encoder
+        @sb.utils.data_pipeline.takes("wrd")
+        @sb.utils.data_pipeline.provides(
+            "wrd", "char_list", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
+        )
+        def text_pipeline(wrd):
+            yield wrd
+            char_list = list(wrd)
+            yield char_list
+            tokens_list = tokenizer.encode_sequence(char_list)
+            yield tokens_list
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            yield tokens_bos
+            tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
+            yield tokens_eos
+            tokens = torch.LongTensor(tokens_list)
+            yield tokens
 
-    sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+        sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
-    # 4. Set output:
-    sb.dataio.dataset.set_output_keys(
-        datasets, ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
-    )
+        lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+        special_labels = {
+            "bos_label": hparams["bos_index"],
+            "eos_label": hparams["eos_index"],
+            "blank_label": hparams["blank_index"],
+        }
+        tokenizer.load_or_create(
+            path=lab_enc_file,
+            from_didatasets=[train_data],
+            output_key="char_list",
+            special_labels=special_labels,
+            sequence_input=True,
+        )
+
+        # 4. Set output:
+        sb.dataio.dataset.set_output_keys(
+            datasets,
+            ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
+        )
+    else:
+        assert isinstance(tokenizer,sentencepiece.SentencePieceTokenizer)
+        @sb.utils.data_pipeline.takes("wrd")
+        @sb.utils.data_pipeline.provides(
+            "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
+        )
+        def text_pipeline(wrd):
+            yield wrd
+            tokens_list = tokenizer.encode_as_ids(wrd)
+            yield tokens_list
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            yield tokens_bos
+            tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
+            yield tokens_eos
+            tokens = torch.LongTensor(tokens_list)
+            yield tokens
+
+        sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+
+        # 4. Set output:
+        sb.dataio.dataset.set_output_keys(
+            datasets, ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+        )
     return train_data, valid_data, test_datasets, tokenizer
 

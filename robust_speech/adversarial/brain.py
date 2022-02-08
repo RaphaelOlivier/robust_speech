@@ -11,8 +11,7 @@ from speechbrain.dataio.dataloader import LoopedLoader
 import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
-from advertorch.attacks import L2PGDAttack
-from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
+from advertorch.attacks import Attack
 from robust_speech.adversarial.metrics import snr, wer, cer
 from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
@@ -136,7 +135,7 @@ class AdvASRBrain(ASRBrain):
         hparams=None,
         run_opts=None,
         checkpointer=None,
-        attack_class=None
+        attacker=None
     ):
         ASRBrain.__init__(
             self,
@@ -152,7 +151,7 @@ class AdvASRBrain(ASRBrain):
             opt_class=opt_class,
             hparams=hparams,
             run_opts=run_opts,
-            attack_class=attack_class
+            attacker=attacker
         )
 
     def __setattr__(self,name,value, attacker_brain=True):
@@ -166,18 +165,20 @@ class AdvASRBrain(ASRBrain):
         opt_class=None,
         hparams=None,
         run_opts=None,
-        attack_class=None
+        attacker=None
     ):
-        if attack_class is not None:
+        if isinstance(attacker,Attack): # attacker object already initiated
+            self.attacker=attacker
+        elif attacker is not None: # attacker class
             brain_to_attack = type(self)(
                 modules=modules,
                 opt_class=opt_class,
                 hparams=hparams,
                 run_opts=run_opts,
                 checkpointer=None,
-                attack_class=None
+                attacker=None
             )
-            self.attacker = attack_class(brain_to_attack)
+            self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
 

@@ -277,7 +277,7 @@ def dataio_prepare(hparams):
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
-    label_encoder = hparams["tokenizer"]
+    tokenizer = hparams["tokenizer"]
 
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("wrd")
@@ -288,7 +288,7 @@ def dataio_prepare(hparams):
         yield wrd
         char_list = list(wrd)
         yield char_list
-        tokens_list = label_encoder.encode_sequence(char_list)
+        tokens_list = tokenizer.encode_sequence(char_list)
         yield tokens_list
         tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
         yield tokens_bos
@@ -305,7 +305,7 @@ def dataio_prepare(hparams):
         "eos_label": hparams["eos_index"],
         "blank_label": hparams["blank_index"],
     }
-    label_encoder.load_or_create(
+    tokenizer.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
         output_key="char_list",
@@ -318,7 +318,7 @@ def dataio_prepare(hparams):
         datasets,
         ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
     )
-    return train_data, valid_data, test_datasets, label_encoder
+    return train_data, valid_data, test_datasets, tokenizer
 
 
 if __name__ == "__main__":
@@ -368,7 +368,7 @@ if __name__ == "__main__":
         hparams=hparams,
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
-        attack_class=hparams["attack_class"],
+        attacker=hparams["attack_class"],
     )
 
     # We dynamicaly add the tokenizer to our brain class.

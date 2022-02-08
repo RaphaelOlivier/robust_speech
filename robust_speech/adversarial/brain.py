@@ -233,31 +233,22 @@ class AdvASRBrain(ASRBrain):
 
         return loss.detach().cpu()
 
+    def evaluate_batch(self, batch, stage):
+        """Computations needed for validation/test batches"""
+        predictions = self.compute_forward(batch, stage=stage)
+        with torch.no_grad():
+            loss = self.compute_objectives(predictions, batch, stage=stage)
+        return loss.detach()
+
+
     def evaluate_batch_adversarial(self, batch, stage):
-        """Evaluate one batch, override for different procedure than train.
-
-        The default implementation depends on two methods being defined
-        with a particular behavior:
-
-        * ``compute_forward()``
-        * ``compute_objectives()``
-
-        Arguments
-        ---------
-        batch : list of torch.Tensors
-            Batch of data to use for evaluation. Default implementation assumes
-            this batch has two elements: inputs and targets.
-        stage : Stage
-            The stage of the experiment: Stage.VALID, Stage.TEST
-
-        Returns
-        -------
-        detached loss
+        """Evaluate one batch, override for different procedure than train, with adversarial attacks.
         """
 
-        out = self.compute_forward_adversarial(batch, stage=stage)
-        loss = self.compute_objectives(out, batch, stage=stage, adv=True)
-        return loss.detach().cpu()
+        predictions = self.compute_forward_adversarial(batch, stage=stage)
+        with torch.no_grad():
+            loss = self.compute_objectives(predictions, batch, stage=stage)
+        return loss.detach()
 
     def fit(
         self,
@@ -503,3 +494,47 @@ class AdvASRBrain(ASRBrain):
         )
         self.step = 0
         return avg_test_loss
+
+    
+    def on_stage_start(self, stage, epoch):
+        """Gets called at the beginning of each epoch"""
+        if stage != sb.Stage.TRAIN:
+            self.cer_metric = self.hparams.cer_computer()
+            self.wer_metric = self.hparams.error_rate_computer()
+            self.adv_cer_metric = self.hparams.cer_computer()
+            self.adv_wer_metric = self.hparams.error_rate_computer()
+
+    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
+        """Gets called at the end of a epoch."""
+        # Compute/store important stats
+        stage_stats = {"loss": stage_loss}
+        if stage_adv_loss is not None:
+            stage_stats["adv_loss"] = stage_adv_loss
+        if stage == sb.Stage.TRAIN:
+            self.train_stats = stage_stats
+        else:
+            stage_stats["CER"] = self.cer_metric.summarize("error_rate")
+            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+            if stage_adv_loss is not None:
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+
+        # Perform end-of-iteration things, like annealing, logging, etc.
+        if stage == sb.Stage.VALID:
+            old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
+            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            self.hparams.train_logger.log_stats(
+                stats_meta={"epoch": epoch, "lr": old_lr},
+                train_stats=self.train_stats,
+                valid_stats=stage_stats,
+            )
+            self.checkpointer.save_and_keep_only(
+                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
+            )
+        elif stage == sb.Stage.TEST:
+            self.hparams.train_logger.log_stats(
+                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                test_stats=stage_stats,
+            )
+            with open(self.hparams.wer_file, "w") as w:
+                self.wer_metric.write_stats(w)

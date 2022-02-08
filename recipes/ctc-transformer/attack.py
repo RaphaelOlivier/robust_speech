@@ -8,7 +8,7 @@ from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import L2PGDAttack
 from robust_speech.adversarial.attacks.pgd import ASRL2PGDAttack
 from robust_speech.adversarial.metrics import snr, wer, cer
-from robust_speech.brain import ASRBrain
+from robust_speech.adversarial.brain import ASRBrain
 from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
 # Define training procedure

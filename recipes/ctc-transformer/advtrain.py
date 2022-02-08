@@ -24,7 +24,7 @@ import gc
 import torch
 import logging
 import speechbrain as sb
-from robust_speech.brain import AdvASRBrain
+from robust_speech.adversarial.brain import AdvASRBrain
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
 from pathlib import Path

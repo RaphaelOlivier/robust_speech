@@ -428,6 +428,12 @@ def dataio_prepare(hparams):
         csv_path=hparams["train_csv"], replacements={"data_root": data_folder},
     )
 
+    train_data = train_data.filtered_sorted(
+        key_max_value={"duration": hparams["avoid_if_longer_than"]},
+        key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+        )
+
+
     if hparams["sorting"] == "ascending":
         # we sort training data to speed up training and get better results.
         train_data = train_data.filtered_sorted(sort_key="duration")
@@ -452,6 +458,11 @@ def dataio_prepare(hparams):
         csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
     )
     valid_data = valid_data.filtered_sorted(sort_key="duration")
+
+    valid_data = valid_data.filtered_sorted(
+        key_max_value={"duration": hparams["avoid_if_longer_than"]},
+        key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+        )
 
     # test is separate
     test_datasets = {}

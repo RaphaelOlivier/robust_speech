@@ -178,6 +178,8 @@ class AdvASRBrain(ASRBrain):
                 attack_class=None
             )
             self.attacker = attack_class(brain_to_attack)
+        else:
+            self.attacker = None
 
     def compute_forward_adversarial(self, batch, stage):
         assert stage != rs.Stage.ATTACK
@@ -352,7 +354,10 @@ class AdvASRBrain(ASRBrain):
             ) as t:
                 for batch in t:
                     self.step += 1
-                    loss = self.fit_batch_adversarial(batch)
+                    if self.attacker is not None:
+                        loss = self.fit_batch_adversarial(batch)
+                    else:
+                        loss = self.fit_batch(batch)
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss
                     )
@@ -388,7 +393,9 @@ class AdvASRBrain(ASRBrain):
                 self.on_stage_start(sb.Stage.VALID, epoch)
                 self.modules.eval()
                 avg_valid_loss = 0.0
-                avg_valid_adv_loss = 0.0
+                avg_valid_adv_loss = None
+                if self.attacker is not None:
+                    avg_valid_adv_loss = 0.0
                 for batch in tqdm(
                     valid_set, dynamic_ncols=True, disable=not enable
                 ):
@@ -397,11 +404,11 @@ class AdvASRBrain(ASRBrain):
                     avg_valid_loss = self.update_average(
                         loss, avg_valid_loss
                     )
-
-                    adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.VALID)
-                    avg_valid_adv_loss = self.update_average(
-                        adv_loss, avg_valid_adv_loss
-                    )
+                    if self.attacker is not None:
+                        adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.VALID)
+                        avg_valid_adv_loss = self.update_average(
+                            adv_loss, avg_valid_adv_loss
+                        )
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
@@ -471,7 +478,9 @@ class AdvASRBrain(ASRBrain):
         self.on_stage_start(sb.Stage.TEST, epoch=None)
         self.modules.eval()
         avg_test_loss = 0.0
-        avg_test_adv_loss = 0.0
+        avg_test_adv_loss = None
+        if self.attacker is not None:
+            avg_test_adv_loss = 0.0
 
         for batch in tqdm(
             test_set, dynamic_ncols=True, disable=not progressbar
@@ -480,8 +489,9 @@ class AdvASRBrain(ASRBrain):
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
-            adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
-            avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+            if self.attacker is not None:
+                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
+                avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
 
             # Debug mode only runs a few batches
             if self.debug and self.step == self.debug_batches:

@@ -121,14 +121,6 @@ class AdvASR(AdvASRBrain):
         return loss.detach().cpu()
 
     def fit_batch_adversarial(self, batch):
-        obj_count=0
-        for obj in gc.get_objects():
-            #try:
-            #    if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-            #        print(type(obj), obj.size())
-            #except Exception as e:
-            #    print(e)
-            obj_count+=1
         """Train the parameters given a single batch in input"""
         predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
@@ -140,7 +132,6 @@ class AdvASR(AdvASRBrain):
         self.wav2vec_optimizer.zero_grad()
         self.model_optimizer.zero_grad()
 
-        print((batch.sig[0].size()))    
         return loss.detach().cpu()
 
     def evaluate_batch(self, batch, stage):
@@ -261,7 +252,9 @@ def dataio_prepare(hparams):
         csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
     )
     valid_data = valid_data.filtered_sorted(sort_key="duration")
-
+    if hparams["max_duration"] is not None:
+            valid_data = valid_data.filtered_sorted(key_max_value = {"duration":hparams["max_duration"]})
+    
     
     # test is separate
     test_datasets = {}
@@ -369,7 +362,6 @@ if __name__ == "__main__":
     train_data, valid_data, test_datasets, label_encoder = dataio_prepare(
         hparams
     )
-    print(run_opts)
     # Trainer initialization
     asr_brain = AdvASR(
         modules=hparams["modules"],

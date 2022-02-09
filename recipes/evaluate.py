@@ -15,6 +15,26 @@ import robust_speech as rs
 Adversarial (or natural) training script
 """
 
+def read_brains(brain_classes, brain_hparams,attacker=None):
+    if isinstance(brain_classes,list):
+        brain_list = []
+        assert len(brain_classes) == len(brain_hparams)
+        for bc,bf in zip(brain_classes,brain_hparams):
+            br = read_brains(bc,bf)
+            brain_list.append(br)
+        brain = rs.adversarial.brain.EnsembleASRBrain(brain_list)
+    else:
+        if isinstance(brain_hparams,str):
+            with open(brain_hparams) as fin:
+                brain_hparams = load_hyperpyyaml(fin,{})
+        brain = brain_classes(
+            modules=brain_hparams["modules"],
+            hparams=brain_hparams,
+            run_opts=run_opts,
+            checkpointer=None,
+            attacker=attacker,
+        )
+    return brain
 
 if __name__ == "__main__":
 
@@ -58,52 +78,16 @@ if __name__ == "__main__":
 
     source_brain = None
     if hparams["source_brain_class"]:
-        if isinstance(hparams["source_brain_class"],list):
-            source_brain_list = []
-            assert len(hparams["source_brain_class"]) == len(hparams["source_brain_hparams_file"])
-            for sbc,sbf in zip(hparams["source_brain_class"],hparams["source_brain_hparams_file"]):
-                with open(sbf) as fin:
-                    sbh = load_hyperpyyaml(fin,{})
-                sbo = sbc(
-                    modules=sbh["modules"],
-                    hparams=sbh,
-                    run_opts=run_opts,
-                    checkpointer=None,
-                    attacker=None,
-                )
-                source_brain_list.append(sbo)
-            source_brain = rs.adversarial.brain.EnsembleASRBrain(source_brain_list)
-        else:
-            with open(hparams["source_brain_hparams_file"]) as fin:
-                source_brain_hparams = load_hyperpyyaml(fin,{})
-            source_brain = hparams["source_brain_class"](
-                modules=source_brain_hparams["modules"],
-                hparams=source_brain_hparams,
-                run_opts=run_opts,
-                checkpointer=None,
-                attacker=None,
-            )
+        source_brain = read_brains(hparams["source_brain_class"], hparams["source_brain_hparams_file"])
     attacker=hparams["attack_class"]
     if source_brain:
         attacker = attacker(source_brain)
 
     # Target model initialization
     target_brain_class = hparams["target_brain_class"]
-    if hparams["target_brain_hparams_file"] is not None:
-        with open(hparams["target_brain_hparams_file"]) as fin:
-            target_brain_hparams = load_hyperpyyaml(fin, {})
-    else:
-        target_brain_hparams = hparams
-
-    target_brain = target_brain_class(
-        modules=target_brain_hparams["modules"],
-        hparams=target_brain_hparams,
-        run_opts=run_opts,
-        checkpointer=None,
-        attacker=hparams["attack_class"],
-    )
-    target_brain.tokenizer = target_brain_hparams["tokenizer"]
-
+    target_hparams = hparams["target_brain_hparams_file"] if hparams["target_brain_hparams_file"] else hparams
+    target_brain = read_brains(target_brain_class, target_hparams, attacker=attacker)
+    target_brain.__setattr__("tokenizer",tokenizer, attacker_brain=True)
     # Testing
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(

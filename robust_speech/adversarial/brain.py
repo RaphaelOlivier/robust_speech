@@ -83,9 +83,12 @@ class PredictionEnsemble:
 
 class EnsembleASRBrain(ASRBrain):
     def __init__(self,asr_brains, ref_tokens = 0):
-        self.nmodels=len(asr_brains)
         self.asr_brains=asr_brains
         self.ref_tokens=ref_tokens # use this model to return tokens
+    @property
+    def nmodels(self):
+        return len(self.asr_brains)
+
     def compute_forward(self, batch, stage, model_idx=None):
         # concatenate predictions 
         if model_idx is not None:
@@ -122,6 +125,12 @@ class EnsembleASRBrain(ASRBrain):
                 return torch.mean(loss,dim=0)
             return losses
         return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage)
+
+    def __setattr__(self,name,value): # useful to set tokenizer
+        if name != "asr_brains" and name != "ref_tokens":
+            for brain in self.asr_brains:
+                brain.__setattr__(name,value)
+        super(AdvASRBrain,self).__setattr__(name,value)
 
     
 class AdvASRBrain(ASRBrain):

@@ -162,9 +162,10 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker
         )
+        print(opt_class)
 
     def __setattr__(self,name,value, attacker_brain=True):
-        if hasattr(self,"attacker") and name != "attacker" and attacker_brain:
+        if hasattr(self,"attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
             super(AdvASRBrain,self.attacker.asr_brain).__setattr__(name,value)
         super(AdvASRBrain,self).__setattr__(name,value)
 
@@ -371,7 +372,10 @@ class AdvASRBrain(ASRBrain):
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss
                     )
-                    t.set_postfix(adv_train_loss=self.avg_train_loss)
+                    if self.attacker is not None:
+                        t.set_postfix(adv_train_loss=self.avg_train_loss)
+                    else:
+                        t.set_postfix(train_loss=self.avg_train_loss)
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:

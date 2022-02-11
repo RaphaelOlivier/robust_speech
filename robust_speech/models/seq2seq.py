@@ -3,7 +3,7 @@ import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
 # Define training procedure
-class ASR(AdvASRBrain):
+class S2SASR(AdvASRBrain):
 
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""

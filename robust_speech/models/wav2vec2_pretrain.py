@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 # Define training procedure
-class W2VBrain(AdvASRBrain):
+class W2VPretrain(AdvASRBrain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the w2v2 loss."""
 

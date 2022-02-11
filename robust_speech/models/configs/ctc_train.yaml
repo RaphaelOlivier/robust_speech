@@ -1,7 +1,6 @@
 # ############################################################################
-# Model: E2E ASR with attention-based ASR
+# Model: E2E ASR with CTC
 # Encoder: CRDNN model
-# Decoder: GRU + beamsearch + RNNLM
 # Tokens: BPE with unigram
 # losses: CTC+ NLL
 # Training: Librispeech 960h
@@ -13,7 +12,7 @@
 seed: 1000
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
-output_folder: !ref <root>/trainings/CRDNN_BPE_960h_LM/<seed>
+output_folder: !ref <root>/trainings/CTCRNN/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -27,7 +26,7 @@ train_log: !ref <output_folder>/train_log.txt
 
 attack_class: null
 
-brain_class: !name:robust_speech.models.seq2seq.ASR
+brain_class: !name:robust_speech.models.ctc.CTCASR
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
@@ -51,12 +50,11 @@ test_csv:
 avoid_if_longer_than: 6.0
 avoid_if_shorter_than: 1.0
 # Training parameters
-number_of_epochs: 15
-number_of_ctc_epochs: 5
-batch_size: 8
+number_of_epochs: 30
+batch_size: 4
+test_batch_size: 2
 lr: 1.0
-ctc_weight: 0.5
-sorting: ascending
+sorting: random
 dynamic_batching: False
 
 # dynamic batching parameters, if used
@@ -85,7 +83,7 @@ valid_dataloader_opts:
    batch_size: !ref <batch_size>
 
 test_dataloader_opts:
-   batch_size: !ref <batch_size>
+   batch_size: !ref <test_batch_size>
 
 # Model parameters
 activation: !name:torch.nn.LeakyReLU
@@ -101,27 +99,11 @@ rnn_neurons: 1024
 rnn_bidirectional: True
 dnn_blocks: 2
 dnn_neurons: 512
-emb_size: 128
-dec_neurons: 1024
 output_neurons: 1000  # Number of tokens (same as LM)
 blank_index: 0
 bos_index: 0
 eos_index: 0
 unk_index: 0
-
-# Decoding parameters
-min_decode_ratio: 0.0
-max_decode_ratio: 1.0
-valid_beam_size: 80
-test_beam_size: 80
-eos_threshold: 1.5
-using_max_attn_shift: True
-max_attn_shift: 240
-lm_weight: 0.50
-ctc_weight_decode: 0.0
-coverage_penalty: 1.5
-temperature: 1.25
-temperature_lm: 1.25
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
@@ -166,30 +148,8 @@ enc: !new:speechbrain.lobes.models.CRDNN.CRDNN
    dnn_neurons: !ref <dnn_neurons>
    use_rnnp: False
 
-emb: !new:speechbrain.nnet.embedding.Embedding
-   num_embeddings: !ref <output_neurons>
-   embedding_dim: !ref <emb_size>
-
-dec: !new:speechbrain.nnet.RNN.AttentionalRNNDecoder
-   enc_dim: !ref <dnn_neurons>
-   input_size: !ref <emb_size>
-   rnn_type: gru
-   attn_type: location
-   hidden_size: !ref <dec_neurons>
-   attn_dim: 1024
-   num_layers: 1
-   scaling: 1.0
-   channels: 10
-   kernel_size: 100
-   re_init: True
-   dropout: !ref <dropout>
-
 ctc_lin: !new:speechbrain.nnet.linear.Linear
    input_size: !ref <dnn_neurons>
-   n_neurons: !ref <output_neurons>
-
-seq_lin: !new:speechbrain.nnet.linear.Linear
-   input_size: !ref <dec_neurons>
    n_neurons: !ref <output_neurons>
 
 log_softmax: !new:speechbrain.nnet.activations.Softmax
@@ -198,14 +158,11 @@ log_softmax: !new:speechbrain.nnet.activations.Softmax
 ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
    blank_index: !ref <blank_index>
 
-seq_cost: !name:speechbrain.nnet.losses.nll_loss
-   label_smoothing: 0.1
 
 # This is the RNNLM that is used according to the Huggingface repository
 # NB: It has to match the pre-trained RNNLM!!
 lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
    output_neurons: !ref <output_neurons>
-   embedding_dim: !ref <emb_size>
    activation: !name:torch.nn.LeakyReLU
    dropout: 0.0
    rnn_layers: 2
@@ -214,59 +171,19 @@ lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
    dnn_neurons: 512
    return_hidden: True  # For inference
 
-tokenizer: !new:sentencepiece.SentencePieceProcessor
+tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
 # Models
 modules:
    enc: !ref <enc>
-   emb: !ref <emb>
-   dec: !ref <dec>
    ctc_lin: !ref <ctc_lin>
-   seq_lin: !ref <seq_lin>
    normalize: !ref <normalize>
    env_corrupt: !ref <env_corrupt>
    lm_model: !ref <lm_model>
 
 model: !new:torch.nn.ModuleList
-   - [!ref <enc>, !ref <emb>, !ref <dec>, !ref <ctc_lin>, !ref <seq_lin>]
+   - [!ref <enc>, !ref <ctc_lin>]
 
-valid_search: !new:speechbrain.decoders.S2SRNNBeamSearcher
-   embedding: !ref <emb>
-   decoder: !ref <dec>
-   linear: !ref <seq_lin>
-   ctc_linear: !ref <ctc_lin>
-   bos_index: !ref <bos_index>
-   eos_index: !ref <eos_index>
-   blank_index: !ref <blank_index>
-   min_decode_ratio: !ref <min_decode_ratio>
-   max_decode_ratio: !ref <max_decode_ratio>
-   beam_size: !ref <valid_beam_size>
-   eos_threshold: !ref <eos_threshold>
-   using_max_attn_shift: !ref <using_max_attn_shift>
-   max_attn_shift: !ref <max_attn_shift>
-   coverage_penalty: !ref <coverage_penalty>
-   temperature: !ref <temperature>
-
-test_search: !new:speechbrain.decoders.S2SRNNBeamSearchLM
-   embedding: !ref <emb>
-   decoder: !ref <dec>
-   linear: !ref <seq_lin>
-   ctc_linear: !ref <ctc_lin>
-   language_model: !ref <lm_model>
-   bos_index: !ref <bos_index>
-   eos_index: !ref <eos_index>
-   blank_index: !ref <blank_index>
-   min_decode_ratio: !ref <min_decode_ratio>
-   max_decode_ratio: !ref <max_decode_ratio>
-   beam_size: !ref <test_beam_size>
-   eos_threshold: !ref <eos_threshold>
-   using_max_attn_shift: !ref <using_max_attn_shift>
-   max_attn_shift: !ref <max_attn_shift>
-   coverage_penalty: !ref <coverage_penalty>
-   lm_weight: !ref <lm_weight>
-   ctc_weight: !ref <ctc_weight_decode>
-   temperature: !ref <temperature>
-   temperature_lm: !ref <temperature_lm>
 
 lr_annealing: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>
@@ -281,6 +198,7 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
       scheduler: !ref <lr_annealing>
       normalizer: !ref <normalize>
       counter: !ref <epoch_counter>
+      tokenizer: !ref <tokenizer>
 
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>

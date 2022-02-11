@@ -23,19 +23,19 @@ dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
 # Data files
-data_folder: <root>/data/LibriSpeech
+data_folder: !ref <root>/data/LibriSpeech
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 train_splits: ["train-clean-100","train-clean-360","train-clean-500"]
 dev_splits: ["dev-clean"]
 test_splits: ["test-clean","test-other"]
-skip_prep: False
-ckpt_interval_minutes: 25 # save checkpoint every N min
-train_csv: !ref <output_folder>/train.csv
-valid_csv: !ref <output_folder>/dev-clean.csv
+skip_prep: True
+ckpt_interval_minutes: 15 # save checkpoint every N min
+train_csv: !ref <data_folder>/csv/train.csv
+valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
-   - !ref <output_folder>/test-clean.csv
-   - !ref <output_folder>/test-other.csv
+   - !ref <data_folder>/csv/test-clean.csv
+   - !ref <data_folder>/csv/test-other.csv
 avoid_if_longer_than: 6.0
 avoid_if_shorter_than: 1.0
 
@@ -131,6 +131,8 @@ model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
 
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
+
+opt_class: null
 
 model_opt_class: !name:torch.optim.Adadelta
    lr: !ref <lr>

@@ -40,12 +40,13 @@ data_folder_rirs: !ref <data_folder>
 train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
 dev_splits: ["dev-clean"]
 test_splits: ["test-clean", "test-other"]
-skip_prep: False
-train_csv: !ref <data_folder>/train.csv
-valid_csv: !ref <data_folder>/dev-clean.csv
+skip_prep: True
+ckpt_interval_minutes: 15 # save checkpoint every N min
+train_csv: !ref <data_folder>/csv/train.csv
+valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
-    - !ref <data_folder>/test-clean.csv
-    - !ref <data_folder>/test-other.csv
+   - !ref <data_folder>/csv/test-clean.csv
+   - !ref <data_folder>/csv/test-other.csv
 avoid_if_longer_than: 6.0
 avoid_if_shorter_than: 1.0
 # Training parameters
@@ -177,7 +178,7 @@ model: !new:torch.nn.ModuleList
     - [!ref <CNN>, !ref <Transformer>, !ref <seq_lin>, !ref <ctc_lin>]
 
 # define two optimizers here for two-stage training
-Adam: !name:torch.optim.Adam
+opt_class: !name:torch.optim.Adam
     lr: !ref <lr_adam>
     betas: (0.9, 0.98)
     eps: 0.000000001

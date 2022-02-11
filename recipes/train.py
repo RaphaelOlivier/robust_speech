@@ -65,6 +65,7 @@ if __name__ == "__main__":
     asr_brain = brain_class(
         modules=hparams["modules"],
         hparams=hparams,
+        opt_class=hparams["opt_class"],
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
         attacker=hparams["attack_class"],

@@ -532,7 +532,7 @@ def dataio_prepare(hparams):
             ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
         )
     else:
-        assert isinstance(tokenizer,sentencepiece.SentencePieceTokenizer)
+        assert isinstance(tokenizer,sentencepiece.SentencePieceProcessor)
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
             "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
@@ -554,5 +554,37 @@ def dataio_prepare(hparams):
         sb.dataio.dataset.set_output_keys(
             datasets, ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
         )
-    return train_data, valid_data, test_datasets, tokenizer
+
+    train_batch_sampler = None
+    valid_batch_sampler = None
+    if hparams["dynamic_batching"]:
+        from speechbrain.dataio.sampler import DynamicBatchSampler  # noqa
+        from speechbrain.dataio.dataloader import SaveableDataLoader  # noqa
+        from speechbrain.dataio.batch import PaddedBatch  # noqa
+
+        dynamic_hparams = hparams["dynamic_batch_sampler"]
+
+        num_buckets = dynamic_hparams["num_buckets"]
+
+        max_batch_len = dynamic_hparams["max_batch_len"]
+
+        train_batch_sampler = DynamicBatchSampler(
+            train_data,
+            max_batch_len,
+            num_buckets=num_buckets,
+            length_func=lambda x: x["duration"] * hparams["sample_rate"],
+            shuffle=dynamic_hparams["shuffle_ex"],
+            batch_ordering=dynamic_hparams["batch_ordering"],
+        )
+
+        valid_batch_sampler = DynamicBatchSampler(
+            valid_data,
+            max_batch_len,
+            num_buckets=num_buckets,
+            length_func=lambda x: x["duration"] * hparams["sample_rate"],
+            shuffle=dynamic_hparams["shuffle_ex"],
+            batch_ordering=dynamic_hparams["batch_ordering"],
+        )
+
+    return train_data, valid_data, test_datasets, train_batch_sampler, valid_batch_sampler, tokenizer
 

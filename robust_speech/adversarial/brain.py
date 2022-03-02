@@ -162,7 +162,6 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker
         )
-        print(opt_class)
 
     def __setattr__(self,name,value, attacker_brain=True):
         if hasattr(self,"attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
@@ -204,6 +203,57 @@ class AdvASRBrain(ASRBrain):
         return res
     
 
+    def fit_batch(self, batch):
+        """Fit one batch, override to do multiple updates.
+
+        The default implementation depends on a few methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+        * ``compute_objectives()``
+
+        Also depends on having optimizers passed at initialization.
+
+        Arguments
+        ---------
+        batch : list of torch.Tensors
+            Batch of data to use for training. Default implementation assumes
+            this batch has two elements: inputs and targets.
+
+        Returns
+        -------
+        detached loss
+        """
+        # Managing automatic mixed precision
+        if self.auto_mix_prec:
+            self.optimizer.zero_grad()
+            with torch.cuda.amp.autocast():
+                outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            if self.check_gradients(loss):
+                self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+
+            # normalize the loss by gradient_accumulation step
+            (loss / self.hparams.gradient_accumulation).backward()
+            if self.step % self.hparams.gradient_accumulation == 0:
+                # gradient clipping & early stop if loss is not fini
+                self.check_gradients(loss)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+            if self.check_gradients(loss):
+                self.optimizer.step()
+            self.optimizer.zero_grad()
+
+        return loss.detach().cpu()
+
+
     def fit_batch_adversarial(self, batch):
         """Fit one batch, override to do multiple updates.
 
@@ -239,7 +289,15 @@ class AdvASRBrain(ASRBrain):
         else:
             outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
             loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            loss.backward()
+
+            # normalize the loss by gradient_accumulation step
+            (loss / self.hparams.gradient_accumulation).backward()
+            if self.step % self.hparams.gradient_accumulation == 0:
+                # gradient clipping & early stop if loss is not fini
+                self.check_gradients(loss)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
             if self.check_gradients(loss):
                 self.optimizer.step()
             self.optimizer.zero_grad()

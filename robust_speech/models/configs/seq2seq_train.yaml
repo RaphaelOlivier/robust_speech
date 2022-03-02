@@ -10,7 +10,7 @@
 # ############################################################################
 
 # Seed needs to be set at top of yaml, before objects with parameters
-seed: 1000
+seed: 1007
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
 output_folder: !ref <root>/trainings/CRDNN_BPE_960h_LM/<seed>
@@ -27,7 +27,7 @@ train_log: !ref <output_folder>/train_log.txt
 
 attack_class: null
 
-brain_class: !name:robust_speech.models.seq2seq.ASR
+brain_class: !name:robust_speech.models.seq2seq.S2SASR
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
@@ -48,21 +48,22 @@ valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
    - !ref <data_folder>/csv/test-clean.csv
    - !ref <data_folder>/csv/test-other.csv
-avoid_if_longer_than: 6.0
-avoid_if_shorter_than: 1.0
+avoid_if_longer_than: 17
+avoid_if_shorter_than: 0.0
 # Training parameters
 number_of_epochs: 15
 number_of_ctc_epochs: 5
-batch_size: 8
+batch_size: 1
 lr: 1.0
 ctc_weight: 0.5
-sorting: ascending
-dynamic_batching: False
+sorting: random
+dynamic_batching: True
+
+gradient_accumulation: 1
 
 # dynamic batching parameters, if used
 dynamic_batch_sampler:
-   feats_hop_size: 0.01
-   max_batch_len: 20000 # in terms of frames
+   max_batch_len: 1024000 # 64 seconds
    shuffle_ex: True
    batch_ordering: random
    num_buckets: 20
@@ -112,12 +113,12 @@ unk_index: 0
 # Decoding parameters
 min_decode_ratio: 0.0
 max_decode_ratio: 1.0
-valid_beam_size: 80
+valid_beam_size: 1
 test_beam_size: 80
 eos_threshold: 1.5
 using_max_attn_shift: True
 max_attn_shift: 240
-lm_weight: 0.50
+lm_weight: 0.
 ctc_weight_decode: 0.0
 coverage_penalty: 1.5
 temperature: 1.25
@@ -205,7 +206,7 @@ seq_cost: !name:speechbrain.nnet.losses.nll_loss
 # NB: It has to match the pre-trained RNNLM!!
 lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
    output_neurons: !ref <output_neurons>
-   embedding_dim: !ref <emb_size>
+   embedding_dim: 128
    activation: !name:torch.nn.LeakyReLU
    dropout: 0.0
    rnn_layers: 2
@@ -286,9 +287,9 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
 cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
    split_tokens: True
+acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats
 
 # The pretrainer allows a mapping between pretrained files and instances that
 # are declared in the yaml. E.g here, we will download the file lm.ckpt

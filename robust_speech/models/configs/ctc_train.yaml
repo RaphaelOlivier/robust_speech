@@ -9,7 +9,7 @@
 # ############################################################################
 
 # Seed needs to be set at top of yaml, before objects with parameters
-seed: 1000
+seed: 1003
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
 output_folder: !ref <root>/trainings/CTCRNN/<seed>
@@ -47,7 +47,7 @@ valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
    - !ref <data_folder>/csv/test-clean.csv
    - !ref <data_folder>/csv/test-other.csv
-avoid_if_longer_than: 6.0
+avoid_if_longer_than: 17.0
 avoid_if_shorter_than: 1.0
 # Training parameters
 number_of_epochs: 30
@@ -55,12 +55,12 @@ batch_size: 4
 test_batch_size: 2
 lr: 1.0
 sorting: random
-dynamic_batching: False
+dynamic_batching: True
+gradient_accumulation: 1
 
 # dynamic batching parameters, if used
 dynamic_batch_sampler:
-   feats_hop_size: 0.01
-   max_batch_len: 20000 # in terms of frames
+   max_batch_len: 384000 # 24 seconds
    shuffle_ex: True
    batch_ordering: random
    num_buckets: 20
@@ -99,7 +99,7 @@ rnn_neurons: 1024
 rnn_bidirectional: True
 dnn_blocks: 2
 dnn_neurons: 512
-output_neurons: 1000  # Number of tokens (same as LM)
+output_neurons: 31  # Number of tokens (same as LM)
 blank_index: 0
 bos_index: 0
 eos_index: 0
@@ -158,19 +158,6 @@ log_softmax: !new:speechbrain.nnet.activations.Softmax
 ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
    blank_index: !ref <blank_index>
 
-
-# This is the RNNLM that is used according to the Huggingface repository
-# NB: It has to match the pre-trained RNNLM!!
-lm_model: !new:speechbrain.lobes.models.RNNLM.RNNLM
-   output_neurons: !ref <output_neurons>
-   activation: !name:torch.nn.LeakyReLU
-   dropout: 0.0
-   rnn_layers: 2
-   rnn_neurons: 2048
-   dnn_blocks: 1
-   dnn_neurons: 512
-   return_hidden: True  # For inference
-
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
 # Models
@@ -179,7 +166,6 @@ modules:
    ctc_lin: !ref <ctc_lin>
    normalize: !ref <normalize>
    env_corrupt: !ref <env_corrupt>
-   lm_model: !ref <lm_model>
 
 model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
@@ -204,19 +190,15 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
 cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
    split_tokens: True
+acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats
 
 # The pretrainer allows a mapping between pretrained files and instances that
-# are declared in the yaml. E.g here, we will download the file lm.ckpt
-# and it will be loaded into "lm" which is pointing to the <lm_model> defined
-# before.
+# are declared in the yaml.
 pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
    collect_in: !ref <save_folder>
    loadables:
-      lm: !ref <lm_model>
       tokenizer: !ref <tokenizer>
    paths:
-      lm: !ref <pretrained_lm_tokenizer_path>/lm.ckpt
       tokenizer: !ref <pretrained_lm_tokenizer_path>/tokenizer.ckpt

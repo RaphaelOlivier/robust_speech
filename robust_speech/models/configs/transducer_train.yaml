@@ -26,7 +26,7 @@ train_log: !ref <output_folder>/train_log.txt
 
 attack_class: null
 
-brain_class: !name:robust_speech.models.transducer.ASR
+brain_class: !name:robust_speech.models.transducer.RNNTASR
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
@@ -125,7 +125,7 @@ compute_features: !new:speechbrain.lobes.features.Fbank
    n_mels: !ref <n_mels>
 
 env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
-   openrir_folder: !ref <data_folder_rirs>
+   #openrir_folder: !ref <data_folder_rirs>
    babble_prob: 0.0
    reverb_prob: 0.0
    noise_prob: 1.0
@@ -281,6 +281,6 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
 cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
    split_tokens: True
+acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats

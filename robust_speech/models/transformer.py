@@ -152,8 +152,75 @@ class TrfASR(AdvASRBrain):
 
         return loss
 
+    def fit_batch(self, batch):
+        """Train the parameters given a single batch in input"""
+        # check if we need to switch optimizer
+        # if so change the optimizer from Adam to SGD
+        self.check_and_reset_optimizer()
+
+        predictions = self.compute_forward(batch, sb.Stage.TRAIN)
+        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+
+        # normalize the loss by gradient_accumulation step
+        (loss / self.hparams.gradient_accumulation).backward()
+
+        if self.step % self.hparams.gradient_accumulation == 0:
+            # gradient clipping & early stop if loss is not fini
+            self.check_gradients(loss)
+
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+
+            # anneal lr every update
+            self.hparams.noam_annealing(self.optimizer)
+
+        return loss.detach()
+
+    def check_and_reset_optimizer(self):
+        """reset the optimizer if training enters stage 2"""
+        current_epoch = self.hparams.epoch_counter.current
+        if not hasattr(self, "switched"):
+            self.switched = False
+            if isinstance(self.optimizer, torch.optim.SGD):
+                self.switched = True
+
+        if self.switched is True:
+            return
+
+        if current_epoch > self.hparams.stage_one_epochs:
+            self.optimizer = self.hparams.SGD(self.modules.parameters())
+
+            if self.checkpointer is not None:
+                self.checkpointer.add_recoverable("optimizer", self.optimizer)
+
+            self.switched = True
+
+    def fit_batch_adversarial(self, batch):
+        """Train the parameters given a single batch in input"""
+        # check if we need to switch optimizer
+        # if so change the optimizer from Adam to SGD
+        self.check_and_reset_optimizer()
+
+        predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+
+        # normalize the loss by gradient_accumulation step
+        (loss / self.hparams.gradient_accumulation).backward()
+
+        if self.step % self.hparams.gradient_accumulation == 0:
+            # gradient clipping & early stop if loss is not fini
+            self.check_gradients(loss)
+
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+
+            # anneal lr every update
+            self.hparams.noam_annealing(self.optimizer)
+
+        return loss.detach()
+    
     def on_stage_start(self, stage, epoch):
-        """Gets called at the beginning of each epoch"""
+        # Gets called at the beginning of each epoch
         if stage != sb.Stage.TRAIN:
             self.acc_metric = self.hparams.acc_computer()
             self.wer_metric = self.hparams.error_rate_computer()
@@ -163,7 +230,7 @@ class TrfASR(AdvASRBrain):
             self.adv_wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
-        """Gets called at the end of a epoch."""
+        # Gets called at the end of a epoch.
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
@@ -181,7 +248,7 @@ class TrfASR(AdvASRBrain):
                 or stage == sb.Stage.TEST
             ):
                 stage_stats["WER"] = self.wer_metric.summarize("error_rate")
-                stage_stats["CER"] = self.adv_cer_metric.summarize("error_rate")
+                stage_stats["CER"] = self.cer_metric.summarize("error_rate")
 
                 if stage_adv_loss is not None:
                     stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
@@ -234,3 +301,4 @@ class TrfASR(AdvASRBrain):
                 max_keys=["ACC"],
                 num_to_keep=1,
             )
+    

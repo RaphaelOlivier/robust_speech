@@ -19,7 +19,6 @@ from advertorch.attacks.utils import rand_init_delta
 
 import robust_speech as rs
 
-
 def reverse_bound_from_rel_bound(batch,rel):
     wavs, wav_lens = batch.sig
     wav_lens = [int(wavs.size(1)*r) for r in wav_lens]

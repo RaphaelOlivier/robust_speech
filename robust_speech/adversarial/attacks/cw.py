@@ -1,19 +1,20 @@
+"""
+A Carlini&Wagner attack for ASR models.
+The algorithm follows non strictly the first attack in https://arxiv.org/abs/1801.01944
+This implementation is based on the one in advertorch for classification models (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py).
+It was pruned of elements that aren't present in the ASR CW attack paper above, like tanh rescaling.
+"""
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-#from advertorch.utils import calc_l2distsq
-from advertorch.utils import clamp
-from advertorch.utils import to_one_hot
-from advertorch.utils import replicate_input
 from advertorch.attacks.base import Attack
 from advertorch.attacks.base import LabelMixin
 
 import speechbrain as sb
 
 import robust_speech as rs
-
 
 CARLINI_L2DIST_UPPER = 1e10
 CARLINI_COEFF_UPPER = 1e10
@@ -22,7 +23,6 @@ REPEAT_STEP = 10
 ONE_MINUS_EPS = 0.999999
 UPPER_CHECK = 1e9
 PREV_LOSS_INIT = 1e6
-TARGET_MULT = 10000.0
 NUM_CHECKS = 10
 
 def is_successful(y1, y2, targeted):
@@ -44,9 +44,9 @@ def calc_l2distsq(x, y, mask):
 
 class ASRCarliniWagnerAttack(Attack, LabelMixin):
     """
-    The Carlini and Wagner L2 Attack, https://arxiv.org/abs/1608.04644
-    :param predict: forward pass function.
-    :param targeted: if the attack is targeted.
+    :param asr_brain: the brain object
+    :param success_only: if the adversarial noise should only be returned when the attack is successful.
+    :param targeted: if the attack is targeted (always true for now).
     :param learning_rate: the learning rate for the attack algorithm
     :param binary_search_steps: number of binary search times to find the
         optimum
@@ -54,9 +54,10 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
     :param abort_early: if set to true, abort early if getting stuck in local
         min
     :param initial_const: initial value of the constant c
-    :param clip_min: mininum value per input dimension.
-    :param clip_max: maximum value per input dimension.
-    :param loss_fn: loss function
+    :param eps: Linf bound applied to the perturbation.
+    :param clip_min: mininum value per input dimension (ignored: herefor compatibility).
+    :param clip_max: maximum value per input dimension (ignored: herefor compatibility).
+    :param train_mode_for_backward: whether to force training mode in backward passes (necessary for RNN models)
     """
 
     def __init__(self, asr_brain, success_only=True,
@@ -64,7 +65,6 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
                  binary_search_steps=9, max_iterations=1000,
                  abort_early=True, initial_const=1e0, eps=0.05,
                  clip_min=-1., clip_max=1., train_mode_for_backward=True):
-        """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         self.clip_min = clip_min # ignored
         self.clip_max = clip_max # ignored
@@ -77,7 +77,8 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         self.train_mode_for_backward=train_mode_for_backward
         # The last iteration (if we run many steps) repeat the search once.
         self.repeat = binary_search_steps >= REPEAT_STEP
-        assert targeted, "CW attack only available for targeted outputs"
+        if not targeted:
+            raise NotImplementedError("CW attack is only available for targeted outputs")
         self.targeted = targeted
         self.success_only = success_only
 
@@ -163,7 +164,7 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
         wavs_init = torch.clone(wavs_init)
         batch_size = wavs_init.size(0)
         if batch_size > 1:
-            raise NotImplementedError("CW attack currently supports only batch size 1")
+            raise NotImplementedError("%s currently supports only batch size 1"%self.__class__.__name__)
         wav_lengths = (rel_lengths.float()*wavs_init.size(1)).long()
         max_len = wav_lengths.max()
         lens_mask = torch.arange(max_len).to(self.asr_brain.device).expand(len(wav_lengths), max_len) < wav_lengths.unsqueeze(1)

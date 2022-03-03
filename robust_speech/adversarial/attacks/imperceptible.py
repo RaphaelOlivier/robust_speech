@@ -1,3 +1,11 @@
+"""
+An implementation of the Imperceptible ASR attack (https://arxiv.org/abs/1903.10346).
+Based on a mixture of the Advertorch CW attack (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py)
+and the ART implementation of Imperceptible (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
+This attack is currently not achieving its expected results and is under debugging.
+"""
+
+
 from typing import Tuple, List
 import math
 import numpy as np
@@ -6,27 +14,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-#from advertorch.utils import calc_l2distsq
-from advertorch.utils import clamp
-from advertorch.utils import to_one_hot
-from advertorch.utils import replicate_input
-from advertorch.attacks.utils import is_successful
-
 import speechbrain as sb
 
 import robust_speech as rs
 from robust_speech.adversarial.attacks.cw import (
     ASRCarliniWagnerAttack,
-    is_successful,
-    calc_l2distsq,
     CARLINI_L2DIST_UPPER,
     CARLINI_COEFF_UPPER,
     INVALID_LABEL,
     REPEAT_STEP,
     ONE_MINUS_EPS,
-    UPPER_CHECK,
     PREV_LOSS_INIT,
-    TARGET_MULT,
     NUM_CHECKS 
 )
 
@@ -39,7 +37,29 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         clip_min=-1., clip_max=1., train_mode_for_backward=True,
         win_length: int = 2048,hop_length: int = 512,n_fft: int = 2048,
         ):
-        """Carlini Wagner L2 Attack implementation in pytorch."""
+        """
+        :param asr_brain: the brain object
+        :param success_only: if the adversarial noise should only be returned when the attack is successful.
+        :param abort_early: if set to true, abort early if getting stuck in local min
+        :param targeted: if the attack is targeted (always true for now).
+        :param eps: Linf bound applied to the perturbation.
+        :param learning_rate_phase_1: the learning rate for the attack algorithm in phase 1
+        :param max_iterations_phase_1: the maximum number of iterations in phase 1
+        :param learning_rate_phase_2: the learning rate for the attack algorithm in phase 2
+        :param max_iterations_phase_2: the maximum number of iterations in phase 2
+        :param binary_search_steps_phase_2: number of binary search times to find the
+            optimum in phase 2
+        :param initial_const_phase_2: initial value of the constant c in phase 2
+        :param clip_min: mininum value per input dimension (ignored: herefor compatibility).
+        :param clip_max: maximum value per input dimension (ignored: herefor compatibility).
+        :param train_mode_for_backward: whether to force training mode in backward passes (necessary for RNN models)
+        :param win_length: window length for computing spectral density
+        :param hop_length: hop length for computing spectral density
+        :param n_fft: number of FFT bins for computing spectral density.
+        """
+
+        raise NotImplementedError('This attack is under development')
+
         self.asr_brain = asr_brain
         self.clip_min = clip_min # ignored
         self.clip_max = clip_max # ignored
@@ -90,10 +110,10 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
     ) -> "torch.Tensor":
         """
         The forward pass of the second stage of the attack.
-        :param local_delta_rescale: Local delta after rescaled.
-        :param theta_batch: Original thresholds.
-        :param original_max_psd_batch: Original maximum psd.
-        :param real_lengths: Real lengths of original sequences.
+        :param delta: current perturbation
+        :param theta: Original thresholds.
+        :param max_psd_init: Original maximum psd.
+        :param wav_lengths: lengths of original sequences.
         :return: The loss tensor of the second stage of the attack.
         """
 
@@ -214,7 +234,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         """
         Compute the psd matrix of the perturbation.
         :param delta: The perturbation.
-        :param original_max_psd: The maximum psd of the original audio.
+        :param max_psd_init: The maximum psd of the original audio.
         :return: The psd matrix.
         """
 

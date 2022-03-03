@@ -3,9 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-import speechbrain as sb 
-
-from advertorch.attacks.iterative_projected_gradient import L2PGDAttack
 from advertorch.attacks.base import Attack,LabelMixin
 from advertorch.utils import clamp
 from advertorch.utils import normalize_by_pnorm

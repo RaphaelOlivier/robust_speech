@@ -1,16 +1,17 @@
 
+
+"""
+Implementation of the Kenansville Attack (https://arxiv.org/abs/1910.05262).
+This attack is model independant and only considers the input audio and its Power Spectral Density.
+The implementation is based on the Armory one (https://github.com/twosixlabs/armory/blob/master/armory/art_experimental/attacks/kenansville_dft.py)
+"""
+
 import torch
-import torch.nn as nn
-import torch.optim as optim
 
 #from advertorch.utils import calc_l2distsq
 from advertorch.utils import replicate_input
 from advertorch.attacks.base import Attack
 from advertorch.attacks.base import LabelMixin
-
-import speechbrain as sb
-
-import robust_speech as rs
 
 def is_successful(y1, y2, targeted):
     equal = type(y1) == type(y2)
@@ -27,9 +28,6 @@ def calc_l2distsq(x, y, mask):
 
 
 class KenansvilleAttack(Attack, LabelMixin):
-    """
-    The Kenansville Attack, https://arxiv.org/abs/1910.05262
-    """
 
     def __init__(self, asr_brain, targeted=False,snr_db=100,train_mode_for_backward=False):
         """Carlini Wagner L2 Attack implementation in pytorch."""

@@ -15,32 +15,43 @@ import robust_speech as rs
 Adversarial (or natural) training script
 """
 
-def read_brains(brain_classes, brain_hparams,attacker=None):
+def read_brains(
+        brain_classes, 
+        brain_hparams,
+        attacker=None, 
+        run_opts = {}, 
+        overrides={}, 
+        tokenizer = None
+        ):
     if isinstance(brain_classes,list):
         brain_list = []
         assert len(brain_classes) == len(brain_hparams)
         for bc,bf in zip(brain_classes,brain_hparams):
-            br = read_brains(bc,bf)
+            br = read_brains(bc,bf,run_opts=run_opts,overrides=overrides,tokenizer=tokenizer)
             brain_list.append(br)
         brain = rs.adversarial.brain.EnsembleASRBrain(brain_list)
     else:
         if isinstance(brain_hparams,str):
             with open(brain_hparams) as fin:
-                brain_hparams = load_hyperpyyaml(fin,{})
+                brain_hparams = load_hyperpyyaml(fin,overrides)
+        checkpointer = brain_hparams["checkpointer"] if "checkpointer" in brain_hparams else None
         brain = brain_classes(
             modules=brain_hparams["modules"],
             hparams=brain_hparams,
             run_opts=run_opts,
-            checkpointer=None,
+            checkpointer=checkpointer,
             attacker=attacker,
         )
+        if "pretrainer" in brain_hparams:
+            run_on_main(brain_hparams["pretrainer"].collect_files)
+            brain_hparams["pretrainer"].load_collected(device=run_opts["device"])
+        brain.tokenizer=tokenizer
     return brain
 
 if __name__ == "__main__":
 
     # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-
     # If distributed_launch=True then
     # create ddp_group with the right communication protocol
     sb.utils.distributed.ddp_init_group(run_opts)
@@ -55,6 +66,10 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
+    if "pretrainer" in hparams:
+        run_on_main(hparams["pretrainer"].collect_files)
+        hparams["pretrainer"].load_collected(device=run_opts["device"])
+    
     # Dataset prep (parsing Librispeech)
     prepare_dataset = hparams["dataset_prepare_fct"]
 
@@ -72,13 +87,18 @@ if __name__ == "__main__":
     dataio_prepare = hparams["dataio_prepare_fct"]
 
     # here we create the datasets objects as well as tokenization and encoding
-    _, _, test_datasets, tokenizer = dataio_prepare(
+    _, _, test_datasets, _, _, tokenizer = dataio_prepare(
         hparams
     )
-
     source_brain = None
-    if hparams["source_brain_class"]:
-        source_brain = read_brains(hparams["source_brain_class"], hparams["source_brain_hparams_file"])
+    if "source_brain_class" in hparams:
+        source_brain = read_brains(
+            hparams["source_brain_class"], 
+            hparams["source_brain_hparams_file"], 
+            run_opts=run_opts,
+            overrides=overrides,
+            tokenizer=tokenizer
+        )
     attacker=hparams["attack_class"]
     if source_brain:
         attacker = attacker(source_brain)
@@ -86,13 +106,25 @@ if __name__ == "__main__":
     # Target model initialization
     target_brain_class = hparams["target_brain_class"]
     target_hparams = hparams["target_brain_hparams_file"] if hparams["target_brain_hparams_file"] else hparams
-    target_brain = read_brains(target_brain_class, target_hparams, attacker=attacker)
+    target_brain = read_brains(
+        target_brain_class, 
+        target_hparams, 
+        attacker=attacker,
+        run_opts=run_opts,
+        overrides=overrides,
+        tokenizer=tokenizer
+    )
     target_brain.__setattr__("tokenizer",tokenizer, attacker_brain=True)
+    target_brain.__setattr__("logger",hparams["logger"], attacker_brain=True)
+    target_brain.hparams.train_logger = hparams["logger"]
     # Testing
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(
             hparams["output_folder"], "wer_{}.txt".format(k)
         )
         target_brain.evaluate(
-            test_datasets[k], test_loader_kwargs=hparams["test_dataloader_opts"]
+            test_datasets[k], 
+            test_loader_kwargs=hparams["test_dataloader_opts"], 
+            save_audio_path = hparams["save_audio_path"], 
+            sample_rate=hparams["sample_rate"]
         )

@@ -296,13 +296,67 @@ class AdvASRBrain(ASRBrain):
         assert stage != rs.Stage.ATTACK
         wavs = batch.sig[0]
         if self.attacker is not None:
-            adv_wavs = self.attacker.perturb(batch)
+            if stage == sb.Stage.TEST:
+                adv_wavs = self.attacker.perturb_and_log(batch)
+            else:
+                adv_wavs = self.attacker.perturb(batch)
             batch.sig = adv_wavs, batch.sig[1]
         res = self.compute_forward(batch,stage)
         batch.sig = wavs, batch.sig[1]
         del adv_wavs
         return res
     
+
+    def fit_batch(self, batch):
+        """Fit one batch, override to do multiple updates.
+
+        The default implementation depends on a few methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+        * ``compute_objectives()``
+
+        Also depends on having optimizers passed at initialization.
+
+        Arguments
+        ---------
+        batch : list of torch.Tensors
+            Batch of data to use for training. Default implementation assumes
+            this batch has two elements: inputs and targets.
+
+        Returns
+        -------
+        detached loss
+        """
+        # Managing automatic mixed precision
+        if self.auto_mix_prec:
+            self.optimizer.zero_grad()
+            with torch.cuda.amp.autocast():
+                outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            if self.check_gradients(loss):
+                self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=False)
+
+            # normalize the loss by gradient_accumulation step
+            (loss / self.hparams.gradient_accumulation).backward()
+            if self.step % self.hparams.gradient_accumulation == 0:
+                # gradient clipping & early stop if loss is not fini
+                self.check_gradients(loss)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+            if self.check_gradients(loss):
+                self.optimizer.step()
+            self.optimizer.zero_grad()
+
+        return loss.detach().cpu()
+
 
     def fit_batch_adversarial(self, batch):
         """Fit one batch with an adversarial objective, override to do multiple updates.
@@ -341,8 +395,16 @@ class AdvASRBrain(ASRBrain):
             self.scaler.update()
         else:
             outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            loss.backward()
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=True)
+
+            # normalize the loss by gradient_accumulation step
+            (loss / self.hparams.gradient_accumulation).backward()
+            if self.step % self.hparams.gradient_accumulation == 0:
+                # gradient clipping & early stop if loss is not fini
+                self.check_gradients(loss)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
             if self.check_gradients(loss):
                 self.optimizer.step()
             self.optimizer.zero_grad()
@@ -373,7 +435,7 @@ class AdvASRBrain(ASRBrain):
 
         predictions = self.compute_forward_adversarial(batch, stage=stage)
         with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage)
+            loss = self.compute_objectives(predictions, batch, stage=stage, adv=True)
         return loss.detach()
 
     def fit(
@@ -563,6 +625,8 @@ class AdvASRBrain(ASRBrain):
         min_key=None,
         progressbar=None,
         test_loader_kwargs={},
+        save_audio_path = None,
+        sample_rate = 16000
     ):
         """Iterate test_set and evaluate brain performance. By default, loads
         the best-performing checkpoint (as recorded using the checkpointer).
@@ -608,6 +672,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_adv_loss = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
+            self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
         for batch in tqdm(
             test_set, dynamic_ncols=True, disable=not progressbar
@@ -630,6 +695,7 @@ class AdvASRBrain(ASRBrain):
                 kwargs={"stage_adv_loss":avg_test_adv_loss}
         )
         self.step = 0
+        self.on_evaluate_end()
         return avg_test_loss
 
     
@@ -699,3 +765,11 @@ class AdvASRBrain(ASRBrain):
             )
             with open(self.hparams.wer_file, "w") as w:
                 self.wer_metric.write_stats(w)
+
+    def on_evaluate_start(self, max_key=None, min_key=None):
+        super().on_evaluate_start(max_key=max_key,min_key=min_key)
+        if self.attacker is not None:
+            self.attacker.on_evaluation_start()
+    def on_evaluate_end(self):
+        if self.attacker is not None:
+            self.attacker.on_evaluation_end(self.hparams.train_logger)

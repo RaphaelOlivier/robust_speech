@@ -12,8 +12,9 @@ import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import perturb_iterative
 
 from advertorch.attacks.base import Attack,LabelMixin
+from robust_speech.adversarial.attacks.attacker import Attacker
 
-class ASRMGAA(Attack, LabelMixin):
+class ASRMGAA(Attacker):
     """
     Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
     This attack encapsulates another attack (typically PGD) and only retains the part of the perturbation that is relevant for transfable attacks.

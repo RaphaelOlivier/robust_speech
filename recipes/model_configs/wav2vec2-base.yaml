@@ -1,0 +1,61 @@
+# ################################
+# Model: wav2vec2
+# Augmentation: SpecAugment
+# Authors: Sung-Lin Yeh 2021
+# ################################
+
+root: !PLACEHOLDER
+model_name: wav2vec2-base
+output_folder: !ref <root>/trainings/<model_name>
+wer_file: !ref <output_folder>/wer.txt
+save_folder: !ref <output_folder>
+train_log: !ref <output_folder>/train_log.txt
+
+pretrained_path: !ref <output_folder>
+
+# URL for the base english wav2vec2 model.
+wav2vec2_hub: facebook/wav2vec2-base
+
+mask_length: 10
+mask_prob: 0.65
+freeze_wav2vec: False
+
+number_of_epochs: 100
+lr_adam: 2.0 # This will get reduced by the training scheduler
+weight_decay: 0.01
+d_model: 768  # Needed by the scheduler. 768 is for the BASE w2v2
+sorting: ascending
+auto_mix_prec: False
+sample_rate: 16000
+ckpt_interval_minutes: 30 # save checkpoint every N min
+
+#
+# Functions and classes
+#
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <number_of_epochs>
+
+wav2vec2: !new:robust_speech.models.wav2vec2_pretrain.AdvHuggingFaceWav2Vec2Pretrain
+    source: !ref <wav2vec2_hub>
+    save_path: !ref <save_folder>/wav2vec2_checkpoints
+    mask_prob: !ref <mask_prob>
+    mask_length: !ref <mask_length>
+
+modules:
+    wav2vec2: !ref <wav2vec2>
+
+noam_annealing: !new:speechbrain.nnet.schedulers.NoamScheduler
+    lr_initial: !ref <lr_adam>
+    n_warmup_steps: 25000
+    model_size: !ref <d_model>
+
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats
+        
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    loadables:
+      wav2vec2: !ref <wav2vec2>
+    paths:
+      wav2vec2: !ref <pretrained_path>/wav2vec2.ckpt
+    collect_in: !ref <output_folder>

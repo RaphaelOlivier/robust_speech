@@ -14,6 +14,7 @@ from advertorch.attacks.utils import rand_init_delta
 
 import robust_speech as rs
 
+from robust_speech.adversarial.attacks.attacker import Attacker
 
 def reverse_bound_from_rel_bound(batch,rel):
     wavs, wav_lens = batch.sig
@@ -34,7 +35,7 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
 
     Arguments
     ---------
-    :asr_brain: rs.adversarial.brain.ASRBrain
+    asr_brain: rs.adversarial.brain.ASRBrain
         brain object.
      eps: float
         maximum distortion.
@@ -119,12 +120,12 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
             error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
             raise NotImplementedError(error)
         delta.grad.data.zero_()
-
+        #print(loss)
     wav_adv = clamp(wav_init + delta, clip_min, clip_max)
     return wav_adv
 
 
-class ASRPGDAttack(Attack, LabelMixin):
+class ASRPGDAttack(Attacker):
     """
     Implementation of the PGD attack (https://arxiv.org/abs/1706.06083)
     Based on the Advertorch implementation (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/iterative_projected_gradient.py)

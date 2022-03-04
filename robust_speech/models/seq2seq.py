@@ -7,9 +7,11 @@ class S2SASR(AdvASRBrain):
 
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
+        self.modules.normalize.to(self.device)
+        wavs, wav_lens = batch.sig
         if not stage == rs.Stage.ATTACK:
             batch = batch.to(self.device)
-        wavs, wav_lens = batch.sig
+            wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         tokens_bos, _ = batch.tokens_bos
         #wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Add augmentation if specified

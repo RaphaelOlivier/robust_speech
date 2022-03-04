@@ -1,5 +1,6 @@
-from .utils import Stage 
+from enum import Enum, auto
 
-__all__ = [
-    "Stage",
-]
+class Stage(Enum):
+    """Completes the sb.Stage enum with an attack stage"""
+
+    ATTACK=auto()

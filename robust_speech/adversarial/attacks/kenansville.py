@@ -6,6 +6,7 @@ import torch
 from advertorch.utils import replicate_input
 from advertorch.attacks.base import Attack
 from advertorch.attacks.base import LabelMixin
+from robust_speech.adversarial.attacks.attacker import Attacker
 
 def is_successful(y1, y2, targeted):
     equal = type(y1) == type(y2)
@@ -21,8 +22,7 @@ def calc_l2distsq(x, y, mask):
     return d.view(d.shape[0], -1).sum(dim=1) #/ mask.view(mask.shape[0], -1).sum(dim=1)
 
 
-class KenansvilleAttack(Attack, LabelMixin):
-
+class KenansvilleAttack(Attacker):
     """
     Implementation of the Kenansville Attack (https://arxiv.org/abs/1910.05262).
     This attack is model independant and only considers the input audio and its Power Spectral Density.

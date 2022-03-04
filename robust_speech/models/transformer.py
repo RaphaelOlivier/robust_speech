@@ -76,10 +76,14 @@ class TrfASR(AdvASRBrain):
             src, tokens_bos, wav_lens, pad_idx=self.hparams.pad_index
         )
 
+        p_ctc = None
+        if self.hparams.ctc_weight>0.:
         # output layer for ctc log-probabilities
-        logits = self.modules.ctc_lin(enc_out)
-        p_ctc = self.hparams.log_softmax(logits)
+            logits = self.modules.ctc_lin(enc_out)
+            p_ctc = self.hparams.log_softmax(logits)
 
+        p_seq = None
+        #if self.hparams.ctc_weight<1.:
         # output layer for seq2seq log-probabilities
         pred = self.modules.seq_lin(pred)
         p_seq = self.hparams.log_softmax(pred)
@@ -96,6 +100,7 @@ class TrfASR(AdvASRBrain):
                 # and no LM to give user some idea of how the AM is doing
                 hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
         elif stage == sb.Stage.TEST:
+
             hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
 
         return p_ctc, p_seq, wav_lens, hyps
@@ -116,11 +121,14 @@ class TrfASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-
-        loss_seq = self.hparams.seq_cost(
-            p_seq, tokens_eos, length=tokens_eos_lens
-        )
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+        loss_seq = 0.
+        if self.hparams.ctc_weight<1.:
+            loss_seq = self.hparams.seq_cost(
+                p_seq, tokens_eos, length=tokens_eos_lens
+            )
+        loss_ctc = 0.
+        if self.hparams.ctc_weight>0.:
+            loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq
@@ -152,8 +160,75 @@ class TrfASR(AdvASRBrain):
 
         return loss
 
+    def fit_batch(self, batch):
+        """Train the parameters given a single batch in input"""
+        # check if we need to switch optimizer
+        # if so change the optimizer from Adam to SGD
+        self.check_and_reset_optimizer()
+
+        predictions = self.compute_forward(batch, sb.Stage.TRAIN)
+        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+
+        # normalize the loss by gradient_accumulation step
+        (loss / self.hparams.gradient_accumulation).backward()
+
+        if self.step % self.hparams.gradient_accumulation == 0:
+            # gradient clipping & early stop if loss is not fini
+            self.check_gradients(loss)
+
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+
+            # anneal lr every update
+            self.hparams.noam_annealing(self.optimizer)
+
+        return loss.detach()
+
+    def check_and_reset_optimizer(self):
+        """reset the optimizer if training enters stage 2"""
+        current_epoch = self.hparams.epoch_counter.current
+        if not hasattr(self, "switched"):
+            self.switched = False
+            if isinstance(self.optimizer, torch.optim.SGD):
+                self.switched = True
+
+        if self.switched is True:
+            return
+
+        if current_epoch > self.hparams.stage_one_epochs:
+            self.optimizer = self.hparams.SGD(self.modules.parameters())
+
+            if self.checkpointer is not None:
+                self.checkpointer.add_recoverable("optimizer", self.optimizer)
+
+            self.switched = True
+
+    def fit_batch_adversarial(self, batch):
+        """Train the parameters given a single batch in input"""
+        # check if we need to switch optimizer
+        # if so change the optimizer from Adam to SGD
+        self.check_and_reset_optimizer()
+
+        predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+
+        # normalize the loss by gradient_accumulation step
+        (loss / self.hparams.gradient_accumulation).backward()
+
+        if self.step % self.hparams.gradient_accumulation == 0:
+            # gradient clipping & early stop if loss is not fini
+            self.check_gradients(loss)
+
+            self.optimizer.step()
+            self.optimizer.zero_grad()
+
+            # anneal lr every update
+            self.hparams.noam_annealing(self.optimizer)
+
+        return loss.detach()
+    
     def on_stage_start(self, stage, epoch):
-        """Gets called at the beginning of each epoch"""
+        # Gets called at the beginning of each epoch
         if stage != sb.Stage.TRAIN:
             self.acc_metric = self.hparams.acc_computer()
             self.wer_metric = self.hparams.error_rate_computer()
@@ -163,7 +238,7 @@ class TrfASR(AdvASRBrain):
             self.adv_wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
-        """Gets called at the end of a epoch."""
+        # Gets called at the end of a epoch.
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
@@ -181,7 +256,7 @@ class TrfASR(AdvASRBrain):
                 or stage == sb.Stage.TEST
             ):
                 stage_stats["WER"] = self.wer_metric.summarize("error_rate")
-                stage_stats["CER"] = self.adv_cer_metric.summarize("error_rate")
+                stage_stats["CER"] = self.cer_metric.summarize("error_rate")
 
                 if stage_adv_loss is not None:
                     stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
@@ -212,11 +287,12 @@ class TrfASR(AdvASRBrain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
-            self.checkpointer.save_and_keep_only(
-                meta={"ACC": stage_stats["ACC"], "epoch": epoch},
-                max_keys=["ACC"],
-                num_to_keep=5,
-            )
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta={"ACC": stage_stats["ACC"], "epoch": epoch},
+                    max_keys=["ACC"],
+                    num_to_keep=5,
+                )
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -229,8 +305,10 @@ class TrfASR(AdvASRBrain):
             # save the averaged checkpoint at the end of the evaluation stage
             # delete the rest of the intermediate checkpoints
             # ACC is set to 1.1 so checkpointer only keeps the averaged checkpoint
-            self.checkpointer.save_and_keep_only(
-                meta={"ACC": 1.1, "epoch": epoch},
-                max_keys=["ACC"],
-                num_to_keep=1,
-            )
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta={"ACC": 1.1, "epoch": epoch},
+                    max_keys=["ACC"],
+                    num_to_keep=1,
+                )
+    

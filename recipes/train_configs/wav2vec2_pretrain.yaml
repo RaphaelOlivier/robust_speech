@@ -15,7 +15,7 @@ train_log: !ref <output_folder>/train_log.txt
 # URL for the base english wav2vec2 model.
 wav2vec2_hub: facebook/wav2vec2-base-960h
 
-brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VBrain
+brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
@@ -88,7 +88,7 @@ test_dataloader_options:
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <number_of_epochs>
 
-wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2Pretrain
+wav2vec2: !new:robust_speech.models.wav2vec2_pretrain.AdvHuggingFaceWav2Vec2Pretrain
     source: !ref <wav2vec2_hub>
     save_path: !ref <save_folder>/wav2vec2_checkpoints
     mask_prob: !ref <mask_prob>
@@ -102,6 +102,8 @@ opt_class: !name:torch.optim.AdamW
     betas: (0.9, 0.98)
     eps: 0.000000001
     weight_decay: !ref <weight_decay>
+
+tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
 noam_annealing: !new:speechbrain.nnet.schedulers.NoamScheduler
     lr_initial: !ref <lr_adam>

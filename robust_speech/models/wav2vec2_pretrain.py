@@ -3,23 +3,38 @@
 import sys
 import torch
 import logging
+import numpy as np
+import torch
+
+import torch.nn.functional as F
+
 import speechbrain as sb
 
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
 
-from transformers import (
-    Wav2Vec2ForPreTraining, 
+import transformers
+
+from transformers import Wav2Vec2ForPreTraining
+
+from transformers import Wav2Vec2Model, HubertModel
+from transformers import Wav2Vec2Config, HubertConfig
+from transformers.models.wav2vec2.modeling_wav2vec2 import (
     Wav2Vec2ForPreTrainingOutput, 
-    WAV_2_VEC_2_INPUTS_DOCSTRING,
-    _CONFIG_FOR_DOC
+    Wav2Vec2FeatureExtractor,
+    WAV_2_VEC_2_INPUTS_DOCSTRING, 
+    _CONFIG_FOR_DOC,
+    _compute_mask_indices
 )
+
+from transformers.models.wav2vec2.configuration_wav2vec2 import Wav2Vec2Config
 from transformers.file_utils import (
     add_start_docstrings_to_model_forward,
     replace_return_docstrings,
 )
 
-from speechbrain.lobes.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain
+from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain, HuggingFaceWav2Vec2
+from speechbrain.pretrained.fetching import fetch
 """Recipe for pretraining a wav2vec 2.0 model on CommonVoice EN. Note that it can be
 trained with ANY dataset as long as you provide the correct JSON or CSV file.
 
@@ -48,9 +63,44 @@ Authors
  * Yan Gao 2021
 """
 
+HF_models = {"wav2vec2": Wav2Vec2Model, "hubert": HubertModel}
+
+HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
+
+
 logger = logging.getLogger(__name__)
 
+class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
+    def forward(self, input_values):
+        hidden_states = input_values[:, None]
+        # make sure hidden_states require grad for gradient_checkpointing
+        if self._requires_grad and self.training and hidden_states.is_leaf: # not always true when attacking
+            hidden_states.requires_grad = True
+
+        for conv_layer in self.conv_layers:
+            if self._requires_grad and self.gradient_checkpointing and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs)
+
+                    return custom_forward
+
+                hidden_states = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(conv_layer),
+                    hidden_states,
+                )
+            else:
+                hidden_states = conv_layer(hidden_states)
+
+        return hidden_states
+
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
+    def __init__(self, config: Wav2Vec2Config):
+        super().__init__(config)
+        self.wav2vec2.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
+
+    
     @add_start_docstrings_to_model_forward(WAV_2_VEC_2_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=Wav2Vec2ForPreTrainingOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
@@ -109,7 +159,6 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
 
         if mask_time_indices is not None:
             mask_time_indices = mask_time_indices.to(torch.bool)
-
         outputs = self.wav2vec2(
             input_values,
             attention_mask=attention_mask,
@@ -181,7 +230,6 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
 
             # 8. \mathbf{L} = \mathbf{L}_m + \alpha * \mathbf{L}_d
             loss = contrastive_loss + self.config.diversity_loss_weight * diversity_loss
-
         if not return_dict:
             if loss is not None:
                 return (loss, transformer_features, quantized_features, codevector_perplexity) + outputs[2:]
@@ -214,20 +262,69 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             mask_length=10,
             normalize_wav=True
         )
-        self.model = AdvWav2Vec2ForPreTraining(self.config)
-        self.model.gradient_checkpointing_disable()  # Required by DDP
-        self.model.train()
+        self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
+
+
+    def forward(self, wav, quantized_representation=None):
+        """Takes an input waveform and return its corresponding wav2vec encoding.
+
+        Arguments
+        ---------
+        wav : torch.Tensor (signal)
+            A batch of audio signals to transform to features.
+        """
+        batch_size, raw_sequence_length = wav.shape
+        if self.normalize_wav:
+            wav = F.layer_norm(wav, wav.shape)
+        sequence_length = self.model._get_feat_extract_output_lengths(
+            raw_sequence_length
+        )
+
+        # 1. Compute the indices that will be masked
+        mask_time_indices = _compute_mask_indices(
+            (batch_size, sequence_length),
+            mask_prob=self.mask_prob,
+            mask_length=self.mask_length,
+        )
+        torch_mask_time_indices = torch.tensor(
+            mask_time_indices, device=wav.device, dtype=torch.long,
+        )
+
+        # 2. Sample the negative samples from the entire sequence.
+        # Fairseq does it only on the masked indices, but this only work if you
+        # have long sentences. For more versatily, we sample on the entire sequence.
+        # value.
+        full_sentence_indices = np.ones((batch_size, sequence_length))
+
+        # print(np.sum(mask_time_indices, axis=1))
+        negative_sample_indices = torch.tensor(
+            transformers.models.wav2vec2.modeling_wav2vec2._sample_negative_indices(
+                (batch_size, sequence_length),
+                num_negatives=self.config.num_negatives,
+                mask_time_indices=full_sentence_indices,
+            ),
+            device=wav.device,
+            dtype=torch.long,
+        )
+        return (
+            self.model(
+                wav,
+                mask_time_indices=torch_mask_time_indices,
+                sampled_negative_indices=negative_sample_indices,
+                quantized_representation=quantized_representation
+            ),
+            torch_mask_time_indices,
+        )
 
 # Define training procedure
 class W2VPretrain(AdvASRBrain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the w2v2 loss."""
+        wavs, wav_lens = batch.sig
 
         if not stage == rs.Stage.ATTACK:
             batch = batch.to(self.device)
-        wavs, wav_lens = batch.sig
-        wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
-
+            wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Forward on w2v2 and take the loss.
         # It has to be on train mode even for eval. Otherwise it would deactivate
         # the loss computation ...
@@ -237,7 +334,7 @@ class W2VPretrain(AdvASRBrain):
                 quantized_representation=batch.quantized_representation
             )
         else:
-            out, mask = self.modules.wav2vec2(wavs)
+            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None)
 
         if stage == rs.Stage.ATTACK:
             loss = out.contrastive_loss
@@ -247,12 +344,10 @@ class W2VPretrain(AdvASRBrain):
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             return loss, out, mask
-
         return loss
 
     def compute_objectives(self, predictions, batch, stage, adv = False):
         """Computes the loss (CTC+NLL) given predictions and targets."""
-
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns
             # the constrative loss.
@@ -263,12 +358,12 @@ class W2VPretrain(AdvASRBrain):
             cosine_sim = torch.cosine_similarity(
                 out.projected_states, out.projected_quantized_states, dim=-1
             )
-            acc = cosine_sim[mask_time_indices].mean()
+            #acc = cosine_sim[mask_time_indices].mean()
+            acc = torch.masked_select(cosine_sim,mask_time_indices.bool()).mean()
             if adv:
                 self.adv_acc_metric.append(acc)
             else:
                 self.acc_metric.append(acc)
-
         return loss
 
     def fit_batch(self, batch):

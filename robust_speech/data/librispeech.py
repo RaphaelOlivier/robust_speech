@@ -425,58 +425,68 @@ def dataio_prepare(hparams):
     It also defines the data processing pipeline through user-defined functions."""
     data_folder = hparams["data_folder"]
 
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_root": data_folder},
-    )
-
-    train_data = train_data.filtered_sorted(
-        key_max_value={"duration": hparams["avoid_if_longer_than"]},
-        key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+    train_data = None
+    if "train_csv" in hparams:
+        train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+            csv_path=hparams["train_csv"], replacements={"data_root": data_folder},
         )
 
-
-    if hparams["sorting"] == "ascending":
-        # we sort training data to speed up training and get better results.
-        train_data = train_data.filtered_sorted(sort_key="duration")
-        # when sorting do not shuffle in dataloader ! otherwise is pointless
-        hparams["train_dataloader_opts"]["shuffle"] = False
-
-    elif hparams["sorting"] == "descending":
         train_data = train_data.filtered_sorted(
-            sort_key="duration", reverse=True
-        )
-        # when sorting do not shuffle in dataloader ! otherwise is pointless
-        hparams["train_dataloader_opts"]["shuffle"] = False
+            key_max_value={"duration": hparams["avoid_if_longer_than"]},
+            key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+            )
 
-    elif hparams["sorting"] == "random":
-        pass
 
-    else:
-        raise NotImplementedError(
-            "sorting must be random, ascending or descending"
-        )
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="duration")
+        if hparams["sorting"] == "ascending":
+            # we sort training data to speed up training and get better results.
+            train_data = train_data.filtered_sorted(sort_key="duration")
+            # when sorting do not shuffle in dataloader ! otherwise is pointless
+            hparams["train_dataloader_opts"]["shuffle"] = False
 
-    valid_data = valid_data.filtered_sorted(
-        key_max_value={"duration": hparams["avoid_if_longer_than"]},
-        key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+        elif hparams["sorting"] == "descending":
+            train_data = train_data.filtered_sorted(
+                sort_key="duration", reverse=True
+            )
+            # when sorting do not shuffle in dataloader ! otherwise is pointless
+            hparams["train_dataloader_opts"]["shuffle"] = False
+
+        elif hparams["sorting"] == "random":
+            pass
+
+        else:
+            raise NotImplementedError(
+                "sorting must be random, ascending or descending"
+            )
+
+    valid_data = None
+    if "valid_csv" in hparams:
+        valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+            csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
         )
+        #valid_data = valid_data.filtered_sorted(sort_key="duration")
+
+        valid_data = valid_data.filtered_sorted(
+            key_max_value={"duration": hparams["avoid_if_longer_than"]},
+            key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+            )
 
     # test is separate
     test_datasets = {}
-    for csv_file in hparams["test_csv"]:
-        name = Path(csv_file).stem
-        test_datasets[name] = sb.dataio.dataset.DynamicItemDataset.from_csv(
-            csv_path=csv_file, replacements={"data_root": data_folder}
-        )
-        test_datasets[name] = test_datasets[name].filtered_sorted(
-            sort_key="duration"
-        )
-
-    datasets = [train_data, valid_data] + [i for k, i in test_datasets.items()]
+    if "test_csv" in hparams:
+        for csv_file in hparams["test_csv"]:
+            name = Path(csv_file).stem
+            test_datasets[name] = sb.dataio.dataset.DynamicItemDataset.from_csv(
+                csv_path=csv_file, replacements={"data_root": data_folder}
+            )
+            #test_datasets[name] = test_datasets[name].filtered_sorted(
+            #    sort_key="duration"
+            #)
+    datasets = []
+    if train_data:
+        datasets.append(train_data)
+    if valid_data:
+        datasets.append(valid_data)
+    datasets = datasets + [i for k, i in test_datasets.items()]
 
     # We get the tokenizer as we need it to encode the labels when creating
     # mini-batches.
@@ -512,19 +522,24 @@ def dataio_prepare(hparams):
 
         sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
-        lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
-        special_labels = {
-            "bos_label": hparams["bos_index"],
-            "eos_label": hparams["eos_index"],
-            "blank_label": hparams["blank_index"],
-        }
-        tokenizer.load_or_create(
-            path=lab_enc_file,
-            from_didatasets=[train_data],
-            output_key="char_list",
-            special_labels=special_labels,
-            sequence_input=True,
-        )
+        if "pretrained_tokenizer_path" in hparams:
+            lab_enc_file = hparams["pretrained_tokenizer_path"]
+            tokenizer.load(path=lab_enc_file)
+        else:
+            lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+
+            special_labels = {
+                "bos_label": hparams["bos_index"],
+                "eos_label": hparams["eos_index"],
+                "blank_label": hparams["blank_index"],
+            }
+            tokenizer.load_or_create(
+                path=lab_enc_file,
+                from_didatasets=[datasets[0]],
+                output_key="char_list",
+                special_labels=special_labels,
+                sequence_input=True,
+            )
 
         # 4. Set output:
         sb.dataio.dataset.set_output_keys(
@@ -557,7 +572,7 @@ def dataio_prepare(hparams):
 
     train_batch_sampler = None
     valid_batch_sampler = None
-    if hparams["dynamic_batching"]:
+    if "dynamic_batching" in hparams and hparams["dynamic_batching"]:
         from speechbrain.dataio.sampler import DynamicBatchSampler  # noqa
         from speechbrain.dataio.dataloader import SaveableDataLoader  # noqa
         from speechbrain.dataio.batch import PaddedBatch  # noqa
@@ -568,23 +583,25 @@ def dataio_prepare(hparams):
 
         max_batch_len = dynamic_hparams["max_batch_len"]
 
-        train_batch_sampler = DynamicBatchSampler(
-            train_data,
-            max_batch_len,
-            num_buckets=num_buckets,
-            length_func=lambda x: x["duration"] * hparams["sample_rate"],
-            shuffle=dynamic_hparams["shuffle_ex"],
-            batch_ordering=dynamic_hparams["batch_ordering"],
-        )
+        if train_data:
+            train_batch_sampler = DynamicBatchSampler(
+                train_data,
+                max_batch_len,
+                num_buckets=num_buckets,
+                length_func=lambda x: x["duration"] * hparams["sample_rate"],
+                shuffle=dynamic_hparams["shuffle_ex"],
+                batch_ordering=dynamic_hparams["batch_ordering"],
+            )
 
-        valid_batch_sampler = DynamicBatchSampler(
-            valid_data,
-            max_batch_len,
-            num_buckets=num_buckets,
-            length_func=lambda x: x["duration"] * hparams["sample_rate"],
-            shuffle=dynamic_hparams["shuffle_ex"],
-            batch_ordering=dynamic_hparams["batch_ordering"],
-        )
+        if valid_data:
+            valid_batch_sampler = DynamicBatchSampler(
+                valid_data,
+                max_batch_len,
+                num_buckets=num_buckets,
+                length_func=lambda x: x["duration"] * hparams["sample_rate"],
+                shuffle=dynamic_hparams["shuffle_ex"],
+                batch_ordering=dynamic_hparams["batch_ordering"],
+            )
 
     return train_data, valid_data, test_datasets, train_batch_sampler, valid_batch_sampler, tokenizer
 

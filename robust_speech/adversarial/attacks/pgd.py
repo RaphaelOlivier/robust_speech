@@ -19,6 +19,8 @@ from advertorch.attacks.utils import rand_init_delta
 
 import robust_speech as rs
 
+from robust_speech.adversarial.attacks.attacker import Attacker
+
 def reverse_bound_from_rel_bound(batch,rel):
     wavs, wav_lens = batch.sig
     wav_lens = [int(wavs.size(1)*r) for r in wav_lens]
@@ -110,12 +112,12 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
             error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
             raise NotImplementedError(error)
         delta.grad.data.zero_()
-
+        #print(loss)
     wav_adv = clamp(wav_init + delta, clip_min, clip_max)
     return wav_adv
 
 
-class ASRPGDAttack(Attack, LabelMixin):
+class ASRPGDAttack(Attacker):
     """
     The projected gradient descent attack (Madry et al, 2017).
     The attack performs nb_iter steps of size eps_iter, while always staying

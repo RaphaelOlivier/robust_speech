@@ -7,6 +7,7 @@ import torch.optim as optim
 from advertorch.utils import replicate_input
 from advertorch.attacks.base import Attack
 from advertorch.attacks.base import LabelMixin
+from robust_speech.adversarial.attacks.attacker import Attacker
 
 import speechbrain as sb
 
@@ -26,7 +27,7 @@ def calc_l2distsq(x, y, mask):
     return d.view(d.shape[0], -1).sum(dim=1) #/ mask.view(mask.shape[0], -1).sum(dim=1)
 
 
-class KenansvilleAttack(Attack, LabelMixin):
+class KenansvilleAttack(Attacker):
     """
     The Kenansville Attack, https://arxiv.org/abs/1910.05262
     """

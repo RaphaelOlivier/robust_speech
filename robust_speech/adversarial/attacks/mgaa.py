@@ -10,8 +10,9 @@ import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import perturb_iterative, reverse_bound_from_rel_bound
 
 from advertorch.attacks.base import Attack,LabelMixin
+from robust_speech.adversarial.attacks.attacker import Attacker
 
-class ASRMGAA(Attack, LabelMixin):
+class ASRMGAA(Attacker):
     """
     Meta Gradient Adversarial Attack for transferable examples.
     Paper: https://arxiv.org/abs/2108.04204

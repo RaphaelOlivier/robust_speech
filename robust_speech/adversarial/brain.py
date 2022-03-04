@@ -195,7 +195,10 @@ class AdvASRBrain(ASRBrain):
         assert stage != rs.Stage.ATTACK
         wavs = batch.sig[0]
         if self.attacker is not None:
-            adv_wavs = self.attacker.perturb(batch)
+            if stage == sb.Stage.TEST:
+                adv_wavs = self.attacker.perturb_and_log(batch)
+            else:
+                adv_wavs = self.attacker.perturb(batch)
             batch.sig = adv_wavs, batch.sig[1]
         res = self.compute_forward(batch,stage)
         batch.sig = wavs, batch.sig[1]
@@ -237,7 +240,7 @@ class AdvASRBrain(ASRBrain):
             self.scaler.update()
         else:
             outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=False)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -288,7 +291,7 @@ class AdvASRBrain(ASRBrain):
             self.scaler.update()
         else:
             outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=True)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -308,7 +311,7 @@ class AdvASRBrain(ASRBrain):
         """Computations needed for validation/test batches"""
         predictions = self.compute_forward(batch, stage=stage)
         with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage)
+            loss = self.compute_objectives(predictions, batch, stage=stage, adv=False)
         return loss.detach()
 
 
@@ -318,7 +321,7 @@ class AdvASRBrain(ASRBrain):
 
         predictions = self.compute_forward_adversarial(batch, stage=stage)
         with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage)
+            loss = self.compute_objectives(predictions, batch, stage=stage, adv=True)
         return loss.detach()
 
     def fit(
@@ -553,6 +556,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_adv_loss = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
+            self.attacker.on_evaluation_start()
 
         for batch in tqdm(
             test_set, dynamic_ncols=True, disable=not progressbar
@@ -575,6 +579,7 @@ class AdvASRBrain(ASRBrain):
                 kwargs={"stage_adv_loss":avg_test_adv_loss}
         )
         self.step = 0
+        self.on_evaluate_end()
         return avg_test_loss
 
     
@@ -620,3 +625,11 @@ class AdvASRBrain(ASRBrain):
             )
             with open(self.hparams.wer_file, "w") as w:
                 self.wer_metric.write_stats(w)
+
+    def on_evaluate_start(self, max_key=None, min_key=None):
+        super().on_evaluate_start(max_key=max_key,min_key=min_key)
+        if self.attacker is not None:
+            self.attacker.on_evaluation_start()
+    def on_evaluate_end(self):
+        if self.attacker is not None:
+            self.attacker.on_evaluation_end(self.hparams.train_logger)

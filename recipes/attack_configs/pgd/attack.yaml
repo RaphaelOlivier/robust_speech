@@ -11,7 +11,7 @@
 seed: 1001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
-output_folder: !ref <root>/attacks/wav2_contrastive/<seed>
+output_folder: !ref <root>/attacks/pgd/<seed>
 model_folder: !ref <root>/models
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
@@ -24,18 +24,16 @@ train_log: !ref <output_folder>/train_log.txt
 # directory containing the lm.ckpt and tokenizer.ckpt may also be specified
 # instead. E.g if you want to use your own LM / tokenizer.
 
-#attack_class: !name:robust_speech.adversarial.attacks.contrastive.ConstrastiveASRAttack
-#  targeted: False
-#  eps: 0.003
-#  nb_iter: 15
-attack_class: null
+attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
+  targeted: False
+  snr: 30
+  nb_iter: 15
+
 #source_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 #source_brain_hparams_file: attack_configs/wav2vec2_contrastive/w2v2.yaml
-#target_brain_class: !name:robust_speech.models.seq2seq.S2SASR
-#target_brain_hparams_file: attack_configs/wav2vec2_contrastive/s2s.yaml
 
-target_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
-target_brain_hparams_file: attack_configs/wav2vec2_contrastive/w2v2ft.yaml
+target_brain_class: !name:robust_speech.models.seq2seq.S2SASR
+target_brain_hparams_file: attack_configs/wav2vec2_contrastive/s2s.yaml
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
@@ -76,10 +74,9 @@ valid_dataloader_opts:
 test_dataloader_opts:
     batch_size: 1
 
-#pretrained_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
-#tokenizer: !new:sentencepiece.SentencePieceProcessor
-tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
-pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2_fine_tune_char/vocab.txt
+pretrained_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
+tokenizer: !new:sentencepiece.SentencePieceProcessor
+
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
 

@@ -55,8 +55,9 @@ if __name__ == "__main__":
 
     dataio_prepare = hparams["dataio_prepare_fct"]
 
-    run_on_main(hparams["pretrainer"].collect_files)
-    hparams["pretrainer"].load_collected(device=run_opts["device"])
+    if "pretrainer" in hparams:
+        run_on_main(hparams["pretrainer"].collect_files)
+        hparams["pretrainer"].load_collected(device=run_opts["device"])
 
     # here we create the datasets objects as well as tokenization and encoding
     train_data, valid_data, test_datasets, train_bsampler, valid_bsampler, tokenizer = dataio_prepare(

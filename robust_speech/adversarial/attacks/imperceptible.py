@@ -29,34 +29,57 @@ from robust_speech.adversarial.attacks.cw import (
 )
 
 class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
+    """
+    A Carlini&Wagner attack for ASR models.
+    The algorithm follows non strictly the first attack in https://arxiv.org/abs/1801.01944
+    This implementation is based on the one in advertorch for classification models (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py).
+    It was pruned of elements that aren't present in the ASR CW attack paper above, like tanh rescaling.
+
+    Arguments
+    ---------
+     asr_brain : rs.adversarial.brain.ASRBrain
+        the brain object to attack
+     success_only: bool
+        if the adversarial noise should only be returned when the attack is successful.
+     targeted: bool
+        if the attack is targeted (always true for now).
+     abort_early: bool
+        if set to true, abort early if getting stuck in localmin
+     eps: float
+        Linf bound applied to the perturbation.
+     learning_rate_phase_1: float
+        the learning rate for the attack algorithm in phase 1
+     max_iterations_phase_1: int
+        the maximum number of iterations in phase 1
+     learning_rate_phase_2: float
+        the learning rate for the attack algorithm in phase 2
+     max_iterations_phase_2: int
+        the maximum number of iterations in phase 2
+     binary_search_steps_phase_2: int
+        number of binary search times to find the optimum in phase 2
+     initial_const_phase_2: float
+        initial value of the constant c in phase 2
+     clip_min: float
+        mininum value per input dimension (ignored: herefor compatibility).
+     clip_max: float
+        maximum value per input dimension (ignored: herefor compatibility).
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
+     win_length: int
+        window length for computing spectral density
+     hop_length: int
+        hop length for computing spectral density
+     n_fft: int
+        number of FFT bins for computing spectral density.
+    """
     def __init__(
         self, asr_brain, success_only=True,abort_early=True, targeted=True,eps=0.05,
         learning_rate_phase_1=0.01, max_iterations_phase_1=1000,
         learning_rate_phase_2=0.01, max_iterations_phase_2=1000,
         binary_search_steps_phase_2=9, initial_const_phase_2=1e0,
         clip_min=-1., clip_max=1., train_mode_for_backward=True,
-        win_length: int = 2048,hop_length: int = 512,n_fft: int = 2048,
+        win_length = 2048,hop_length = 512,n_fft = 2048,
         ):
-        """
-        :param asr_brain: the brain object
-        :param success_only: if the adversarial noise should only be returned when the attack is successful.
-        :param abort_early: if set to true, abort early if getting stuck in local min
-        :param targeted: if the attack is targeted (always true for now).
-        :param eps: Linf bound applied to the perturbation.
-        :param learning_rate_phase_1: the learning rate for the attack algorithm in phase 1
-        :param max_iterations_phase_1: the maximum number of iterations in phase 1
-        :param learning_rate_phase_2: the learning rate for the attack algorithm in phase 2
-        :param max_iterations_phase_2: the maximum number of iterations in phase 2
-        :param binary_search_steps_phase_2: number of binary search times to find the
-            optimum in phase 2
-        :param initial_const_phase_2: initial value of the constant c in phase 2
-        :param clip_min: mininum value per input dimension (ignored: herefor compatibility).
-        :param clip_max: maximum value per input dimension (ignored: herefor compatibility).
-        :param train_mode_for_backward: whether to force training mode in backward passes (necessary for RNN models)
-        :param win_length: window length for computing spectral density
-        :param hop_length: hop length for computing spectral density
-        :param n_fft: number of FFT bins for computing spectral density.
-        """
 
         raise NotImplementedError('This attack is under development')
 
@@ -268,6 +291,18 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         return psd
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         
         theta_batch = []
         max_psd_init = []

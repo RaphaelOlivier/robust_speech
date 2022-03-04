@@ -1,9 +1,3 @@
-"""
-A Carlini&Wagner attack for ASR models.
-The algorithm follows non strictly the first attack in https://arxiv.org/abs/1801.01944
-This implementation is based on the one in advertorch for classification models (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py).
-It was pruned of elements that aren't present in the ASR CW attack paper above, like tanh rescaling.
-"""
 
 import torch
 import torch.nn as nn
@@ -44,20 +38,38 @@ def calc_l2distsq(x, y, mask):
 
 class ASRCarliniWagnerAttack(Attack, LabelMixin):
     """
-    :param asr_brain: the brain object
-    :param success_only: if the adversarial noise should only be returned when the attack is successful.
-    :param targeted: if the attack is targeted (always true for now).
-    :param learning_rate: the learning rate for the attack algorithm
-    :param binary_search_steps: number of binary search times to find the
+    A Carlini&Wagner attack for ASR models.
+    The algorithm follows non strictly the first attack in https://arxiv.org/abs/1801.01944
+    This implementation is based on the one in advertorch for classification models (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py).
+    It was pruned of elements that aren't present in the ASR CW attack paper above, like tanh rescaling.
+
+    Arguments
+    ---------
+     asr_brain : rs.adversarial.brain.ASRBrain
+        the brain object to attack
+     success_only: bool
+        if the adversarial noise should only be returned when the attack is successful.
+     targeted: bool
+        if the attack is targeted (always true for now).
+     learning_rate: float
+        the learning rate for the attack algorithm
+     binary_search_steps: int
+        number of binary search times to find the
         optimum
-    :param max_iterations: the maximum number of iterations
-    :param abort_early: if set to true, abort early if getting stuck in local
-        min
-    :param initial_const: initial value of the constant c
-    :param eps: Linf bound applied to the perturbation.
-    :param clip_min: mininum value per input dimension (ignored: herefor compatibility).
-    :param clip_max: maximum value per input dimension (ignored: herefor compatibility).
-    :param train_mode_for_backward: whether to force training mode in backward passes (necessary for RNN models)
+     max_iterations: int
+        the maximum number of iterations
+     abort_early: bool
+        if set to true, abort early if getting stuck in localmin
+     initial_const: float
+        initial value of the constant c
+     eps: float
+        Linf bound applied to the perturbation.
+     clip_min: float
+        mininum value per input dimension (ignored: herefor compatibility).
+     clip_max: float
+        maximum value per input dimension (ignored: herefor compatibility).
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
     """
 
     def __init__(self, asr_brain, success_only=True,
@@ -153,6 +165,18 @@ class ASRCarliniWagnerAttack(Attack, LabelMixin):
                     loss_coeffs[ii] *= 10
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         else:

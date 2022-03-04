@@ -1,4 +1,3 @@
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -10,7 +9,6 @@ from advertorch.utils import clamp_by_pnorm
 from advertorch.utils import is_float_or_torch_tensor
 from advertorch.utils import batch_multiply
 from advertorch.utils import batch_clamp
-from advertorch.utils import replicate_input
 from advertorch.utils import batch_l1_proj
 from advertorch.attacks.utils import rand_init_delta
 
@@ -32,25 +30,38 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
                       clip_min=None, clip_max=None,
                       l1_sparsity=None):
     """
-    Iteratively maximize the loss over the input. It is a shared method for
-    iterative attacks including IterativeGradientSign, LinfPGD, etc.
-    :param xvar: input data.
-    :param yvar: input labels.
-    :param predict: forward pass function.
-    :param nb_iter: number of iterations.
-    :param eps: maximum distortion.
-    :param eps_iter: attack step size.
-    :param loss_fn: loss function.
-    :param delta_init: (optional) tensor contains the random initialization.
-    :param minimize: (optional bool) whether to minimize or maximize the loss.
-    :param ord: (optional) the order of maximum distortion (inf or 2).
-    :param clip_min: mininum value per input dimension.
-    :param clip_max: maximum value per input dimension.
-    :param l1_sparsity: sparsity value for L1 projection.
-                  - if None, then perform regular L1 projection.
-                  - if float value, then perform sparse L1 descent from
-                    Algorithm 1 in https://arxiv.org/pdf/1904.13000v1.pdf
-    :return: tensor containing the perturbed input.
+    Iteratively maximize the loss over the input.
+
+    Arguments
+    ---------
+    :asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     eps: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     ord: (optional) int
+         the order of maximum distortion (inf or 2).
+     targeted: bool
+        if the attack is targeted.
+     l1_sparsity: optional float
+        sparsity value for L1 projection.
+            - if None, then perform regular L1 projection.
+            - if float value, then perform sparse L1 descent from
+            Algorithm 1 in https://arxiv.org/pdf/1904.13000v1.pdf
+
+
+    Returns
+    -------
+     tensor containing the perturbed input.
     """
     wav_init, wav_lens = batch.sig
     if delta_init is not None:
@@ -115,29 +126,40 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
 
 class ASRPGDAttack(Attack, LabelMixin):
     """
-    The projected gradient descent attack (Madry et al, 2017).
+    Implementation of the PGD attack (https://arxiv.org/abs/1706.06083)
+    Based on the Advertorch implementation (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/iterative_projected_gradient.py)
     The attack performs nb_iter steps of size eps_iter, while always staying
     within eps from the initial point.
-    Paper: https://arxiv.org/pdf/1706.06083.pdf
-    :param predict: forward pass function.
-    :param loss_fn: loss function.
-    :param eps: maximum distortion.
-    :param nb_iter: number of iterations.
-    :param eps_iter: attack step size.
-    :param rand_init: (optional bool) random initialization.
-    :param clip_min: mininum value per input dimension.
-    :param clip_max: maximum value per input dimension.
-    :param ord: (optional) the order of maximum distortion (inf or 2).
-    :param targeted: if the attack is targeted.
+    
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     eps: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     ord: (optional) int
+         the order of maximum distortion (inf or 2).
+     targeted: bool
+        if the attack is targeted.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
     """
 
     def __init__(
             self, asr_brain, eps=0.3, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
             ord=np.inf, l1_sparsity=None, targeted=False, train_mode_for_backward=True):
-        """
-        Create an instance of the PGDAttack.
-        """
+
         self.clip_min = clip_min
         self.clip_max = clip_max
         self.eps = eps
@@ -153,20 +175,22 @@ class ASRPGDAttack(Attack, LabelMixin):
         assert is_float_or_torch_tensor(self.eps)
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         else:
             self.asr_brain.module_eval()
-        """
-        Given examples (x, y), returns their adversarial counterparts with
-        an attack length of eps.
-        :param x: input tensor.
-        :param y: label tensor.
-                  - if None and self.targeted=False, compute y as predicted
-                    labels.
-                  - if self.targeted=True, then y must be the targeted labels.
-        :return: tensor containing perturbed inputs.
-        """
         
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
@@ -199,15 +223,26 @@ class ASRPGDAttack(Attack, LabelMixin):
 class ASRL2PGDAttack(ASRPGDAttack):
     """
     PGD Attack with order=L2
-    :param predict: forward pass function.
-    :param loss_fn: loss function.
-    :param eps: maximum distortion.
-    :param nb_iter: number of iterations.
-    :param eps_iter: attack step size.
-    :param rand_init: (optional bool) random initialization.
-    :param clip_min: mininum value per input dimension.
-    :param clip_max: maximum value per input dimension.
-    :param targeted: if the attack is targeted.
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     eps: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     targeted: bool
+        if the attack is targeted.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
     """
 
     def __init__(
@@ -225,15 +260,26 @@ class ASRL2PGDAttack(ASRPGDAttack):
 class ASRLinfPGDAttack(ASRPGDAttack):
     """
     PGD Attack with order=Linf
-    :param predict: forward pass function.
-    :param loss_fn: loss function.
-    :param eps: maximum distortion.
-    :param nb_iter: number of iterations.
-    :param rel_eps_iter: relative attack step size.
-    :param rand_init: (optional bool) random initialization.
-    :param clip_min: mininum value per input dimension.
-    :param clip_max: maximum value per input dimension.
-    :param targeted: if the attack is targeted.
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     eps: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     targeted: bool
+        if the attack is targeted.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
     """
 
     def __init__(
@@ -249,6 +295,32 @@ class ASRLinfPGDAttack(ASRPGDAttack):
 
 
 class SNRPGDAttack(ASRL2PGDAttack):
+    """
+    PGD Attack with order=L2, bounded with Signal-Noise Ratio instead of L2 norm
+
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     snr: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     ord: (optional) int
+         the order of maximum distortion (inf or 2).
+     targeted: bool
+        if the attack is targeted.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
+    """
     def __init__(
             self, asr_brain, snr=40, nb_iter=40,
             rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
@@ -261,17 +333,6 @@ class SNRPGDAttack(ASRL2PGDAttack):
         self.rel_eps=torch.pow(torch.tensor(10.),float(snr)/20)
 
     def perturb(self, batch):
-        """
-        Given examples (x, y), returns their adversarial counterparts with
-        an attack length of eps.
-        :param x: input tensor.
-        :param y: label tensor.
-                  - if None and self.targeted=False, compute y as predicted
-                    labels.
-                  - if self.targeted=True, then y must be the targeted labels.
-        :return: tensor containing perturbed inputs.
-        """
-
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         self.eps = reverse_bound_from_rel_bound(batch,self.rel_eps)

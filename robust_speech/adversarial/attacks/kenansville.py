@@ -1,11 +1,5 @@
 
 
-"""
-Implementation of the Kenansville Attack (https://arxiv.org/abs/1910.05262).
-This attack is model independant and only considers the input audio and its Power Spectral Density.
-The implementation is based on the Armory one (https://github.com/twosixlabs/armory/blob/master/armory/art_experimental/attacks/kenansville_dft.py)
-"""
-
 import torch
 
 #from advertorch.utils import calc_l2distsq
@@ -29,6 +23,24 @@ def calc_l2distsq(x, y, mask):
 
 class KenansvilleAttack(Attack, LabelMixin):
 
+    """
+    Implementation of the Kenansville Attack (https://arxiv.org/abs/1910.05262).
+    This attack is model independant and only considers the input audio and its Power Spectral Density.
+    The implementation is based on the Armory one (https://github.com/twosixlabs/armory/blob/master/armory/art_experimental/attacks/kenansville_dft.py)
+    
+    Arguments
+    ---------
+     asr_brain : rs.adversarial.brain.ASRBrain
+        the brain object to attack
+     targeted: bool
+        if the attack is targeted (always true for now).
+     snr_db: float
+        Linf bound applied to the perturbation.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
+
+    
+    """
     def __init__(self, asr_brain, targeted=False,snr_db=100,train_mode_for_backward=False):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
@@ -39,8 +51,18 @@ class KenansvilleAttack(Attack, LabelMixin):
         self.train_mode_for_backward=train_mode_for_backward # not used, for compatibility only
 
     def perturb(self, batch):
-        #save_device = batch.sig[0].device
-        #batch = batch.to(self.asr_brain.device)
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         wavs, rel_lengths = batch.sig 
         wavs = replicate_input(wavs)
         batch_size = wavs.size(0)

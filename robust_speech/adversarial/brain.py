@@ -1,19 +1,15 @@
 
-import os
-import sys
 import time
 import logging
-from typing import List
+import warnings
+warnings.simplefilter('once', RuntimeWarning)
 from tqdm import tqdm
 import torch
 from torch.utils.data import DataLoader
 from speechbrain.dataio.dataloader import LoopedLoader
 import speechbrain as sb
-from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import Attack
-from robust_speech.adversarial.metrics import snr, wer, cer
-from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
 
 logger = logging.getLogger(__name__)
@@ -21,7 +17,8 @@ logger = logging.getLogger(__name__)
 # Define training procedure
 class ASRBrain(sb.Brain):
     """
-    Intermediate abstract class that specifies some methods for ASR models that can be attacked.
+    Intermediate abstract brain class that specifies some methods for ASR models that can be attacked.
+    See sb.Brain for more details.
     """
 
     def compute_forward(self, batch, stage):
@@ -65,15 +62,27 @@ class ASRBrain(sb.Brain):
         raise NotImplementedError
 
     def module_train(self):
+        """
+        Set PyTorch modules to training mode
+        """
         self.modules.train()
 
     def module_eval(self):
+        """
+        Set PyTorch modules to eval mode
+        """
         self.modules.eval()
 
     def get_tokens(self,predictions):
+        """
+        Extract tokens from predictions
+        """
         return predictions[-1]
 
 class PredictionEnsemble:
+    """
+    Iterable of predictions returned by EnsembleASRBrain
+    """
     def __init__(self,predictions):
         self.predictions=predictions
     def __iter__(self,i):
@@ -82,6 +91,10 @@ class PredictionEnsemble:
         return len(self.predictions)
 
 class EnsembleASRBrain(ASRBrain):
+    """
+    Ensemble of multiple brains.
+    This class is used for attacks that compute adversarial noise simultaneously on multiple models.
+    """
     def __init__(self,asr_brains, ref_tokens = 0):
         self.asr_brains=asr_brains
         self.ref_tokens=ref_tokens # use this model to return tokens
@@ -100,7 +113,13 @@ class EnsembleASRBrain(ASRBrain):
         return PredictionEnsemble(predictions)
 
     def get_tokens(self,predictions, all=False, model_idx=None): 
-        # all or ref
+        """
+        Extract tokens from predictions.
+
+        :param predictions: model predictions
+        :param all: whether to extract all tokens or just one
+        :param model_idx: which model to extract tokens from (defaults to self.ref_tokens)
+        """
         if isinstance(predictions,PredictionEnsemble):
             assert len(predictions)==self.nmodels
             if all:
@@ -135,8 +154,68 @@ class EnsembleASRBrain(ASRBrain):
     
 class AdvASRBrain(ASRBrain):
     """
-    Intermediate abstract class that specifies some methods for ASR models that can be trained adversarially.
-    """
+    Intermediate abstract class that specifies some methods for ASR models that can be evaluated on attacks or trained adversarially.
+    See sb.Brain for more details.
+
+    Arguments
+    ---------
+    modules : dict of str:torch.nn.Module pairs
+        These modules are passed to the optimizer by default if they have
+        trainable parameters, and will have ``train()``/``eval()`` called on them.
+    opt_class : torch.optim class
+        A torch optimizer constructor that has takes only the list of
+        parameters (e.g. a lambda or partial function definition). By default,
+        this will be passed all modules in ``modules`` at the
+        beginning of the ``fit()`` method. This behavior can be changed
+        by overriding the ``configure_optimizers()`` method.
+    hparams : dict
+        Each key:value pair should consist of a string key and a hyperparameter
+        that is used within the overridden methods. These will
+        be accessible via an ``hparams`` attribute, using "dot" notation:
+        e.g., self.hparams.model(x).
+    run_opts : dict
+        A set of options to change the runtime environment, including
+
+        debug (bool)
+            If ``True``, this will only iterate a few batches for all
+            datasets, to ensure code runs without crashing.
+        debug_batches (int)
+            Number of batches to run in debug mode, Default ``2``.
+        debug_epochs (int)
+            Number of epochs to run in debug mode, Default ``2``.
+            If a non-positive number is passed, all epochs are run.
+        jit_module_keys (list of str)
+            List of keys in ``modules`` that should be jit compiled.
+        distributed_backend (str)
+            One of ``nccl``, ``gloo``, ``mpi``.
+        device (str)
+            The location for performing computations.
+        auto_mix_prec (bool)
+            If ``True``, automatic mixed-precision is used.
+            Activate it only with cuda.
+        max_grad_norm (float)
+            Default implementation of ``fit_batch()`` uses
+            ``clip_grad_norm_`` with this value. Default: ``5``.
+        nonfinite_patience (int)
+            Number of times to ignore non-finite losses before stopping.
+            Default: ``3``.
+        noprogressbar (bool)
+            Whether to turn off progressbar when training. Default: ``False``.
+        ckpt_interval_minutes (float)
+            Amount of time between saving intra-epoch checkpoints,
+            in minutes, default: ``15.0``. If non-positive, these are not saved.
+
+        Typically in a script this comes from ``speechbrain.parse_args``, which
+        has different defaults than Brain. If an option is not defined here
+        (keep in mind that parse_args will inject some options by default),
+        then the option is also searched for in hparams (by key).
+    checkpointer : speechbrain.Checkpointer
+        By default, this will be used to load checkpoints, and will have the
+        optimizer added to continue training if interrupted.
+    attacker : Optional[robust_speech.adversarial.attacker.Attacker]
+        If not None, this will run attacks on the nested source brain model 
+        (which may share its modules with this brain model)
+"""
     def __init__(  # noqa: C901
         self,
         modules=None,
@@ -162,7 +241,6 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker
         )
-        print(opt_class)
 
     def __setattr__(self,name,value, attacker_brain=True):
         if hasattr(self,"attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
@@ -177,6 +255,8 @@ class AdvASRBrain(ASRBrain):
         run_opts=None,
         attacker=None
     ):
+        """Initialize attacker class
+        """
         if isinstance(attacker,Attack): # attacker object already initiated
             self.attacker=attacker
         elif attacker is not None: # attacker class
@@ -193,6 +273,26 @@ class AdvASRBrain(ASRBrain):
             self.attacker = None
 
     def compute_forward_adversarial(self, batch, stage):
+        """Forward pass applied to an adversarial example.
+
+        The default implementation depends on a few methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+
+        Arguments
+        ---------
+        batch : torch.Tensor or tensors
+            An element from the dataloader, including inputs for processing.
+        stage : Stage
+            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
+
+        Returns
+        -------
+        torch.Tensor or Tensors
+            The outputs after all processing is complete.
+            Directly passed to ``compute_objectives()``.
+        """
         assert stage != rs.Stage.ATTACK
         wavs = batch.sig[0]
         if self.attacker is not None:
@@ -205,7 +305,7 @@ class AdvASRBrain(ASRBrain):
     
 
     def fit_batch_adversarial(self, batch):
-        """Fit one batch, override to do multiple updates.
+        """Fit one batch with an adversarial objective, override to do multiple updates.
 
         The default implementation depends on a few methods being defined
         with a particular behavior:
@@ -214,6 +314,8 @@ class AdvASRBrain(ASRBrain):
         * ``compute_objectives()``
 
         Also depends on having optimizers passed at initialization.
+
+        This method is currently under testing.
 
         Arguments
         ---------
@@ -225,6 +327,7 @@ class AdvASRBrain(ASRBrain):
         -------
         detached loss
         """
+        warnings.warn("Adversarial training is currently under development. Use this function at your own discretion.",RuntimeWarning)
         # Managing automatic mixed precision
         if self.auto_mix_prec:
             self.optimizer.zero_grad()
@@ -246,16 +349,26 @@ class AdvASRBrain(ASRBrain):
 
         return loss.detach().cpu()
 
-    def evaluate_batch(self, batch, stage):
-        """Computations needed for validation/test batches"""
-        predictions = self.compute_forward(batch, stage=stage)
-        with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage)
-        return loss.detach()
-
-
     def evaluate_batch_adversarial(self, batch, stage):
-        """Evaluate one batch, override for different procedure than train, with adversarial attacks.
+        """Evaluate one batch on adversarial examples.
+
+        The default implementation depends on two methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+        * ``compute_objectives()``
+
+        Arguments
+        ---------
+        batch : list of torch.Tensors
+            Batch of data to use for evaluation. Default implementation assumes
+            this batch has two elements: inputs and targets.
+        stage : Stage
+            The stage of the experiment: Stage.VALID, Stage.TEST
+
+        Returns
+        -------
+        detached loss
         """
 
         predictions = self.compute_forward_adversarial(batch, stage=stage)
@@ -521,7 +634,17 @@ class AdvASRBrain(ASRBrain):
 
     
     def on_stage_start(self, stage, epoch):
-        """Gets called at the beginning of each epoch"""
+        """Gets called when a stage starts.
+
+        Useful for defining class variables used during the stage.
+
+        Arguments
+        ---------
+        stage : Stage
+            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
+        epoch : int
+            The current epoch count.
+        """
         if stage != sb.Stage.TRAIN:
             self.cer_metric = self.hparams.cer_computer()
             self.wer_metric = self.hparams.error_rate_computer()
@@ -529,7 +652,21 @@ class AdvASRBrain(ASRBrain):
             self.adv_wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
-        """Gets called at the end of a epoch."""
+        """Gets called at the end of a stage.
+
+        Useful for computing stage statistics, saving checkpoints, etc.
+
+        Arguments
+        ---------
+        stage : Stage
+            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
+        stage_loss : float
+            The average loss over the completed stage.
+        epoch : int
+            The current epoch count.
+        stage_adv_loss : Optional[float]
+            The average adversarial loss over the completed stage, if available.
+        """
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:

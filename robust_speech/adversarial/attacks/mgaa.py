@@ -1,11 +1,6 @@
 
 
-"""
-Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
-This attack encapsulates another attack (typically PGD) and only retains the part of the perturbation that is relevant for transfable attacks.
-It requires multiple models, i.e. ASR brains.
-"""
-    
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -19,22 +14,39 @@ from robust_speech.adversarial.attacks.pgd import perturb_iterative
 from advertorch.attacks.base import Attack,LabelMixin
 
 class ASRMGAA(Attack, LabelMixin):
+    """
+    Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
+    This attack encapsulates another attack (typically PGD) and only retains the part of the perturbation that is relevant for transfable attacks.
+    It requires multiple models, i.e. ASR brains.
+
+    Arguments
+    ---------
+     asr_brain: robust_speech.adversarial.brain.EnsembleAsrBrain
+        the brain objects. It should be an EnsembleAsrBrain object where the first brain is the meta model and the second is the train model.
+        That second brain is typically also an EnsembleAsrBrain to improve transferability.
+     nested_attack_class: robust_speech.adversarial.attacks.attacker.Attacker 
+        the nested adversarial attack class.
+     nb_iter: int
+        number of test (meta) iterations
+     eps: float
+        bound applied to the meta perturbation.
+     ord: int
+        order of the attack norm
+     clip_min: float
+        mininum value per input dimension
+     clip_max: float
+        maximum value per input dimension
+     targeted: bool
+        if the attack is targeted
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
+        
+    """
+    
     def __init__(
         self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
         rel_eps_iter=1., clip_min=None, clip_max=None,
         ord=np.inf, targeted=False,train_mode_for_backward=True):
-        """
-        :param asr_brain: the brain objects. It should be an EnsembleAsrBrain object where the first brain is the meta model and the second is the train model.
-        That second brain is typically also an EnsembleAsrBrain to improve transferability.
-        :param nested_attack_class: the nested adversarial attack class.
-        :param nb_iter: number of test (meta) iterations
-        :param eps: bound applied to the meta perturbation.
-        :param ord: order of the attack norm
-        :param clip_min: mininum value per input dimension
-        :param clip_max: maximum value per input dimension
-        :param targeted: if the attack is targeted
-        :param train_mode_for_backward: whether to force training mode in backward passes (necessary for RNN models)
-        """
 
         raise NotImplementedError('This attack is under development')
 
@@ -55,6 +67,18 @@ class ASRMGAA(Attack, LabelMixin):
         assert is_float_or_torch_tensor(self.eps)
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         else:

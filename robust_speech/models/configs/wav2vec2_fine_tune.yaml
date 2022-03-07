@@ -16,11 +16,7 @@ train_log: !ref <output_folder>/train_log.txt
 attack_class: null
 
 # URL for the base english wav2vec2 model.
-wav2vec2_hub: facebook/wav2vec2-base
-
-brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
-dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+wav2vec2_hub: facebook/wav2vec2-base-960h
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech
@@ -38,11 +34,16 @@ test_csv:
 avoid_if_longer_than: 17.0
 avoid_if_shorter_than: 1.0
 
+brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
+dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
+dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+
 # Training parameters
-number_of_epochs: 20
+number_of_epochs: 1
 lr: 0.9
 lr_wav2vec: 0.0001
-sorting: random
+sorting: ascending
+auto_mix_prec: False
 sample_rate: 16000
 
 
@@ -67,7 +68,7 @@ test_dataloader_opts:
 activation: !name:torch.nn.LeakyReLU
 dnn_layers: 2
 dnn_neurons: 768
-freeze_wav2vec: False
+freeze_wav2vec: True
 
 # Outputs
 output_neurons: 31  # BPE size, index(blank/eos/bos) = 0
@@ -168,6 +169,6 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
+
 cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
    split_tokens: True
-acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats

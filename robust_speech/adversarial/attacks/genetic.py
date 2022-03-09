@@ -60,9 +60,11 @@ class GeneticAttack(Attacker):
         for k in batch.__dict__:
             if k != "sig":
                 val = batch.__dict__[k]
-                if isinstance(torch.Tensor,val):
-                    new_val = batch.__dict__[k].expand(self.population_size,*val.size()[1:])
-                    dic[k]=new_val
+                if isinstance(val,torch.Tensor):
+                    new_val = val.expand(self.population_size,*val.size()[1:])
+                else:
+                    new_val = val * self.population_size
+                dic[k]=new_val
         pop_batch = PaddedBatch(dic)
         return pop_batch
 
@@ -78,7 +80,7 @@ class GeneticAttack(Attacker):
                 score = -score
             scores.append(score)
         return batch.sig[0].new_(scores)
-        
+
     def _crossover(self,wavs,pop_probs,n):
         new_wavs = wavs[np.random.choice(self.population_size, p=pop_probs.detach().cpu().numpy(),size=2*n)]
         wavs1,wavs2 = new_wavs[:n],new_wavs[n:]

@@ -12,7 +12,6 @@ import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import Attack
-from robust_speech.adversarial.metrics import snr, wer, cer
 from robust_speech.utils import make_batch_from_waveform, transcribe_batch, load_audio
 import robust_speech as rs
 
@@ -511,6 +510,8 @@ class AdvASRBrain(ASRBrain):
         min_key=None,
         progressbar=None,
         test_loader_kwargs={},
+        save_audio_path = None,
+        sample_rate = 16000
     ):
         """Iterate test_set and evaluate brain performance. By default, loads
         the best-performing checkpoint (as recorded using the checkpointer).
@@ -556,7 +557,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_adv_loss = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
-            self.attacker.on_evaluation_start()
+            self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
         for batch in tqdm(
             test_set, dynamic_ncols=True, disable=not progressbar

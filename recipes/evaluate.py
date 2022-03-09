@@ -15,7 +15,14 @@ import robust_speech as rs
 Adversarial (or natural) training script
 """
 
-def read_brains(brain_classes, brain_hparams,attacker=None, run_opts = {}, overrides={}, tokenizer = None):
+def read_brains(
+        brain_classes, 
+        brain_hparams,
+        attacker=None, 
+        run_opts = {}, 
+        overrides={}, 
+        tokenizer = None
+        ):
     if isinstance(brain_classes,list):
         brain_list = []
         assert len(brain_classes) == len(brain_hparams)
@@ -27,11 +34,12 @@ def read_brains(brain_classes, brain_hparams,attacker=None, run_opts = {}, overr
         if isinstance(brain_hparams,str):
             with open(brain_hparams) as fin:
                 brain_hparams = load_hyperpyyaml(fin,overrides)
+        checkpointer = brain_hparams["checkpointer"] if "checkpointer" in brain_hparams else None
         brain = brain_classes(
             modules=brain_hparams["modules"],
             hparams=brain_hparams,
             run_opts=run_opts,
-            checkpointer=None,
+            checkpointer=checkpointer,
             attacker=attacker,
         )
         if "pretrainer" in brain_hparams:
@@ -61,7 +69,7 @@ if __name__ == "__main__":
     if "pretrainer" in hparams:
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(device=run_opts["device"])
-
+    
     # Dataset prep (parsing Librispeech)
     prepare_dataset = hparams["dataset_prepare_fct"]
 
@@ -82,7 +90,6 @@ if __name__ == "__main__":
     _, _, test_datasets, _, _, tokenizer = dataio_prepare(
         hparams
     )
-    
     source_brain = None
     if "source_brain_class" in hparams:
         source_brain = read_brains(
@@ -108,11 +115,16 @@ if __name__ == "__main__":
         tokenizer=tokenizer
     )
     target_brain.__setattr__("tokenizer",tokenizer, attacker_brain=True)
+    target_brain.__setattr__("logger",hparams["logger"], attacker_brain=True)
+    target_brain.hparams.train_logger = hparams["logger"]
     # Testing
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(
             hparams["output_folder"], "wer_{}.txt".format(k)
         )
         target_brain.evaluate(
-            test_datasets[k], test_loader_kwargs=hparams["test_dataloader_opts"]
+            test_datasets[k], 
+            test_loader_kwargs=hparams["test_dataloader_opts"], 
+            save_audio_path = hparams["save_audio_path"], 
+            sample_rate=hparams["sample_rate"]
         )

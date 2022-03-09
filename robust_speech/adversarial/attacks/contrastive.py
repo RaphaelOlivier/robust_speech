@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from advertorch.attacks.utils import rand_init_delta
 from advertorch.utils import clamp
-from robust_speech.adversarial.metrics import snr
 import speechbrain as sb
 from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, perturb_iterative
 

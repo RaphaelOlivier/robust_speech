@@ -432,8 +432,7 @@ def dataio_prepare(hparams):
         )
 
         train_data = train_data.filtered_sorted(
-            key_max_value={"duration": hparams["avoid_if_longer_than"]},
-            key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+            key_max_value={"duration": hparams["avoid_if_longer_than"]}
             )
 
 
@@ -466,8 +465,7 @@ def dataio_prepare(hparams):
         #valid_data = valid_data.filtered_sorted(sort_key="duration")
 
         valid_data = valid_data.filtered_sorted(
-            key_max_value={"duration": hparams["avoid_if_longer_than"]},
-            key_min_value={"duration": hparams["avoid_if_shorter_than"]},
+            key_max_value={"duration": hparams["avoid_if_longer_than"]}
             )
 
     # test is separate
@@ -478,9 +476,13 @@ def dataio_prepare(hparams):
             test_datasets[name] = sb.dataio.dataset.DynamicItemDataset.from_csv(
                 csv_path=csv_file, replacements={"data_root": data_folder}
             )
-            #test_datasets[name] = test_datasets[name].filtered_sorted(
-            #    sort_key="duration"
-            #)
+            test_datasets[name] = test_datasets[name].filtered_sorted(
+                sort_key="duration", reverse=True
+            )
+            if "avoid_if_longer_than" in hparams:
+                test_datasets[name] = test_datasets[name].filtered_sorted(
+                    key_max_value={"duration": hparams["avoid_if_longer_than"]}
+                    )
     datasets = []
     if train_data:
         datasets.append(train_data)
@@ -522,9 +524,9 @@ def dataio_prepare(hparams):
 
         sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
-        if "pretrained_tokenizer_path" in hparams:
-            lab_enc_file = hparams["pretrained_tokenizer_path"]
-            tokenizer.load(path=lab_enc_file)
+        if "pretrainer" in hparams and "tokenizer" in hparams["pretrainer"].loadables:
+            # tokenizer has already been loaded
+            pass
         else:
             lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 

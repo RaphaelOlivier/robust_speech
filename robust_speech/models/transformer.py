@@ -76,10 +76,14 @@ class TrfASR(AdvASRBrain):
             src, tokens_bos, wav_lens, pad_idx=self.hparams.pad_index
         )
 
+        p_ctc = None
+        if self.hparams.ctc_weight>0.:
         # output layer for ctc log-probabilities
-        logits = self.modules.ctc_lin(enc_out)
-        p_ctc = self.hparams.log_softmax(logits)
+            logits = self.modules.ctc_lin(enc_out)
+            p_ctc = self.hparams.log_softmax(logits)
 
+        p_seq = None
+        #if self.hparams.ctc_weight<1.:
         # output layer for seq2seq log-probabilities
         pred = self.modules.seq_lin(pred)
         p_seq = self.hparams.log_softmax(pred)
@@ -96,6 +100,7 @@ class TrfASR(AdvASRBrain):
                 # and no LM to give user some idea of how the AM is doing
                 hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
         elif stage == sb.Stage.TEST:
+
             hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
 
         return p_ctc, p_seq, wav_lens, hyps
@@ -116,11 +121,14 @@ class TrfASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-
-        loss_seq = self.hparams.seq_cost(
-            p_seq, tokens_eos, length=tokens_eos_lens
-        )
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+        loss_seq = 0.
+        if self.hparams.ctc_weight<1.:
+            loss_seq = self.hparams.seq_cost(
+                p_seq, tokens_eos, length=tokens_eos_lens
+            )
+        loss_ctc = 0.
+        if self.hparams.ctc_weight>0.:
+            loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq
@@ -279,11 +287,12 @@ class TrfASR(AdvASRBrain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
-            self.checkpointer.save_and_keep_only(
-                meta={"ACC": stage_stats["ACC"], "epoch": epoch},
-                max_keys=["ACC"],
-                num_to_keep=5,
-            )
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta={"ACC": stage_stats["ACC"], "epoch": epoch},
+                    max_keys=["ACC"],
+                    num_to_keep=5,
+                )
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -296,9 +305,10 @@ class TrfASR(AdvASRBrain):
             # save the averaged checkpoint at the end of the evaluation stage
             # delete the rest of the intermediate checkpoints
             # ACC is set to 1.1 so checkpointer only keeps the averaged checkpoint
-            self.checkpointer.save_and_keep_only(
-                meta={"ACC": 1.1, "epoch": epoch},
-                max_keys=["ACC"],
-                num_to_keep=1,
-            )
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta={"ACC": 1.1, "epoch": epoch},
+                    max_keys=["ACC"],
+                    num_to_keep=1,
+                )
     

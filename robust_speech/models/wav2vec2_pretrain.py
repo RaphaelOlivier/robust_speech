@@ -318,6 +318,12 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
 
 # Define training procedure
 class W2VPretrain(AdvASRBrain):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        if self.checkpointer and not hasattr(self.hparams,"pretrainer"):
+            # model was loaded from HuggingFace but not preloaded with SpeechBrain: saving it at initialization
+            self.checkpointer.save_checkpoint()
+
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the w2v2 loss."""
         wavs, wav_lens = batch.sig

@@ -1,8 +1,11 @@
 from advertorch.attacks.base import Attack,LabelMixin
-from robust_speech.adversarial.metrics import SNRComputer
+from robust_speech.adversarial.metrics import SNRComputer, AudioSaver
 class Attacker(Attack,LabelMixin):
-    def on_evaluation_start(self):
+    def on_evaluation_start(self, save_audio_path=None,sample_rate=16000):
         self.snr_metric = SNRComputer()
+        self.save_audio_path = save_audio_path
+        if self.save_audio_path:
+            self.audio_saver = AudioSaver(save_audio_path, sample_rate)
 
     def on_evaluation_end(self, logger):
         snr = self.snr_metric.summarize()
@@ -15,4 +18,6 @@ class Attacker(Attack,LabelMixin):
     def perturb_and_log(self,batch):
         adv_wav = self.perturb(batch)
         self.snr_metric.append(batch.id, batch,adv_wav)
+        if self.save_audio_path:
+            self.audio_saver.save(batch.id,batch,adv_wav)
         return adv_wav

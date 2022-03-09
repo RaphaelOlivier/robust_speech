@@ -29,7 +29,8 @@ train_log: !ref <output_folder>/train_log.txt
 #  eps: 0.003
 #  nb_iter: 15
 attack_class: null
-#source_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
+save_audio_path: null
+\#source_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 #source_brain_hparams_file: attack_configs/wav2vec2_contrastive/w2v2.yaml
 #target_brain_class: !name:robust_speech.models.seq2seq.S2SASR
 #target_brain_hparams_file: attack_configs/wav2vec2_contrastive/s2s.yaml

@@ -4,6 +4,8 @@ import sys
 import gc
 import torch
 import logging
+logger = logging.getLogger('speechbrain.dataio.sampler')
+logger.setLevel(logging.WARNING)
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 from speechbrain.utils.distributed import run_on_main

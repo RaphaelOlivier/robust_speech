@@ -334,13 +334,13 @@ class W2VPretrain(AdvASRBrain):
         # Forward on w2v2 and take the loss.
         # It has to be on train mode even for eval. Otherwise it would deactivate
         # the loss computation ...
-        if stage == rs.Stage.ATTACK and hasattr(batch, "quantized_representation"):
+        if hasattr(batch, "quantized_representation"): # used saved quantized representation (prior to attack)
             out, mask = self.modules.wav2vec2(
                 wavs, 
                 quantized_representation=batch.quantized_representation
             )
         else:
-            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None)
+            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None) # compute quantized representation on the fly
 
         if stage == rs.Stage.ATTACK:
             loss = out.contrastive_loss

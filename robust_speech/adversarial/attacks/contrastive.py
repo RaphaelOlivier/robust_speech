@@ -49,7 +49,7 @@ class ConstrastiveASRAttack(ASRPGDAttack):
             clip_min=self.clip_min, clip_max=self.clip_max, 
             delta_init=delta, l1_sparsity=self.l1_sparsity
         )
-        delattr(batch,'quantized_representation')
+        #delattr(batch,'quantized_representation')
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)
         return wav_adv.data.to(save_device)

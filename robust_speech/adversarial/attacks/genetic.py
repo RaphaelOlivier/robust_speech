@@ -23,7 +23,7 @@ class GeneticAttack(Attacker):
     def perturb(self,batch):
         if len(batch.sig[0])>1:
             raise NotImplementedError("%s only supports batch size 1"%self.__class__.__name__)
-        pop_batch = self._gen_population(batch).to(self.asr_brain.device)
+        pop_batch, max_wavs, min_wavs = self._gen_population(batch).to(self.asr_brain.device)
 
         for idx in range(self.nb_iter):
             pop_scores = self._score(pop_batch)
@@ -34,7 +34,7 @@ class GeneticAttack(Attacker):
             elite_sig = pop_batch.sig[elite_indices]
             child_sig = self._crossover(pop_batch.sig,pop_probs,self.population_size - ELITE_SIZE)
             child_sig = self._mutation(child_sig)
-            pop_batch.sig = torch.stack([elite_sig,child_sig],dim=0)
+            pop_batch.sig = torch.clamp(torch.stack([elite_sig,child_sig],dim=0),min=min_wavs,max=max_wavs)
         return pop_batch.sig[elite_indices[0]].unsqueeze(0).to(batch.sig[0].device)
 
     def _mutation(self,wavs):
@@ -54,6 +54,8 @@ class GeneticAttack(Attacker):
     def _gen_population(self,batch):
         # from (1,len) to (self.population_size,len)
         new_wavs = batch.sig[0].expand(self.population_size,batch.sig[0].size(1))
+        max_wavs = torch.clone(new_wavs) + self.eps
+        min_wavs = max_wavs - 2*self.eps
         new_wavs = self._mutation(new_wavs)
         new_lengths = batch.sig[1].expand(self.population_size)
         dic = {"sig":(new_wavs,new_lengths)}
@@ -66,7 +68,7 @@ class GeneticAttack(Attacker):
                     new_val = val * self.population_size
                 dic[k]=new_val
         pop_batch = PaddedBatch(dic)
-        return pop_batch
+        return pop_batch, max_wavs, min_wavs
 
     def _score(self,batch):
         predictions = self.asr_brain.compute_forward(batch)

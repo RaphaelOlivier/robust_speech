@@ -1,23 +1,11 @@
-# ############################################################################
-# Model: E2E ASR with CTC
-# Encoder: CRDNN model
-# Tokens: BPE with unigram
-# losses: CTC+ NLL
-# Training: Librispeech 960h
-# Authors:  Ju-Chieh Chou, Mirco Ravanelli, Abdel Heba, Peter Plantinga,
-# Samuele Cornell 2020
-# ############################################################################
-
-# Seed needs to be set at top of yaml, before objects with parameters
-seed: 1003
-__set_seed: !apply:torch.manual_seed [!ref <seed>]
-model_name: CTCRNN
 root: !PLACEHOLDER
-output_folder: !ref <root>/trainings/<model_name>/<seed>
+model_name: asr-ctcrnn-librispeech
+output_folder: !ref <root>/models/<model_name>
 wer_file: !ref <output_folder>/wer.txt
-save_folder: !ref <output_folder>/save
+save_folder: !ref <output_folder>
 train_log: !ref <output_folder>/train_log.txt
-tokenizers_folder: !ref <root>/tokenizers
+
+pretrained_path: !ref <root>/models/<model_name>
 
 # Language model (LM) pretraining
 # NB: To avoid mismatch, the speech recognizer must be trained with the same
@@ -26,65 +14,10 @@ tokenizers_folder: !ref <root>/tokenizers
 # directory containing the lm.ckpt and tokenizer.ckpt may also be specified
 # instead. E.g if you want to use your own LM / tokenizer.
 
-attack_class: null
-
-brain_class: !name:robust_speech.models.ctc.CTCASR
-dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
-
-pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2-base-960h
-
-# Data files
-data_folder: !ref <root>/data/LibriSpeech
-# noise/ris dataset will automatically be downloaded
-data_folder_rirs: !ref <data_folder>
-
-train_splits: ["train-clean-100"]
-dev_splits: ["dev-clean"]
-test_splits: ["test-clean"]
-skip_prep: True
-ckpt_interval_minutes: 15 # save checkpoint every N min
-train_csv: !ref <data_folder>/csv/train.csv
-valid_csv: !ref <data_folder>/csv/dev-clean.csv
-test_csv:
-   - !ref <data_folder>/csv/test-clean.csv
-avoid_if_longer_than: 17.0
-avoid_if_shorter_than: 1.0
-# Training parameters
-number_of_epochs: 15
-batch_size: 8
-test_batch_size: 4
-lr: 1.0
-sorting: random
-dynamic_batching: True
-gradient_accumulation: 1
-
-# dynamic batching parameters, if used
-dynamic_batch_sampler:
-   max_batch_len: 512000
-   shuffle_ex: True
-   batch_ordering: random
-   num_buckets: 20
-
 # Feature parameters
 sample_rate: 16000
 n_fft: 400
 n_mels: 40
-
-opt_class: !name:torch.optim.Adadelta
-   lr: !ref <lr>
-   rho: 0.95
-   eps: 1.e-8
-
-# Dataloader options
-train_dataloader_opts:
-   batch_size: !ref <batch_size>
-
-valid_dataloader_opts:
-   batch_size: !ref <batch_size>
-
-test_dataloader_opts:
-   batch_size: !ref <test_batch_size>
 
 # Model parameters
 activation: !name:torch.nn.LeakyReLU
@@ -106,10 +39,9 @@ bos_index: 0
 eos_index: 0
 unk_index: 0
 
-epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
-   limit: !ref <number_of_epochs>
+number_of_epochs: 15
 
-normalize: !new:speechbrain.processing.features.InputNormalization
+normalizer: !new:speechbrain.processing.features.InputNormalization
    norm_type: global
 
 compute_features: !new:speechbrain.lobes.features.Fbank
@@ -165,27 +97,14 @@ tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 modules:
    enc: !ref <enc>
    ctc_lin: !ref <ctc_lin>
-   normalize: !ref <normalize>
+   normalize: !ref <normalizer>
    env_corrupt: !ref <env_corrupt>
 
 model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
 
-
-lr_annealing: !new:speechbrain.nnet.schedulers.NewBobScheduler
-   initial_value: !ref <lr>
-   improvement_threshold: 0.0025
-   annealing_factor: 0.8
-   patient: 0
-
-checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
-   checkpoints_dir: !ref <save_folder>
-   recoverables:
-      model: !ref <model>
-      scheduler: !ref <lr_annealing>
-      normalizer: !ref <normalize>
-      counter: !ref <epoch_counter>
-      tokenizer: !ref <tokenizer>
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+   limit: !ref <number_of_epochs>
 
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
@@ -198,8 +117,12 @@ acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats
 # The pretrainer allows a mapping between pretrained files and instances that
 # are declared in the yaml.
 pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
-   collect_in: !ref <tokenizers_folder>/<model_name>
-   loadables:
-      tokenizer: !ref <tokenizer>
-   paths:
-      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
+    loadables:
+        normalizer: !ref <normalizer>
+        model: !ref <model>
+        tokenizer: !ref <tokenizer>
+    paths:
+      normalizer: !ref <pretrained_path>/normalizer.ckpt
+      model: !ref <pretrained_path>/model.ckpt
+      tokenizer: !ref <pretrained_path>/tokenizer.ckpt
+    collect_in: !ref <output_folder>

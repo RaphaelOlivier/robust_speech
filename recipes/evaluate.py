@@ -124,7 +124,7 @@ if __name__ == "__main__":
         target_hparams, 
         attacker=attacker,
         run_opts=run_opts,
-        overrides=overrides,
+        overrides={"root":hparams["root"]},
         tokenizer=tokenizer
     )
     target_brain.logger=hparams["logger"]

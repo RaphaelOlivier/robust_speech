@@ -1,34 +1,54 @@
+# General information
 seed: 1001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-model_name: asr-transformer-transformerlm-librispeech
 root: !PLACEHOLDER
+tokenizers_folder: !ref <root>/tokenizers
+
+# Hyparameters below are dependant on the attack and model used 
+# and should be changed at the user's discretion
+# -------------------------------------------------------------
+# Attack information
+attack_class: null
+save_audio_path: null
+
+# Model information
+model_name: asr-transformer-transformerlm-librispeech
+target_brain_class: !name:robust_speech.models.transformer.TrfASR
+target_brain_hparams_file: !ref model_configs/<model_name>.yaml
+# source_brain_class: null
+# source_brain_hparams_file: null
+
+# Tokenizer information (compatible with target and source)
+pretrained_tokenizer_path: !ref speechbrain/<model_name>
+tokenizer: !new:sentencepiece.SentencePieceProcessor
+# -------------------------------------------------------------
+
+# Pretrainer loading parameters
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+   collect_in: !ref <tokenizers_folder>/<model_name>
+   loadables:
+      tokenizer: !ref <tokenizer>
+   paths:
+      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
+
 output_folder: !ref <root>/attacks/none/<model_name>/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt
-tokenizers_folder: !ref <root>/tokenizers
-
-attack_class: null
-save_audio_path: null
-
-target_brain_class: !name:robust_speech.models.transformer.TrfASR
-target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
-
-pretrained_lm_tokenizer_path: !ref speechbrain/<model_name>
-
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
 # If RIRS_NOISES dir exists in /localscratch/xxx_corpus/RIRS_NOISES
 # then data_folder_rirs should be /localscratch/xxx_corpus
 # otherwise the dataset will automatically be downloaded
-test_splits: ["test-clean-short"]
+test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
+data_csv_name: test-clean-short
 test_csv:
-   - !ref <data_folder>/csv/test-clean-short.csv
+   - !ref <data_folder>/csv/<data_csv_name>.csv
 # Training parameters
 # To make Transformers converge, the global bath size should be large enough.
 # The global batch size is computed as batch_size * n_gpus * gradient_accumulation.
@@ -48,29 +68,11 @@ blank_index: 0
 bos_index: 1
 eos_index: 2
 
-valid_dataloader_opts:
-    batch_size: 1
-
 test_dataloader_opts:
     batch_size: 1
-
-pretrained_tokenizer_path: !ref speechbrain/<model_name>
-tokenizer: !new:sentencepiece.SentencePieceProcessor
 
 logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
 acc_computer: !name:speechbrain.utils.Accuracy.AccuracyStats
-
-# The pretrainer allows a mapping between pretrained files and instances that
-# are declared in the yaml. E.g here, we will download the file lm.ckpt
-# and it will be loaded into "lm" which is pointing to the <lm_model> defined
-# before.
-
-pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
-   collect_in: !ref <tokenizers_folder>/<model_name>
-   loadables:
-      tokenizer: !ref <tokenizer>
-   paths:
-      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt

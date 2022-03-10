@@ -28,7 +28,7 @@ setup(
     package_data={"robust_speech": ["version.txt", "log-config.yaml"]},
     install_requires=[
         "torch>=1.7,<=1.11",
-        "speechbrain",
+        "speechbrain==0.5.11",
         "transformers",
         "torchvision",
         "advertorch @ git+https://github.com/BorealisAI/advertorch.git"

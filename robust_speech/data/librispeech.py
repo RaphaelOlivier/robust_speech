@@ -1,3 +1,12 @@
+"""
+Data preparation and loading scripts for LibriSpeech.
+The prepare_librispeech function was copied from https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/librispeech_prepare.py
+The dataio_prepare is a mixture from that function in speechbrain recipes using subwords tokenizers
+(https://github.com/speechbrain/speechbrain/tree/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
+and Char tokenizers (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
+in order to handle both cases.
+"""
+
 import os
 import csv
 import logging

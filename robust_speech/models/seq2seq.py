@@ -1,3 +1,10 @@
+"""A sequence-to-sequence ASR system with librispeech supporting adversarial attacks.
+The system employs an encoder, a decoder, and an attention mechanism
+between them. Decoding is performed with beamsearch coupled with a neural
+language model.
+
+Inspired from SpeechBrain Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
+"""
 import torch
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain

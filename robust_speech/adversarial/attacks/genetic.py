@@ -12,7 +12,23 @@ MUTATION_PROB = 0.0005
 EPS_NUM_STRIDES = 512
 
 class GeneticAttack(Attacker):
+    """ 
+    Implementation of the Black-Box genetic adversarial attack for ASR models (https://arxiv.org/abs/1801.00554)
+    The original implementation (https://github.com/nesl/adversarial_audio) was slightly changed: 
+        -untargeted attacks are supported
+        -mutations occur in float space rather than byte space (for smoother integration to pytorch)
 
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     nb_iter: int
+        number of iterations.
+     population_size: int
+        size of the maintained population.
+     eps: float
+        maximum Linf distortion.
+    """
     def __init__(self,asr_brain,nb_iter=100,population_size=20, eps=0.01,targeted=False):
         self.asr_brain=asr_brain
         self.nb_iter=nb_iter

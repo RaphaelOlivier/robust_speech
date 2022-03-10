@@ -81,7 +81,6 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         win_length = 2048,hop_length = 512,n_fft = 2048,
         ):
 
-        raise NotImplementedError('This attack is under development')
 
         self.asr_brain = asr_brain
         self.clip_min = clip_min # ignored
@@ -107,6 +106,8 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         self.binary_search_steps_2 = binary_search_steps_phase_2
         self.initial_const_2 = initial_const_phase_2
         self.repeat_2 = binary_search_steps_phase_2 >= REPEAT_STEP
+        
+        raise NotImplementedError('This attack is under development')
 
     def _forward_and_update_delta_phase_2(
             self, optimizer, batch, wavs_init, wav_lengths, delta, loss_coeffs, theta, max_psd_init):
@@ -131,13 +132,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         max_psd_init: List[np.ndarray],
         wav_lengths,
     ) -> "torch.Tensor":
-        """
-        The forward pass of the second stage of the attack.
-        :param delta: current perturbation
-        :param theta: Original thresholds.
-        :param max_psd_init: Original maximum psd.
-        :param wav_lengths: lengths of original sequences.
-        :return: The loss tensor of the second stage of the attack.
+        """The forward pass of the second stage of the attack.
         """
 
         # Compute loss for masking threshold
@@ -156,10 +151,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         return losses_stack
 
     def _compute_masking_threshold(self, x: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
-        """
-        Compute the masking threshold and the maximum psd of the original audio.
-        :param x: Samples of shape (seq_length,).
-        :return: A tuple of the masking threshold and the maximum psd.
+        """Compute the masking threshold and the maximum psd of the original audio.
         """
 
         # First compute the psd matrix
@@ -254,11 +246,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         return theta, original_max_psd
 
     def _psd_transform(self, delta: "torch.Tensor", max_psd_init: "torch.Tensor") -> "torch.Tensor":
-        """
-        Compute the psd matrix of the perturbation.
-        :param delta: The perturbation.
-        :param max_psd_init: The maximum psd of the original audio.
-        :return: The psd matrix.
+        """Compute the psd matrix of the perturbation.
         """
 
         # Get window for the transformation

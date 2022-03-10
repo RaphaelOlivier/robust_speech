@@ -1,19 +1,15 @@
 #!/usr/bin/env/python3
-"""Recipe for training a ctc ASR system with librispeech.
+"""A CTC ASR system with librispeech supporting adversarial attacks.
 The system can employ any encoder. Decoding is performed with
 ctc greedy decoder.
 The neural network is trained on CTC likelihood target and character units
 are used as basic recognition tokens. Training is performed on the full
 LibriSpeech dataset (960 h).
 
-Authors
- * Sung-Lin Yeh 2021
- * Titouan Parcollet 2021
- * Ju-Chieh Chou 2020
- * Mirco Ravanelli 2020
- * Abdel Heba 2020
- * Peter Plantinga 2020
- * Samuele Cornell 2020
+Inspired from both SpeechBrain Wav2Vec2 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
+and Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
+
 """
 
 import torch

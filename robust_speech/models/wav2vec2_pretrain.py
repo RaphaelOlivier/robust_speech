@@ -1,5 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env/python3
+"""A Wav2Vec2 Pretraining system with librispeech supporting adversarial attacks, and specifically the contrastive attack.
+The HuggingFace implementation of the wav2vec 2.0 pretraining is used and wrapped
+to fit properly the SpeechBrain framework.
 
+Contrary to ASR models this one requires some additional work over SpeechBrain
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/CommonVoice/self-supervised-learning/wav2vec2/train.py)
+in order to:
+    -support loading of pretrained models from Huggingface (Speechbrain handles it for Wav2Vec2 for ASR but not pretraining)
+    -support the quantized_representation argument to fix the quantized labels used by Wav2Vec2 (required for the contrastive attack).
+    -backpropagate gradients to the inputs
+Some transformers and SpeechBrain models have been rewritten below for that purpose.
+"""
 import sys
 import torch
 import logging
@@ -17,8 +28,6 @@ import transformers
 
 from transformers import Wav2Vec2ForPreTraining
 
-from transformers import Wav2Vec2Model, HubertModel
-from transformers import Wav2Vec2Config, HubertConfig
 from transformers.models.wav2vec2.modeling_wav2vec2 import (
     Wav2Vec2ForPreTrainingOutput, 
     Wav2Vec2FeatureExtractor,
@@ -33,44 +42,16 @@ from transformers.file_utils import (
     replace_return_docstrings,
 )
 
-from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain, HuggingFaceWav2Vec2
-from speechbrain.pretrained.fetching import fetch
-"""Recipe for pretraining a wav2vec 2.0 model on CommonVoice EN. Note that it can be
-trained with ANY dataset as long as you provide the correct JSON or CSV file.
-
-The HuggingFace implementation of the wav2vec 2.0 pretraining is used and wrapped
-to fit properly the SpeechBrain framework. Models have been compared to the original
-fairseq implementation with success. The Transformers HuggingFace library is
-required:
-> pip install extra_requirements.txt
-
-Hence the process is the following:
-1. Indicate a HuggingFace repository that stores the wav2vec 2.0 config file.
-This is necessary to determine the architecture of the model that will be
-instantiated.
-2. Train it with our wrapper.
-3. Save it to be reused as a pretrained encoder within SpeechBrain (or others).
-
-wav2vec 2.0: https://arxiv.org/abs/2006.11477
-HuggingFace: https://huggingface.co/transformers/model_doc/wav2vec2.html
-
-To run this recipe, do the following:
-> python train.py hparams/hyperparams.yaml
-
-
-Authors
- * Titouan Parcollet 2021
- * Yan Gao 2021
-"""
-
-HF_models = {"wav2vec2": Wav2Vec2Model, "hubert": HubertModel}
-
-HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
+from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain
 
 
 logger = logging.getLogger(__name__)
 
 class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
+    """ 
+    Slight modification of the HF feature extractor. 
+    The original class assumes that input is a leaf tensor, which when running attacks isn't always the case.
+    """
     def forward(self, input_values):
         hidden_states = input_values[:, None]
         # make sure hidden_states require grad for gradient_checkpointing
@@ -96,6 +77,11 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
         return hidden_states
 
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
+    """
+    This class modifies the transformers Wav2Vec2ForPreTraining module in order to 
+        -replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
+        -handle contrastive attacks in forward
+    """
     def __init__(self, config: Wav2Vec2Config):
         super().__init__(config)
         self.wav2vec2.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
@@ -114,46 +100,10 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         return_dict=None,
         quantized_representation=None,
     ):
-        r"""
-        mask_time_indices (`torch.BoolTensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Indices to mask extracted features for contrastive loss. When in training mode, model learns to predict
-            masked extracted features in *config.proj_codevector_dim* space.
-        sampled_negative_indices (`torch.BoolTensor` of shape `(batch_size, sequence_length, num_negatives)`, *optional*):
-            Indices indicating which quantized target vectors are used as negative sampled vectors in contrastive loss.
-            Required input for pre-training.
-        Returns:
-        Example:
-        ```python
-        >>> import torch
-        >>> from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForPreTraining
-        >>> from transformers.models.wav2vec2.modeling_wav2vec2 import _compute_mask_indices
-        >>> from datasets import load_dataset
-        >>> import soundfile as sf
-        >>> feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained("patrickvonplaten/wav2vec2-base")
-        >>> model = Wav2Vec2ForPreTraining.from_pretrained("patrickvonplaten/wav2vec2-base")
-        >>> def map_to_array(batch):
-        ...     speech, _ = sf.read(batch["file"])
-        ...     batch["speech"] = speech
-        ...     return batch
-        >>> ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
-        >>> ds = ds.map(map_to_array)
-        >>> input_values = feature_extractor(ds["speech"][0], return_tensors="pt").input_values  # Batch size 1
-        >>> # compute masked indices
-        >>> batch_size, raw_sequence_length = input_values.shape
-        >>> sequence_length = model._get_feat_extract_output_lengths(raw_sequence_length)
-        >>> mask_time_indices = _compute_mask_indices((batch_size, sequence_length), mask_prob=0.2, mask_length=2)
-        >>> mask_time_indices = torch.tensor(mask_time_indices, device=input_values.device, dtype=torch.long)
-        >>> with torch.no_grad():
-        ...     outputs = model(input_values, mask_time_indices=mask_time_indices)
-        >>> # compute cosine similarity between predicted (=projected_states) and target (=projected_quantized_states)
-        >>> cosine_sim = torch.cosine_similarity(outputs.projected_states, outputs.projected_quantized_states, dim=-1)
-        >>> # show that cosine similarity is much higher than random
-        >>> cosine_sim[mask_time_indices.to(torch.bool)].mean() > 0.5
-        tensor(True)
-        >>> # for contrastive loss training model should be put into train mode
-        >>> model = model.train()
-        >>> loss = model(input_values, mask_time_indices=mask_time_indices).loss
-        ```"""
+        """
+        New argument quantized_representation contains an optional precomputed value for (quantized_features, codevector_perplexity).
+        If available, this value is not recomputed in the foward pass.
+        """
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
@@ -247,6 +197,22 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         )
 
 class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
+    """This lobe enables the integration of HuggingFace
+     wav2vec2.0 models to be pretrained.
+     It also enables contrastive attacks and parameter loading from HuggingFace.
+
+    Arguments
+    ---------
+    source : str
+        HuggingFace hub name: e.g "facebook/wav2vec2-large-lv60"
+    save_path : str
+        Path (dir) of the downloaded model.
+    mask_prob : float (default: 0.65)
+        Probability of masking a given frame. Default is taken from the paper.
+    mask_length : float (default: 10)
+        Length (i.e. number of consecutive masked frames). Default is taken from
+        the paper.
+    """
     def __init__(
         self,
         source,
@@ -258,9 +224,9 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         super(AdvHuggingFaceWav2Vec2Pretrain,self).__init__(
             source,
             save_path,
-            mask_prob=0.65,
-            mask_length=10,
-            normalize_wav=True
+            mask_prob=mask_prob,
+            mask_length=mask_length,
+            normalize_wav=normalize_wav
         )
         self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
 
@@ -272,6 +238,8 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         ---------
         wav : torch.Tensor (signal)
             A batch of audio signals to transform to features.
+        quantized_representation : Optional[torch.Tensor,torch.Tensor]
+            A precomputed quantized representation of the audio signal.
         """
         batch_size, raw_sequence_length = wav.shape
         if self.normalize_wav:

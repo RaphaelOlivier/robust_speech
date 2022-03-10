@@ -1,35 +1,11 @@
 #!/usr/bin/env/python3
-"""Recipe for training a Transducer ASR system with librispeech.
+"""A RNN-Transducer ASR system with librispeech supporting adversarial attacks.
 The system employs an encoder, a decoder, and an joint network
 between them. Decoding is performed with beamsearch coupled with a neural
 language model.
 
-To run this recipe, do the following:
-> python train.py hparams/train.yaml
-
-With the default hyperparameters, the system employs a CRDNN encoder.
-The decoder is based on a standard  GRU. Beamsearch coupled with a RNN
-language model is used on the top of decoder probabilities.
-
-The neural network is trained on both CTC and negative-log likelihood
-targets and sub-word units estimated with Byte Pairwise Encoding (BPE)
-are used as basic recognition tokens. Training is performed on the full
-LibriSpeech dataset (960 h).
-
-The experiment file is flexible enough to support a large variety of
-different systems. By properly changing the parameter files, you can try
-different encoders, decoders, tokens (e.g, characters instead of BPE),
-training split (e.g, train-clean 100 rather than the full one), and many
-other possible variations.
-
-
-Authors
- * Abdel Heba 2020
- * Mirco Ravanelli 2020
- * Ju-Chieh Chou 2020
- * Peter Plantinga 2020
+Inspired from SpeechBrain Transducer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transducer/train.py)
 """
-
 import os
 import sys
 import torch
@@ -44,7 +20,6 @@ from robust_speech.adversarial.brain import AdvASRBrain
 logger = logging.getLogger(__name__)
 
 # Define training procedure
-
 
 class RNNTASR(AdvASRBrain):
     def compute_forward(self, batch, stage):

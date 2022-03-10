@@ -1,37 +1,10 @@
-#!/usr/bin/env python3
-"""Recipe for training a Transformer ASR system with librispeech.
+#!/usr/bin/env/python3
+"""A Transformer ASR system with librispeech supporting adversarial attacks.
 The system employs an encoder, a decoder, and an attention mechanism
 between them. Decoding is performed with (CTC/Att joint) beamsearch coupled with a neural
 language model.
 
-To run this recipe, do the following:
-> python train.py hparams/transformer.yaml
-> python train.py hparams/conformer.yaml
-
-With the default hyperparameters, the system employs a convolutional frontend and a transformer.
-The decoder is based on a Transformer decoder. Beamsearch coupled with a Transformer
-language model is used  on the top of decoder probabilities.
-
-The neural network is trained on both CTC and negative-log likelihood
-targets and sub-word units estimated with Byte Pairwise Encoding (BPE)
-are used as basic recognition tokens. Training is performed on the full
-LibriSpeech dataset (960 h).
-
-The best model is the average of the checkpoints from last 5 epochs.
-
-The experiment file is flexible enough to support a large variety of
-different systems. By properly changing the parameter files, you can try
-different encoders, decoders, tokens (e.g, characters instead of BPE),
-training split (e.g, train-clean 100 rather than the full one), and many
-other possible variations.
-
-
-Authors
- * Jianyuan Zhong 2020
- * Mirco Ravanelli 2020
- * Peter Plantinga 2020
- * Samuele Cornell 2020
- * Titouan Parcollet 2021
+Inspired from SpeechBrain Transformer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transformer/train.py)
 """
 import os
 import sys

@@ -4,23 +4,68 @@ from advertorch.attacks.utils import rand_init_delta
 from advertorch.utils import clamp
 import speechbrain as sb
 from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, perturb_iterative
+from robust_speech.models.wav2vec2_pretrain import AdvHuggingFaceWav2Vec2Pretrain
 
 class ConstrastiveASRAttack(ASRPGDAttack):
-    # TODO : verify that the model supports contrastive loss
+    """
+    Implementation of the Contrastive attack for Wav2Vec2.
+    This attack is inspired by Adversarial Contrastive Learning for self-supervised Classification
+    (https://arxiv.org/abs/2006.07589)
+    
+    Arguments
+    ---------
+     asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+     eps: float
+        maximum distortion.
+     nb_iter: int
+        number of iterations.
+     eps_iter: float
+        attack step size.
+     rand_init: (optional bool) 
+        random initialization.
+     clip_min: (optional) float
+        mininum value per input dimension.
+     clip_max: (optional) float
+        maximum value per input dimension.
+     ord: (optional) int
+         the order of maximum distortion (inf or 2).
+     targeted: bool
+        if the attack is targeted.
+     train_mode_for_backward: bool
+        whether to force training mode in backward passes (necessary for RNN models)
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self._check_for_contrastive_loss():
+            raise ValueError(
+                "Contrastive attack can only be applied to wav2vec2-based models that support fixing quantized representations"
+            )
+
+    def _check_for_contrastive_loss(self):
+        if not hasattr(self.asr_brain.modules,"wav2vec2"):
+            return False 
+        if not isinstance(self.asr_brain.modules.wav2vec2,AdvHuggingFaceWav2Vec2Pretrain):
+            return False 
+        return True
+    
     def perturb(self, batch):
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         else:
             self.asr_brain.module_eval()
         """
-        Given examples (x, y), returns their adversarial counterparts with
-        an attack length of eps.
-        :param x: input tensor.
-        :param y: label tensor.
-                  - if None and self.targeted=False, compute y as predicted
-                    labels.
-                  - if self.targeted=True, then y must be the targeted labels.
-        :return: tensor containing perturbed inputs.
+        Given an audio batch, returns its adversarial counterpart with
+        an attack radius of eps.
+        
+        Arguments
+        ---------
+        batch: PaddedBatch
+
+        Returns
+        -------
+        tensor containing perturbed inputs.
         """
         
         save_device = batch.sig[0].device

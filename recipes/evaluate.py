@@ -1,19 +1,29 @@
 
+"""
+Evaluation script supporting adversarial attacks.
+Similar to the training script without the brain.fit() call, with one key difference:
+To support transferred attacks or attacks conducted on multiple models like MGAA,
+the model hparams files was decoupled from the main hparams file. 
+
+hparams contains target_brain_class and target_brain_hparams_file arguments,
+which are used to load corresponding brains, modules and pretrained parameters.
+Optional source_brain_class and source_brain_hparams_file can be specified to transfer 
+the adversarial perturbations. Each of them can be specified as a (nested) list, in which case
+the brain will be an EnsembleASRBrain object.
+
+Example:
+python evaluate.py attack_configs/pgd/attack.yaml\
+     --root=/path/to/data/and/results/folder\
+     --auto_mix_prec`
+"""
 import os
 import sys
-import gc
-import torch
-import logging
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
 from pathlib import Path
 import robust_speech as rs
-
-"""
-Adversarial (or natural) training script
-"""
 
 def read_brains(
         brain_classes, 
@@ -66,7 +76,8 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
-    if "pretrainer" in hparams:
+    if "pretrainer" in hparams: # load parameters 
+        #the tokenizer currently is loaded from the main hparams file and set in all brain classes
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(device=run_opts["device"])
     
@@ -91,7 +102,7 @@ if __name__ == "__main__":
         hparams
     )
     source_brain = None
-    if "source_brain_class" in hparams:
+    if "source_brain_class" in hparams: # loading source model
         source_brain = read_brains(
             hparams["source_brain_class"], 
             hparams["source_brain_hparams_file"], 
@@ -101,6 +112,8 @@ if __name__ == "__main__":
         )
     attacker=hparams["attack_class"]
     if source_brain:
+        # instanciating with the source model if there is one.
+        # Otherwise, AdvASRBrain will handle instanciating the attacker with the target model.
         attacker = attacker(source_brain)
 
     # Target model initialization
@@ -114,10 +127,10 @@ if __name__ == "__main__":
         overrides=overrides,
         tokenizer=tokenizer
     )
-    target_brain.__setattr__("tokenizer",tokenizer, attacker_brain=True)
-    target_brain.__setattr__("logger",hparams["logger"], attacker_brain=True)
+    target_brain.logger=hparams["logger"]
     target_brain.hparams.train_logger = hparams["logger"]
-    # Testing
+
+    # Evaluation
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(
             hparams["output_folder"], "wer_{}.txt".format(k)

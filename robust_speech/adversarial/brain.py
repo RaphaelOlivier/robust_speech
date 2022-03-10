@@ -243,6 +243,8 @@ class AdvASRBrain(ASRBrain):
         )
 
     def __setattr__(self,name,value, attacker_brain=True):
+        """Maintain similar attributes for the main and nested brain
+        """
         if hasattr(self,"attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
             super(AdvASRBrain,self.attacker.asr_brain).__setattr__(name,value)
         super(AdvASRBrain,self).__setattr__(name,value)
@@ -255,7 +257,13 @@ class AdvASRBrain(ASRBrain):
         run_opts=None,
         attacker=None
     ):
-        """Initialize attacker class
+        """
+        Initialize attacker class. 
+        Attackers take a brain as argument. If the attacker is not already instantiated,
+         then it will receive a copy of the current object (without an attacker!), sharing modules.
+         If the attacker is already instanciated it may contain a different brain. This is useful for
+         transferring adversarial attacks between models: the noise is computed on the nested (source) 
+         brain and evaluated on the main (target) brain.
         """
         if isinstance(attacker,Attack): # attacker object already initiated
             self.attacker=attacker

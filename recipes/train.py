@@ -1,22 +1,31 @@
 
+"""
+Training script for robust-speech models. 
+It handles adversarial training using the hparams.attacker object, 
+and externalizes data loading and brain classes with hparams.
+This aside, the script is very similar to SpeechBrain training scripts. 
+It is compatible with any robust-speech model.
+
+Example:
+
+`python train.py train_configs/ctc_train.yaml\
+     --root=/path/to/data/and/results/folder\
+     --auto_mix_prec\
+     --data_parallel_backend`
+"""
+
+
 import os
 import sys
-import gc
-import torch
 import logging
 logger = logging.getLogger('speechbrain.dataio.sampler')
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.WARNING) # avoid annoying logs
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
 from pathlib import Path
 import robust_speech as rs
-
-"""
-Adversarial (or natural) training script
-"""
-
 
 if __name__ == "__main__":
 
@@ -38,7 +47,7 @@ if __name__ == "__main__":
     )
 
     # Dataset prep (parsing Librispeech)
-    prepare_dataset = hparams["dataset_prepare_fct"]
+    prepare_dataset = hparams["dataset_prepare_fct"] # data preparation function. Have skip_prep=True if csv files have already been processed.
 
     # multi-gpu (ddp) save data preparation
     run_on_main(
@@ -55,9 +64,9 @@ if __name__ == "__main__":
         },
     )
 
-    dataio_prepare = hparams["dataio_prepare_fct"]
+    dataio_prepare = hparams["dataio_prepare_fct"] # data loading function
 
-    if "pretrainer" in hparams:
+    if "pretrainer" in hparams: # load parameters (such as tokenizer or language model)
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(device=run_opts["device"])
 
@@ -89,7 +98,7 @@ if __name__ == "__main__":
     if valid_bsampler is not None:
         valid_dataloader_opts = {"batch_sampler": valid_bsampler}
 
-    # Training
+    # Training (with attacks if hparams.attacker is not None)
     asr_brain.fit(
         asr_brain.hparams.epoch_counter,
         train_data,
@@ -98,7 +107,7 @@ if __name__ == "__main__":
         valid_loader_kwargs=valid_dataloader_opts,
     )
 
-    # Testing
+    # Testing (with attacks if hparams.attacker is not None)
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         asr_brain.hparams.wer_file = os.path.join(
             hparams["output_folder"], "wer_{}.txt".format(k)

@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 attack_class: null
-save_audio_path: null
+save_audio: False
 
 # Model information
 model_name: wav2vec2-base
@@ -36,6 +36,7 @@ output_folder: !ref <root>/attacks/none/<model_name>/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt
+save_audio_path: !ref <output_folder>/save
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare

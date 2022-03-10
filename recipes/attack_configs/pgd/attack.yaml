@@ -24,12 +24,10 @@ log: !ref <output_folder>/log.txt
 # directory containing the lm.ckpt and tokenizer.ckpt may also be specified
 # instead. E.g if you want to use your own LM / tokenizer.
 
-#attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
-#  targeted: False
-#  snr: 30
-#  nb_iter: 15
-attack_class: null
-save_audio_path: null
+attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
+  targeted: False
+  snr: 30
+  nb_iter: 15
 #source_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 #source_brain_hparams_file: attack_configs/wav2vec2_contrastive/w2v2.yaml
 

@@ -138,6 +138,6 @@ if __name__ == "__main__":
         target_brain.evaluate(
             test_datasets[k], 
             test_loader_kwargs=hparams["test_dataloader_opts"], 
-            save_audio_path = hparams["save_audio_path"], 
+            save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None, 
             sample_rate=hparams["sample_rate"]
         )

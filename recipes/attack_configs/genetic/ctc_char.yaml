@@ -8,23 +8,23 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-eps: 0.003
-nb_iter: 100
-attack_class: !name:robust_speech.adversarial.attacks.contrastive.ConstrastiveASRAttack
+eps: 0.01
+nb_iter: 1000
+attack_class: !name:robust_speech.adversarial.attacks.genetic.GeneticAttack
   targeted: False
   eps: !ref <eps>
   nb_iter: !ref <nb_iter>
 save_audio: False
 
 # Model information
-model_name: wav2vec2-base
-target_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
+model_name: asr-ctcrnn-librispeech
+target_brain_class: !name:robust_speech.models.ctc.CTCASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null
 # source_brain_hparams_file: null
 
-# Tokenizer information (compatible with target and source). W2VPretrain does not use any tokenizer but this is kept for speech compatibilty
-pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2-base-960h
+# Tokenizer information (compatible with target and source)
+pretrained_tokenizer_path: !ref <root>/trainings/<model_name>/tokenizer
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 
@@ -75,4 +75,3 @@ test_dataloader_opts:
 
 logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <log>
-    

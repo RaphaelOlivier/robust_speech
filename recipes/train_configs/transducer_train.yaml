@@ -262,8 +262,6 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
       scheduler: !ref <lr_annealing>
       normalizer: !ref <normalize>
       counter: !ref <epoch_counter>
-      tokenizer: !ref <tokenizer>
-      lm: !ref <lm_model>
 
 pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
    collect_in: !ref <save_folder>

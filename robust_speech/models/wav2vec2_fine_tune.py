@@ -55,7 +55,7 @@ class W2VASR(AdvASRBrain):
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv = False):
+    def compute_objectives(self, predictions, batch, stage, adv = False, reduction = "mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
@@ -72,7 +72,7 @@ class W2VASR(AdvASRBrain):
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
         
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
         loss = loss_ctc
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:

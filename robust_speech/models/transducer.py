@@ -110,7 +110,7 @@ class RNNTASR(AdvASRBrain):
             ) = self.hparams.Beamsearcher(x)
             return p_transducer, wav_lens, best_hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv = False):
+    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
         """Computes the loss (Transducer+(CTC+NLL)) given predictions and targets."""
 
         ids = batch.id
@@ -127,13 +127,13 @@ class RNNTASR(AdvASRBrain):
             if len(predictions) == 4:
                 p_ctc, p_ce, p_transducer, wav_lens = predictions
                 CTC_loss = self.hparams.ctc_cost(
-                    p_ctc, tokens, wav_lens, token_lens
+                    p_ctc, tokens, wav_lens, token_lens, reduction=reduction
                 )
                 CE_loss = self.hparams.ce_cost(
-                    p_ce, tokens_eos, length=token_eos_lens
+                    p_ce, tokens_eos, length=token_eos_lens, reduction=reduction
                 )
                 loss_transducer = self.hparams.transducer_cost(
-                    p_transducer, tokens, wav_lens, token_lens
+                    p_transducer, tokens, wav_lens, token_lens,reduction=reduction
                 )
                 loss = (
                     self.hparams.ctc_weight * CTC_loss
@@ -147,10 +147,10 @@ class RNNTASR(AdvASRBrain):
                 if current_epoch <= self.hparams.number_of_ctc_epochs:
                     p_ctc, p_transducer, wav_lens = predictions
                     CTC_loss = self.hparams.ctc_cost(
-                        p_ctc, tokens, wav_lens, token_lens
+                        p_ctc, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss_transducer = self.hparams.transducer_cost(
-                        p_transducer, tokens, wav_lens, token_lens
+                        p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss = (
                         self.hparams.ctc_weight * CTC_loss
@@ -160,10 +160,10 @@ class RNNTASR(AdvASRBrain):
                 else:
                     p_ce, p_transducer, wav_lens = predictions
                     CE_loss = self.hparams.ce_cost(
-                        p_ce, tokens_eos, length=token_eos_lens
+                        p_ce, tokens_eos, length=token_eos_lens, reduction=reduction
                     )
                     loss_transducer = self.hparams.transducer_cost(
-                        p_transducer, tokens, wav_lens, token_lens
+                        p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss = (
                         self.hparams.ce_weight * CE_loss
@@ -172,12 +172,12 @@ class RNNTASR(AdvASRBrain):
             else:
                 p_transducer, wav_lens = predictions
                 loss = self.hparams.transducer_cost(
-                    p_transducer, tokens, wav_lens, token_lens
+                    p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                 )
         else:
             p_transducer, wav_lens, predicted_tokens = predictions
             loss = self.hparams.transducer_cost(
-                p_transducer, tokens, wav_lens, token_lens
+                p_transducer, tokens, wav_lens, token_lens, reduction=reduction
             )
 
         if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:

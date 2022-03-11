@@ -78,7 +78,7 @@ class TrfASR(AdvASRBrain):
 
         return p_ctc, p_seq, wav_lens, hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv = False):
+    def compute_objectives(self, predictions, batch, stage, adv = False, reduction = "mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         (p_ctc, p_seq, wav_lens, hyps,) = predictions
@@ -97,11 +97,11 @@ class TrfASR(AdvASRBrain):
         loss_seq = 0.
         if self.hparams.ctc_weight<1.:
             loss_seq = self.hparams.seq_cost(
-                p_seq, tokens_eos, length=tokens_eos_lens
+                p_seq, tokens_eos, length=tokens_eos_lens, reduction=reduction
             )
         loss_ctc = 0.
         if self.hparams.ctc_weight>0.:
-            loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+            loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq

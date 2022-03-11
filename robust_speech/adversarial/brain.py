@@ -41,7 +41,7 @@ class ASRBrain(sb.Brain):
         """
         raise NotImplementedError
 
-    def compute_objectives(self, predictions, batch, stage, adv=False):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Compute loss, to be overridden by sub-classes.
 
         Arguments
@@ -53,6 +53,10 @@ class ASRBrain(sb.Brain):
             An element from the dataloader, including targets for comparison.
         stage : Union[sb.Stage, rs.Stage]
             The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+        adv : bool
+            Whether this is an adversarial input (used for metric logging)
+        reduction : str
+            the type of loss reduction to apply (required by some attacks)
 
         Returns
         -------
@@ -129,7 +133,7 @@ class EnsembleASRBrain(ASRBrain):
             return self.asr_brains[self.ref_tokens].get_tokens(predictions[self.ref_tokens])
         return self.asr_brains[self.ref_tokens].get_tokens(predictions)
 
-    def compute_objectives(self,predictions, batch, stage, average=True, model_idx=None):
+    def compute_objectives(self,predictions, batch, stage, average=True, model_idx=None, adv = False, reduction="mean"):
         # concatenate of average objectives
         if isinstance(predictions,PredictionEnsemble) or model_idx is None: # many predictions
             assert len(predictions)==self.nmodels
@@ -137,13 +141,13 @@ class EnsembleASRBrain(ASRBrain):
             for i in range(self.nmodels):
                 ab = self.asr_brains[i] if model_idx is None else self.asr_brains[model_idx] # one pred per model or n pred per model
                 pred = predictions[i] if isinstance(predictions,PredictionEnsemble) else predictions
-                loss = ab.compute_objectives(pred, batch, stage)
+                loss = ab.compute_objectives(pred, batch, stage, adv = adv, reduction=reduction)
                 losses.append(loss)
             losses = torch.stack(losses,dim=0)
             if average:
                 return torch.mean(loss,dim=0)
             return losses
-        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage)
+        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage, adv=adv, reduction=reduction)
 
     def __setattr__(self,name,value): # useful to set tokenizer
         if name != "asr_brains" and name != "ref_tokens":

@@ -103,6 +103,9 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         """
         New argument quantized_representation contains an optional precomputed value for (quantized_features, codevector_perplexity).
         If available, this value is not recomputed in the foward pass.
+
+        Returns:
+        --------
         """
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -320,7 +323,7 @@ class W2VPretrain(AdvASRBrain):
             return loss, out, mask
         return loss
 
-    def compute_objectives(self, predictions, batch, stage, adv = False):
+    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns

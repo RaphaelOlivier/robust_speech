@@ -64,7 +64,7 @@ class S2SASR(AdvASRBrain):
                 p_tokens, scores = self.hparams.test_search(x, wav_lens)
             return p_seq, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv = False):
+    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         current_epoch = self.hparams.epoch_counter.current
@@ -89,7 +89,7 @@ class S2SASR(AdvASRBrain):
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
         
         loss_seq = self.hparams.seq_cost(
-            p_seq, tokens_eos, length=tokens_eos_lens
+            p_seq, tokens_eos, length=tokens_eos_lens,reduction=reduction
         )
 
         # Add ctc loss if necessary
@@ -98,7 +98,7 @@ class S2SASR(AdvASRBrain):
             and current_epoch <= self.hparams.number_of_ctc_epochs
         ):
             loss_ctc = self.hparams.ctc_cost(
-                p_ctc, tokens, wav_lens, tokens_lens
+                p_ctc, tokens, wav_lens, tokens_lens,reduction=reduction
             )
             loss = self.hparams.ctc_weight * loss_ctc
             loss += (1 - self.hparams.ctc_weight) * loss_seq

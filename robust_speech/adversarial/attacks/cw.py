@@ -243,4 +243,5 @@ class ASRCarliniWagnerAttack(Attacker):
             )
         batch.sig = wavs_init, rel_lengths
         batch = batch.to(save_device)
+        self.asr_brain.module_eval()
         return final_advs.to(save_device)

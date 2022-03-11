@@ -217,6 +217,7 @@ class ASRPGDAttack(Attacker):
 
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)
+        self.asr_brain.module_eval()
         return wav_adv.data.to(save_device)
 
 

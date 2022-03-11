@@ -77,6 +77,7 @@ class CTCASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
+        
         loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens,reduction=reduction)
         loss = loss_ctc
 

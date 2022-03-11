@@ -40,7 +40,7 @@ cd robust_speech
 pip install .
 ```
 
-## Use
+## Usage
 We provide scripts to train and evaluate models (with adversarial attacks in both stages). These scripts are similar to speechbrain training recipes.
 
 We also provide a number of training and evaluation config files ready for use.

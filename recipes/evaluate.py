@@ -139,5 +139,6 @@ if __name__ == "__main__":
             test_datasets[k], 
             test_loader_kwargs=hparams["test_dataloader_opts"], 
             save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None, 
-            sample_rate=hparams["sample_rate"]
+            sample_rate=hparams["sample_rate"],
+            target = hparams["target_sentence"] if "target_sentence" in hparams else None
         )

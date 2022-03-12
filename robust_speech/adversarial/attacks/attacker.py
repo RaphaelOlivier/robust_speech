@@ -49,7 +49,7 @@ class Attacker(Attack,LabelMixin):
                 test_stats={"Adversarial SNR":snr},
             )
 
-    def perturb_and_log(self,batch):
+    def perturb_and_log(self,batch, target=None):
         """
         Compute an adversarial perturbation and log results
 

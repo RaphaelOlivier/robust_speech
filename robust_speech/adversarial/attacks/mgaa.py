@@ -1,18 +1,18 @@
 
 
-
 import numpy as np
 import torch
 import torch.nn as nn
 from advertorch.utils import is_float_or_torch_tensor
 
-import speechbrain as sb 
+import speechbrain as sb
 
 import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import perturb_iterative
 
-from advertorch.attacks.base import Attack,LabelMixin
+from advertorch.attacks.base import Attack, LabelMixin
 from robust_speech.adversarial.attacks.attacker import Attacker
+
 
 class ASRMGAA(Attacker):
     """
@@ -41,17 +41,18 @@ class ASRMGAA(Attacker):
         if the attack is targeted
      train_mode_for_backward: bool
         whether to force training mode in backward passes (necessary for RNN models)
-        
+
     """
-    
+
     def __init__(
-        self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
-        rel_eps_iter=1., clip_min=None, clip_max=None,
-        ord=np.inf, targeted=False,train_mode_for_backward=True):
+            self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
+            rel_eps_iter=1., clip_min=None, clip_max=None,
+            ord=np.inf, targeted=False, train_mode_for_backward=True):
 
         raise NotImplementedError('This attack is under development')
 
-        assert isinstance(asr_brain,rs.adversarial.brain.EnsembleASRBrain) and asr_brain.nmodels==2
+        assert isinstance(
+            asr_brain, rs.adversarial.brain.EnsembleASRBrain) and asr_brain.nmodels == 2
         self.nested_attack = nested_attack_class(asr_brain.asr_brains[1])
         self.asr_brain = asr_brain.asr_brains[0]
 
@@ -84,7 +85,7 @@ class ASRMGAA(Attacker):
             self.asr_brain.module_train()
         else:
             self.asr_brain.module_eval()
-        
+
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         save_input = batch.sig[0]
@@ -98,8 +99,8 @@ class ASRMGAA(Attacker):
             test_adv = perturb_iterative(
                 batch, self.asr_brain, nb_iter=1,
                 eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
-                minimize=self.targeted, ord=self.ord, 
-                clip_min=self.clip_min, clip_max=self.clip_max, 
+                minimize=self.targeted, ord=self.ord,
+                clip_min=self.clip_min, clip_max=self.clip_max,
                 delta_init=nn.Parameter(train_adv - x), l1_sparsity=False
             )
             delta = test_adv - train_adv

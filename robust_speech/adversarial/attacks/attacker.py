@@ -1,11 +1,13 @@
-import numpy as np 
+import numpy as np
 import torch
 import torch.nn as nn
-from advertorch.attacks.base import Attack,LabelMixin
+from advertorch.attacks.base import Attack, LabelMixin
 from advertorch.attacks.utils import rand_init_delta
 from advertorch.utils import clamp
 from robust_speech.adversarial.metrics import SNRComputer, AudioSaver
-class Attacker(Attack,LabelMixin):
+
+
+class Attacker(Attack, LabelMixin):
     """
     Abstract class for running attacks and logging results (SNR and audio files)
 
@@ -17,7 +19,7 @@ class Attacker(Attack,LabelMixin):
         if the attack is targeted.
     """
 
-    def on_evaluation_start(self, save_audio_path=None,sample_rate=16000):
+    def on_evaluation_start(self, save_audio_path=None, sample_rate=16000):
         """
         Method to run at the beginning of an evaluation phase with adverersarial attacks.
 
@@ -43,13 +45,14 @@ class Attacker(Attack,LabelMixin):
             path to the folder in which to save audio files
         """
         snr = self.snr_metric.summarize()
-        snr = {"average":snr["average"], 'min_score':snr['min_score'], 'max_score':snr['max_score']}
+        snr = {"average": snr["average"],
+               'min_score': snr['min_score'], 'max_score': snr['max_score']}
         logger.log_stats(
-                stats_meta={},
-                test_stats={"Adversarial SNR":snr},
-            )
+            stats_meta={},
+            test_stats={"Adversarial SNR": snr},
+        )
 
-    def perturb_and_log(self,batch, target=None):
+    def perturb_and_log(self, batch, target=None):
         """
         Compute an adversarial perturbation and log results
 
@@ -63,9 +66,9 @@ class Attacker(Attack,LabelMixin):
         the tensor of the perturbed batch
         """
         adv_wav = self.perturb(batch)
-        self.snr_metric.append(batch.id, batch,adv_wav)
+        self.snr_metric.append(batch.id, batch, adv_wav)
         if self.save_audio_path:
-            self.audio_saver.save(batch.id,batch,adv_wav)
+            self.audio_saver.save(batch.id, batch, adv_wav)
         return adv_wav
 
     def perturb(self, batch):
@@ -84,11 +87,12 @@ class Attacker(Attack,LabelMixin):
 
         raise NotImplementedError
 
+
 class RandomAttack(Attacker):
     """
     An attack based on entirely random noise, which can be used as a baseline with various noise bounds.
     The attack returns a noisy input within eps from the initial point.
-    
+
     Arguments
     ---------
      asr_brain: rs.adversarial.brain.ASRBrain
@@ -104,16 +108,16 @@ class RandomAttack(Attacker):
      targeted: bool
         if the attack is targeted (not used).
     """
-    def __init__(
-            self, asr_brain, eps=0.3,ord=np.inf, clip_min=None, clip_max=None, targeted=False
-        ):
-        self.asr_brain=asr_brain
-        self.eps=eps
-        self.ord=ord
-        self.clip_min=clip_min
-        self.clip_max=clip_max
-        assert not targeted
 
+    def __init__(
+        self, asr_brain, eps=0.3, ord=np.inf, clip_min=None, clip_max=None, targeted=False
+    ):
+        self.asr_brain = asr_brain
+        self.eps = eps
+        self.ord = ord
+        self.clip_min = clip_min
+        self.clip_max = clip_max
+        assert not targeted
 
     def perturb(self, batch):
         """

@@ -29,9 +29,9 @@ import transformers
 from transformers import Wav2Vec2ForPreTraining
 
 from transformers.models.wav2vec2.modeling_wav2vec2 import (
-    Wav2Vec2ForPreTrainingOutput, 
+    Wav2Vec2ForPreTrainingOutput,
     Wav2Vec2FeatureExtractor,
-    WAV_2_VEC_2_INPUTS_DOCSTRING, 
+    WAV_2_VEC_2_INPUTS_DOCSTRING,
     _CONFIG_FOR_DOC,
     _compute_mask_indices
 )
@@ -47,15 +47,17 @@ from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pret
 
 logger = logging.getLogger(__name__)
 
+
 class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
     """ 
     Slight modification of the HF feature extractor. 
     The original class assumes that input is a leaf tensor, which when running attacks isn't always the case.
     """
+
     def forward(self, input_values):
         hidden_states = input_values[:, None]
         # make sure hidden_states require grad for gradient_checkpointing
-        if self._requires_grad and self.training and hidden_states.is_leaf: # not always true when attacking
+        if self._requires_grad and self.training and hidden_states.is_leaf:  # not always true when attacking
             hidden_states.requires_grad = True
 
         for conv_layer in self.conv_layers:
@@ -76,17 +78,18 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
 
         return hidden_states
 
+
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
     """
     This class modifies the transformers Wav2Vec2ForPreTraining module in order to 
         -replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
         -handle contrastive attacks in forward
     """
+
     def __init__(self, config: Wav2Vec2Config):
         super().__init__(config)
         self.wav2vec2.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
-    
     @add_start_docstrings_to_model_forward(WAV_2_VEC_2_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=Wav2Vec2ForPreTrainingOutput, config_class=_CONFIG_FOR_DOC)
     def forward(
@@ -166,7 +169,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
 
             # 5. if a negative vector is identical to the positive (i.e. when codebook utilization is low),
             # its cosine similarity will be masked
-            neg_is_pos = (quantized_features == negative_quantized_features).all(-1)
+            neg_is_pos = (quantized_features ==
+                          negative_quantized_features).all(-1)
 
             if neg_is_pos.any():
                 logits[1:][neg_is_pos] = float("-inf")
@@ -174,12 +178,16 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             # 6. compute contrastive loss \mathbf{L}_m = cross_entropy(logs) =
             # -log(exp(sim(c_t, q_t)/\kappa) / \sum_{\sim{q}} exp(sim(c_t, \sim{q})/\kappa))
             logits = logits.transpose(0, 2).reshape(-1, logits.size(0))
-            target = ((1 - mask_time_indices.long()) * -100).transpose(0, 1).flatten()
+            target = ((1 - mask_time_indices.long())
+                      * -100).transpose(0, 1).flatten()
 
-            contrastive_loss = torch.nn.functional.cross_entropy(logits.float(), target, reduction="sum")
+            contrastive_loss = torch.nn.functional.cross_entropy(
+                logits.float(), target, reduction="sum")
             # 7. compute diversity loss: \mathbf{L}_d
-            num_codevectors = self.config.num_codevectors_per_group * self.config.num_codevector_groups
-            diversity_loss = ((num_codevectors - codevector_perplexity) / num_codevectors) * mask_time_indices.sum()
+            num_codevectors = self.config.num_codevectors_per_group * \
+                self.config.num_codevector_groups
+            diversity_loss = ((num_codevectors - codevector_perplexity) /
+                              num_codevectors) * mask_time_indices.sum()
 
             # 8. \mathbf{L} = \mathbf{L}_m + \alpha * \mathbf{L}_d
             loss = contrastive_loss + self.config.diversity_loss_weight * diversity_loss
@@ -199,6 +207,7 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             diversity_loss=diversity_loss,
         )
 
+
 class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
     """This lobe enables the integration of HuggingFace
      wav2vec2.0 models to be pretrained.
@@ -216,6 +225,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         Length (i.e. number of consecutive masked frames). Default is taken from
         the paper.
     """
+
     def __init__(
         self,
         source,
@@ -224,7 +234,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         mask_length=10,
         normalize_wav=True,
     ):
-        super(AdvHuggingFaceWav2Vec2Pretrain,self).__init__(
+        super(AdvHuggingFaceWav2Vec2Pretrain, self).__init__(
             source,
             save_path,
             mask_prob=mask_prob,
@@ -232,7 +242,6 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             normalize_wav=normalize_wav
         )
         self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
-
 
     def forward(self, wav, quantized_representation=None):
         """Takes an input waveform and return its corresponding wav2vec encoding.
@@ -288,10 +297,12 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         )
 
 # Define training procedure
+
+
 class W2VPretrain(AdvASRBrain):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
-        if self.checkpointer and not hasattr(self.hparams,"pretrainer"):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.checkpointer and not hasattr(self.hparams, "pretrainer"):
             # model was loaded from HuggingFace but not preloaded with SpeechBrain: saving it at initialization
             self.checkpointer.save_checkpoint()
 
@@ -305,25 +316,27 @@ class W2VPretrain(AdvASRBrain):
         # Forward on w2v2 and take the loss.
         # It has to be on train mode even for eval. Otherwise it would deactivate
         # the loss computation ...
-        if hasattr(batch, "quantized_representation"): # used saved quantized representation (prior to attack)
+        # used saved quantized representation (prior to attack)
+        if hasattr(batch, "quantized_representation"):
             out, mask = self.modules.wav2vec2(
-                wavs, 
+                wavs,
                 quantized_representation=batch.quantized_representation
             )
         else:
-            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None) # compute quantized representation on the fly
+            # compute quantized representation on the fly
+            out, mask = self.modules.wav2vec2(
+                wavs, quantized_representation=None)
 
         if stage == rs.Stage.ATTACK:
             loss = out.contrastive_loss
         else:
             loss = out.loss
-        
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             return loss, out, mask
         return loss
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns
@@ -336,7 +349,8 @@ class W2VPretrain(AdvASRBrain):
                 out.projected_states, out.projected_quantized_states, dim=-1
             )
             #acc = cosine_sim[mask_time_indices].mean()
-            acc = torch.masked_select(cosine_sim,mask_time_indices.bool()).mean()
+            acc = torch.masked_select(
+                cosine_sim, mask_time_indices.bool()).mean()
             if adv:
                 self.adv_acc_metric.append(acc)
             else:
@@ -395,7 +409,8 @@ class W2VPretrain(AdvASRBrain):
         # Here we manage mixed precision
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
-                predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+                predictions = self.compute_forward_adversarial(
+                    batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(
                     predictions, batch, sb.Stage.TRAIN
                 )
@@ -452,7 +467,8 @@ class W2VPretrain(AdvASRBrain):
         else:
             stage_stats["acc"] = sum(self.acc_metric) / len(self.acc_metric)
             if stage_adv_loss is not None:
-                stage_stats["adv acc"] = sum(self.adv_acc_metric) / len(self.adv_acc_metric)
+                stage_stats["adv acc"] = sum(
+                    self.adv_acc_metric) / len(self.adv_acc_metric)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -478,6 +494,7 @@ class W2VPretrain(AdvASRBrain):
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )

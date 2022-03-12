@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 OPT_FILE = "opt_librispeech_prepare.pkl"
 SAMPLERATE = 16000
 
+
 def prepare_librispeech(
     data_folder,
     save_folder,
@@ -249,8 +250,8 @@ def split_lexicon(data_folder, split_ratio):
     tr_snts = int(0.01 * split_ratio[0] * len(lexicon_lines))
     train_lines = [header] + lexicon_lines[0:tr_snts]
     valid_snts = int(0.01 * split_ratio[1] * len(lexicon_lines))
-    valid_lines = [header] + lexicon_lines[tr_snts : tr_snts + valid_snts]
-    test_lines = [header] + lexicon_lines[tr_snts + valid_snts :]
+    valid_lines = [header] + lexicon_lines[tr_snts: tr_snts + valid_snts]
+    test_lines = [header] + lexicon_lines[tr_snts + valid_snts:]
 
     # Saving files
     with open(os.path.join(data_folder, "lexicon_tr.csv"), "w") as f:
@@ -437,13 +438,13 @@ def dataio_prepare(hparams):
     train_data = None
     if "train_csv" in hparams:
         train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-            csv_path=hparams["train_csv"], replacements={"data_root": data_folder},
+            csv_path=hparams["train_csv"], replacements={
+                "data_root": data_folder},
         )
 
         train_data = train_data.filtered_sorted(
             key_max_value={"duration": hparams["avoid_if_longer_than"]}
-            )
-
+        )
 
         if hparams["sorting"] == "ascending":
             # we sort training data to speed up training and get better results.
@@ -469,13 +470,14 @@ def dataio_prepare(hparams):
     valid_data = None
     if "valid_csv" in hparams:
         valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-            csv_path=hparams["valid_csv"], replacements={"data_root": data_folder},
+            csv_path=hparams["valid_csv"], replacements={
+                "data_root": data_folder},
         )
         #valid_data = valid_data.filtered_sorted(sort_key="duration")
 
         valid_data = valid_data.filtered_sorted(
             key_max_value={"duration": hparams["avoid_if_longer_than"]}
-            )
+        )
 
     # test is separate
     test_datasets = {}
@@ -491,7 +493,7 @@ def dataio_prepare(hparams):
             if "avoid_if_longer_than" in hparams:
                 test_datasets[name] = test_datasets[name].filtered_sorted(
                     key_max_value={"duration": hparams["avoid_if_longer_than"]}
-                    )
+                )
     datasets = []
     if train_data:
         datasets.append(train_data)
@@ -513,7 +515,7 @@ def dataio_prepare(hparams):
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
     # 3. Define text pipeline:
-    if isinstance(tokenizer,sb.dataio.encoder.CTCTextEncoder): # char encoder
+    if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):  # char encoder
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
             "wrd", "char_list", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
@@ -524,7 +526,8 @@ def dataio_prepare(hparams):
             yield char_list
             tokens_list = tokenizer.encode_sequence(char_list)
             yield tokens_list
-            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor(
+                [hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -537,7 +540,8 @@ def dataio_prepare(hparams):
             # tokenizer has already been loaded
             pass
         else:
-            lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+            lab_enc_file = os.path.join(
+                hparams["save_folder"], "label_encoder.txt")
 
             special_labels = {
                 "bos_label": hparams["bos_index"],
@@ -558,7 +562,8 @@ def dataio_prepare(hparams):
             ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
         )
     else:
-        assert isinstance(tokenizer,sentencepiece.SentencePieceProcessor)
+        assert isinstance(tokenizer, sentencepiece.SentencePieceProcessor)
+
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
             "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
@@ -567,7 +572,8 @@ def dataio_prepare(hparams):
             yield wrd
             tokens_list = tokenizer.encode_as_ids(wrd)
             yield tokens_list
-            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor(
+                [hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -578,7 +584,8 @@ def dataio_prepare(hparams):
 
         # 4. Set output:
         sb.dataio.dataset.set_output_keys(
-            datasets, ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+            datasets, ["id", "sig", "wrd",
+                       "tokens_bos", "tokens_eos", "tokens"],
         )
 
     train_batch_sampler = None
@@ -615,4 +622,3 @@ def dataio_prepare(hparams):
             )
 
     return train_data, valid_data, test_datasets, train_batch_sampler, valid_batch_sampler, tokenizer
-

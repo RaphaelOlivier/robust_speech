@@ -1,12 +1,14 @@
+from speechbrain.utils.metric_stats import MetricStats
 import os
 import torch
 import torchaudio
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
 
-def snr(audio,perturbation, rel_length=torch.tensor([1.])):
+
+def snr(audio, perturbation, rel_length=torch.tensor([1.])):
     """ 
     Signal to Noise Ratio computation
-    
+
     Arguments
     ---------
     audio : torch.tensor
@@ -18,21 +20,24 @@ def snr(audio,perturbation, rel_length=torch.tensor([1.])):
     """
 
     length = (audio.size(1)*rel_length).long()
-    num = torch.tensor([torch.square(audio[i,:length[i]]).sum() for i in range(audio.size(0))])
-    den = torch.tensor([torch.square(perturbation[i,:length[i]]).sum() for i in range(audio.size(0))])
+    num = torch.tensor([torch.square(audio[i, :length[i]]).sum()
+                        for i in range(audio.size(0))])
+    den = torch.tensor([torch.square(perturbation[i, :length[i]]).sum()
+                        for i in range(audio.size(0))])
     ratio = 10*torch.log10(num/den)
     return torch.round(ratio).long()
 
-from speechbrain.utils.metric_stats import MetricStats
 
 class SNRComputer(MetricStats):
     """Tracks Signal to Noise Ratio
     """
-    def __init__(self,**kwargs):
+
+    def __init__(self, **kwargs):
 
         def metric(batch, adv_wav):
-            return snr(batch.sig[0],adv_wav-batch.sig[0],batch.sig[1])
-        super().__init__(metric,**kwargs)
+            return snr(batch.sig[0], adv_wav-batch.sig[0], batch.sig[1])
+        super().__init__(metric, **kwargs)
+
 
 class AudioSaver:
     """
@@ -45,27 +50,30 @@ class AudioSaver:
     sample_rate: int
         audio sample rate for wav encoding
     """
-    def __init__(self,save_audio_path, sample_rate = 16000):
-        self.save_audio_path=save_audio_path
-        self.sample_rate=sample_rate
+
+    def __init__(self, save_audio_path, sample_rate=16000):
+        self.save_audio_path = save_audio_path
+        self.sample_rate = sample_rate
         if os.path.exists(self.save_audio_path):
             if not os.path.isdir(self.save_audio_path):
-                raise ValueError("%f not a directory"%self.save_audio_path)
+                raise ValueError("%f not a directory" % self.save_audio_path)
         else:
             os.makedirs(save_audio_path)
-    def save(self,audio_ids, batch, adv_sig):
+
+    def save(self, audio_ids, batch, adv_sig):
         bs = len(audio_ids)
         lengths = (batch.sig[0].size(1)*batch.sig[1]).long()
         for i in range(bs):
             id = audio_ids[i]
-            wav = batch.sig[0][i,:lengths[i]].detach().cpu().unsqueeze(0)
-            adv_wav = adv_sig[i,:lengths[i]].detach().cpu().unsqueeze(0)
-            self.save_wav(id,wav,adv_wav)
+            wav = batch.sig[0][i, :lengths[i]].detach().cpu().unsqueeze(0)
+            adv_wav = adv_sig[i, :lengths[i]].detach().cpu().unsqueeze(0)
+            self.save_wav(id, wav, adv_wav)
 
-    def save_wav(self,id,wav,adv_wav):
+    def save_wav(self, id, wav, adv_wav):
         print(wav.size())
         nat_path = id + "_nat.wav"
         adv_path = id + "_adv.wav"
-        torchaudio.save(os.path.join(self.save_audio_path,nat_path),wav,self.sample_rate)
-        torchaudio.save(os.path.join(self.save_audio_path,adv_path),adv_wav,self.sample_rate)
-
+        torchaudio.save(os.path.join(self.save_audio_path,
+                                     nat_path), wav, self.sample_rate)
+        torchaudio.save(os.path.join(self.save_audio_path,
+                                     adv_path), adv_wav, self.sample_rate)

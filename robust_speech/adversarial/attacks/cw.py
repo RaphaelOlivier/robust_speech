@@ -48,6 +48,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
     optimizer: Optional["torch.optim.Optimizer"]
         the optimizer to use
     """
+
     def __init__(
         self,
         asr_brain: rs.adversarial.brain.ASRBrain,
@@ -59,12 +60,12 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         initial_rescale: float = 1.0,
         decrease_factor_eps: float = 0.8,
         num_iter_decrease_eps: int = 1,
-        targeted : bool = True,
-        train_mode_for_backward : bool = True,
-        clip_min : Optional[float] = None,
-        clip_max : Optional[float] = None
+        targeted: bool = True,
+        train_mode_for_backward: bool = True,
+        clip_min: Optional[float] = None,
+        clip_max: Optional[float] = None
     ):
-        super(ASRCarliniWagnerAttack,self).__init__(
+        super(ASRCarliniWagnerAttack, self).__init__(
             asr_brain,
             eps=eps,
             max_iter_1=max_iter,

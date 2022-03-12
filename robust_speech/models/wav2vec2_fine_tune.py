@@ -14,7 +14,7 @@ import logging
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
- 
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,14 +48,14 @@ class W2VASR(AdvASRBrain):
         p_tokens = None
         logits = self.modules.ctc_lin(x)
         p_ctc = self.hparams.log_softmax(logits)
-        
-        if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK] :
+
+        if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:
             p_tokens = sb.decoders.ctc_greedy_decode(
                 p_ctc, wav_lens, blank_id=self.hparams.blank_index
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction = "mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
@@ -63,7 +63,7 @@ class W2VASR(AdvASRBrain):
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
         tokens, tokens_lens = batch.tokens
-        
+
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
             tokens_eos_lens = torch.cat(
@@ -71,8 +71,9 @@ class W2VASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-        
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
+
+        loss_ctc = self.hparams.ctc_cost(
+            p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
         loss = loss_ctc
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
@@ -131,8 +132,10 @@ class W2VASR(AdvASRBrain):
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
             if stage_adv_loss is not None:
-                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                    "error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -162,7 +165,8 @@ class W2VASR(AdvASRBrain):
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:

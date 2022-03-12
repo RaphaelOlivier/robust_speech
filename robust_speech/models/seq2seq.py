@@ -10,6 +10,8 @@ import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
 # Define training procedure
+
+
 class S2SASR(AdvASRBrain):
 
     def compute_forward(self, batch, stage):
@@ -36,7 +38,9 @@ class S2SASR(AdvASRBrain):
         if stage == sb.Stage.TRAIN:
             feats = self.modules.normalize(feats, wav_lens)
         else:
-            feats = self.modules.normalize(feats, wav_lens,epoch=self.modules.normalize.update_until_epoch+1) # don't update normalization outside of training!
+            # don't update normalization outside of training!
+            feats = self.modules.normalize(
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch+1)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -46,7 +50,7 @@ class S2SASR(AdvASRBrain):
         # Output layer for seq2seq log-probabilities
         logits = self.modules.seq_lin(h)
         p_seq = self.hparams.log_softmax(logits)
-        
+
         # Compute outputs
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
@@ -64,7 +68,7 @@ class S2SASR(AdvASRBrain):
                 p_tokens, scores = self.hparams.test_search(x, wav_lens)
             return p_seq, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         current_epoch = self.hparams.epoch_counter.current
@@ -79,7 +83,7 @@ class S2SASR(AdvASRBrain):
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
         tokens, tokens_lens = batch.tokens
-        
+
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
             tokens_eos_lens = torch.cat(
@@ -87,18 +91,18 @@ class S2SASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-        
+
         loss_seq = self.hparams.seq_cost(
-            p_seq, tokens_eos, length=tokens_eos_lens,reduction=reduction
+            p_seq, tokens_eos, length=tokens_eos_lens, reduction=reduction
         )
 
         # Add ctc loss if necessary
         if (
-            (stage == sb.Stage.TRAIN  or stage == rs.Stage.ATTACK)
+            (stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK)
             and current_epoch <= self.hparams.number_of_ctc_epochs
         ):
             loss_ctc = self.hparams.ctc_cost(
-                p_ctc, tokens, wav_lens, tokens_lens,reduction=reduction
+                p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
             )
             loss = self.hparams.ctc_weight * loss_ctc
             loss += (1 - self.hparams.ctc_weight) * loss_seq

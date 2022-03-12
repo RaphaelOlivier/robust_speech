@@ -17,7 +17,7 @@ import logging
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
- 
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,7 +45,9 @@ class CTCASR(AdvASRBrain):
         if stage == sb.Stage.TRAIN:
             feats = self.modules.normalize(feats, wav_lens)
         else:
-            feats = self.modules.normalize(feats, wav_lens,epoch=self.modules.normalize.update_until_epoch+1) # don't update normalization outside of training!
+            # don't update normalization outside of training!
+            feats = self.modules.normalize(
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch+1)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -54,14 +56,14 @@ class CTCASR(AdvASRBrain):
         p_tokens = None
         logits = self.modules.ctc_lin(x)
         p_ctc = self.hparams.log_softmax(logits)
-        
-        if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK] :
+
+        if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:
             p_tokens = sb.decoders.ctc_greedy_decode(
                 p_ctc, wav_lens, blank_id=self.hparams.blank_index
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
@@ -69,7 +71,7 @@ class CTCASR(AdvASRBrain):
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
         tokens, tokens_lens = batch.tokens
-        
+
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
             tokens_eos_lens = torch.cat(
@@ -77,8 +79,9 @@ class CTCASR(AdvASRBrain):
             )
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-        
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens,reduction=reduction)
+
+        loss_ctc = self.hparams.ctc_cost(
+            p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
         loss = loss_ctc
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
@@ -97,18 +100,20 @@ class CTCASR(AdvASRBrain):
 
         return loss
 
+
 class CTCGreedyDecode(sb.decoders.seq2seq.S2SBaseSearcher):
     """Binding between Seq2Seq models and CTC decoders"""
-    def __init__(self,blank_index, ctc_lin, log_softmax):
-        super(CTCGreedyDecode, self).__init__(None,None,None,None)
-        self.blank_index=blank_index
-        self.ctc_lin=ctc_lin
+
+    def __init__(self, blank_index, ctc_lin, log_softmax):
+        super(CTCGreedyDecode, self).__init__(None, None, None, None)
+        self.blank_index = blank_index
+        self.ctc_lin = ctc_lin
         self.log_softmax = log_softmax
-        
-    def forward(self,enc_states, wav_len):
+
+    def forward(self, enc_states, wav_len):
         logits = self.ctc_lin(enc_states)
         p_ctc = self.log_softmax(logits)
         p_tokens = sb.decoders.ctc_greedy_decode(
             p_ctc, wav_len, blank_id=self.blank_index
         )
-        return p_tokens,None
+        return p_tokens, None

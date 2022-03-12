@@ -15,17 +15,17 @@ Example:
 """
 
 
+import robust_speech as rs
+from pathlib import Path
+from hyperpyyaml import load_hyperpyyaml
+from speechbrain.utils.distributed import run_on_main
+from robust_speech.adversarial.brain import AdvASRBrain
+import speechbrain as sb
 import os
 import sys
 import logging
 logger = logging.getLogger('speechbrain.dataio.sampler')
-logger.setLevel(logging.WARNING) # avoid annoying logs
-import speechbrain as sb
-from robust_speech.adversarial.brain import AdvASRBrain
-from speechbrain.utils.distributed import run_on_main
-from hyperpyyaml import load_hyperpyyaml
-from pathlib import Path
-import robust_speech as rs
+logger.setLevel(logging.WARNING)  # avoid annoying logs
 
 if __name__ == "__main__":
 
@@ -47,7 +47,8 @@ if __name__ == "__main__":
     )
 
     # Dataset prep (parsing Librispeech)
-    prepare_dataset = hparams["dataset_prepare_fct"] # data preparation function. Have skip_prep=True if csv files have already been processed.
+    # data preparation function. Have skip_prep=True if csv files have already been processed.
+    prepare_dataset = hparams["dataset_prepare_fct"]
 
     # multi-gpu (ddp) save data preparation
     run_on_main(
@@ -64,9 +65,10 @@ if __name__ == "__main__":
         },
     )
 
-    dataio_prepare = hparams["dataio_prepare_fct"] # data loading function
+    dataio_prepare = hparams["dataio_prepare_fct"]  # data loading function
 
-    if "pretrainer" in hparams: # load parameters (such as tokenizer or language model)
+    # load parameters (such as tokenizer or language model)
+    if "pretrainer" in hparams:
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(device=run_opts["device"])
 

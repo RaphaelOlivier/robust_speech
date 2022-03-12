@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Define training procedure
 
+
 class RNNTASR(AdvASRBrain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
@@ -52,7 +53,9 @@ class RNNTASR(AdvASRBrain):
         if stage == sb.Stage.TRAIN:
             feats = self.modules.normalize(feats, wav_lens)
         else:
-            feats = self.modules.normalize(feats, wav_lens,epoch=self.modules.normalize.update_until_epoch+1) # don't update normalization outside of training!
+            # don't update normalization outside of training!
+            feats = self.modules.normalize(
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch+1)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -110,7 +113,7 @@ class RNNTASR(AdvASRBrain):
             ) = self.hparams.Beamsearcher(x)
             return p_transducer, wav_lens, best_hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (Transducer+(CTC+NLL)) given predictions and targets."""
 
         ids = batch.id
@@ -133,7 +136,7 @@ class RNNTASR(AdvASRBrain):
                     p_ce, tokens_eos, length=token_eos_lens, reduction=reduction
                 )
                 loss_transducer = self.hparams.transducer_cost(
-                    p_transducer, tokens, wav_lens, token_lens,reduction=reduction
+                    p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                 )
                 loss = (
                     self.hparams.ctc_weight * CTC_loss

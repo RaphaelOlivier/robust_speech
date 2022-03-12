@@ -18,7 +18,7 @@ attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    global_max_length: 562480
    initial_rescale: 1.0
    learning_rate: 0.0001
-   max_iter: 10000
+   max_iter: 100
 save_audio: False
 
 # Model information

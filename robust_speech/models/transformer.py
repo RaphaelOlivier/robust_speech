@@ -50,13 +50,13 @@ class TrfASR(AdvASRBrain):
         )
 
         p_ctc = None
-        if self.hparams.ctc_weight>0.:
-        # output layer for ctc log-probabilities
+        if self.hparams.ctc_weight > 0.:
+            # output layer for ctc log-probabilities
             logits = self.modules.ctc_lin(enc_out)
             p_ctc = self.hparams.log_softmax(logits)
 
         p_seq = None
-        #if self.hparams.ctc_weight<1.:
+        # if self.hparams.ctc_weight<1.:
         # output layer for seq2seq log-probabilities
         pred = self.modules.seq_lin(pred)
         p_seq = self.hparams.log_softmax(pred)
@@ -78,7 +78,7 @@ class TrfASR(AdvASRBrain):
 
         return p_ctc, p_seq, wav_lens, hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv = False, reduction = "mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         (p_ctc, p_seq, wav_lens, hyps,) = predictions
@@ -95,13 +95,14 @@ class TrfASR(AdvASRBrain):
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
         loss_seq = 0.
-        if self.hparams.ctc_weight<1.:
+        if self.hparams.ctc_weight < 1.:
             loss_seq = self.hparams.seq_cost(
                 p_seq, tokens_eos, length=tokens_eos_lens, reduction=reduction
             )
         loss_ctc = 0.
-        if self.hparams.ctc_weight>0.:
-            loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
+        if self.hparams.ctc_weight > 0.:
+            loss_ctc = self.hparams.ctc_cost(
+                p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq
@@ -119,8 +120,10 @@ class TrfASR(AdvASRBrain):
                 ]
                 target_words = [wrd.split(" ") for wrd in batch.wrd]
                 if adv:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
                 else:
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
@@ -199,7 +202,7 @@ class TrfASR(AdvASRBrain):
             self.hparams.noam_annealing(self.optimizer)
 
         return loss.detach()
-    
+
     def on_stage_start(self, stage, epoch):
         # Gets called at the beginning of each epoch
         if stage != sb.Stage.TRAIN:
@@ -232,8 +235,10 @@ class TrfASR(AdvASRBrain):
                 stage_stats["CER"] = self.cer_metric.summarize("error_rate")
 
                 if stage_adv_loss is not None:
-                    stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                    stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                    stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                        "error_rate")
+                    stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                        "error_rate")
 
         # log stats and save checkpoint at end-of-epoch
         if stage == sb.Stage.VALID and sb.utils.distributed.if_main_process():
@@ -269,7 +274,8 @@ class TrfASR(AdvASRBrain):
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:
@@ -284,4 +290,3 @@ class TrfASR(AdvASRBrain):
                     max_keys=["ACC"],
                     num_to_keep=1,
                 )
-    

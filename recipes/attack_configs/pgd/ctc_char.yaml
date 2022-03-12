@@ -18,6 +18,7 @@ save_audio: False
 
 # Model information
 model_name: asr-ctcrnn-librispeech
+attack_name: pgd
 target_brain_class: !name:robust_speech.models.ctc.CTCASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null

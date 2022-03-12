@@ -18,6 +18,7 @@ save_audio: False
 
 # Model information
 model_name: wav2vec2-base
+attack_name: contrastive
 target_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null
@@ -36,7 +37,7 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
    paths:
       tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
 
-output_folder: !ref <root>/attacks/none/<model_name>/<seed>
+output_folder: !ref <root>/attacks/<attack_name>/<model_name>/<seed>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt

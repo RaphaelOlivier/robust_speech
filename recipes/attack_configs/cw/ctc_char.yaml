@@ -12,9 +12,13 @@ eps: 0.05
 nb_iter: 5000
 target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
-  targeted: True
-  eps: !ref <eps>
-  nb_iter: !ref <nb_iter>
+   targeted: True
+   decrease_factor_eps: 0.5
+   eps: 0.0075
+   global_max_length: 562480
+   initial_rescale: 1.0
+   learning_rate: 0.0001
+   max_iter: 10000
 save_audio: False
 
 # Model information

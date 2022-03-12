@@ -1,3 +1,4 @@
+import os
 import torch
 import torchaudio
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
@@ -57,13 +58,14 @@ class AudioSaver:
         lengths = (batch.sig[0].size(1)*batch.sig[1]).long()
         for i in range(bs):
             id = audio_ids[i]
-            wav = batch.sig[0][i,:lengths[i]]
-            adv_wav = adv_sig[i,:lengths[i]]
+            wav = batch.sig[0][i,:lengths[i]].detach().cpu().unsqueeze(0)
+            adv_wav = adv_sig[i,:lengths[i]].detach().cpu().unsqueeze(0)
             self.save_wav(id,wav,adv_wav)
 
     def save_wav(self,id,wav,adv_wav):
+        print(wav.size())
         nat_path = id + "_nat.wav"
         adv_path = id + "_adv.wav"
-        torchaudio.save(nat_path,wav,self.sample_rate)
-        torchaudio.save(adv_path,adv_wav,self.sample_rate)
+        torchaudio.save(os.path.join(self.save_audio_path,nat_path),wav,self.sample_rate)
+        torchaudio.save(os.path.join(self.save_audio_path,adv_path),adv_wav,self.sample_rate)
 

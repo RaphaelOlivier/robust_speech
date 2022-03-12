@@ -447,7 +447,6 @@ class AdvASRBrain(ASRBrain):
         -------
         detached loss
         """
-        
         if target is not None and self.attacker.targeted:
             batch_to_attack = replace_tokens_in_batch(batch,target, self.tokenizer, self.hparams)
         else:
@@ -455,7 +454,7 @@ class AdvASRBrain(ASRBrain):
 
         predictions = self.compute_forward_adversarial(batch_to_attack, stage=stage)
         with torch.no_grad():
-            loss = self.compute_objectives(predictions, batch, stage=stage, adv=True)
+            loss = self.compute_objectives(predictions, batch_to_attack, stage=stage, adv=True)
         return loss.detach()
 
     def fit(
@@ -709,7 +708,7 @@ class AdvASRBrain(ASRBrain):
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
-                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST, target=None)
+                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST, target=target)
                 avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
 
             # Debug mode only runs a few batches

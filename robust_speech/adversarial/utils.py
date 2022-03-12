@@ -42,7 +42,7 @@ def replace_tokens_in_batch(batch, sent,tokenizer, hparams):
     tokens = torch.LongTensor(tokens_list)
     dic = {
         "id":"0",
-        "sig":batch.sig[0],
+        "sig":batch.sig[0][0],
         "tokens_list":tokens_list,
         "tokens_bos":tokens_bos,
         "tokens_eos":tokens_eos,
@@ -51,10 +51,9 @@ def replace_tokens_in_batch(batch, sent,tokenizer, hparams):
     if isinstance(tokenizer,sb.dataio.encoder.CTCTextEncoder):
         dic["char_list"] = list(sent)
 
-    else:
-        dic["wrd"] = sent
-
-    return PaddedBatch([dic])
+    dic["wrd"] = sent
+    new_batch = PaddedBatch([dic])
+    return new_batch
 
 def transcribe_batch(asr_brain, batch):
     out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST) 

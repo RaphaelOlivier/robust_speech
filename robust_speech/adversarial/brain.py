@@ -11,6 +11,7 @@ import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
 from advertorch.attacks import Attack
 import robust_speech as rs
+from robust_speech.adversarial.utils import replace_tokens_in_batch
 
 logger = logging.getLogger(__name__)
 
@@ -423,7 +424,7 @@ class AdvASRBrain(ASRBrain):
 
         return loss.detach().cpu()
 
-    def evaluate_batch_adversarial(self, batch, stage):
+    def evaluate_batch_adversarial(self, batch, stage, target=None):
         """Evaluate one batch on adversarial examples.
 
         The default implementation depends on two methods being defined
@@ -439,13 +440,20 @@ class AdvASRBrain(ASRBrain):
             this batch has two elements: inputs and targets.
         stage : Stage
             The stage of the experiment: Stage.VALID, Stage.TEST
+        target : str
+            The optional attack target
 
         Returns
         -------
         detached loss
         """
+        
+        if target is not None and self.attacker.targeted:
+            batch_to_attack = replace_tokens_in_batch(batch,target, self.tokenizer, self.hparams)
+        else:
+            batch_to_attack = batch
 
-        predictions = self.compute_forward_adversarial(batch, stage=stage)
+        predictions = self.compute_forward_adversarial(batch_to_attack, stage=stage)
         with torch.no_grad():
             loss = self.compute_objectives(predictions, batch, stage=stage, adv=True)
         return loss.detach()
@@ -638,7 +646,8 @@ class AdvASRBrain(ASRBrain):
         progressbar=None,
         test_loader_kwargs={},
         save_audio_path = None,
-        sample_rate = 16000
+        sample_rate = 16000,
+        target=None
     ):
         """Iterate test_set and evaluate brain performance. By default, loads
         the best-performing checkpoint (as recorded using the checkpointer).
@@ -661,6 +670,12 @@ class AdvASRBrain(ASRBrain):
             DataLoader. NOTE: ``loader_kwargs["ckpt_prefix"]`` gets
             automatically overwritten to ``None`` (so that the test DataLoader
             is not added to the checkpointer).
+        save_audio_path : str
+            optional path where to store adversarial audio files
+        sample_rate = 16000
+            the audio sample rate
+        target : str
+            The optional attack target
 
         Returns
         -------
@@ -694,7 +709,7 @@ class AdvASRBrain(ASRBrain):
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
-                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST)
+                adv_loss = self.evaluate_batch_adversarial(batch, stage=sb.Stage.TEST, target=None)
                 avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
 
             # Debug mode only runs a few batches

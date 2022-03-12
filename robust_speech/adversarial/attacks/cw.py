@@ -57,7 +57,7 @@ class ASRCarliniWagnerAttack(Attacker):
      binary_search_steps: int
         number of binary search times to find the
         optimum
-     max_iterations: int
+     nb_iter: int
         the maximum number of iterations
      abort_early: bool
         if set to true, abort early if getting stuck in localmin
@@ -75,7 +75,7 @@ class ASRCarliniWagnerAttack(Attacker):
 
     def __init__(self, asr_brain, success_only=True,
                  targeted=True, learning_rate=0.01,
-                 binary_search_steps=9, max_iterations=1000,
+                 binary_search_steps=9, nb_iter=1000,
                  abort_early=True, initial_const=1e0, eps=0.05,
                  clip_min=-1., clip_max=1., train_mode_for_backward=True):
         self.asr_brain = asr_brain
@@ -83,7 +83,7 @@ class ASRCarliniWagnerAttack(Attacker):
         self.clip_max = clip_max # ignored
         self.eps=eps
         self.learning_rate = learning_rate
-        self.max_iterations = max_iterations
+        self.max_iterations = nb_iter
         self.binary_search_steps = binary_search_steps
         self.abort_early = abort_early
         self.initial_const = initial_const

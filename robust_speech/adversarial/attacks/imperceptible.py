@@ -6,59 +6,41 @@ This attack is currently not achieving its expected results and is under debuggi
 """
 
 
-from typing import Tuple, List
+from typing import Tuple, List, Optional
+
+from scipy.signal import argrelextrema
 import math
 import numpy as np
-from scipy.signal import argrelextrema
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
+from torch.autograd import Variable
 import speechbrain as sb
 
 import robust_speech as rs
-from robust_speech.adversarial.attacks.cw import (
-    ASRCarliniWagnerAttack,
-    CARLINI_L2DIST_UPPER,
-    CARLINI_COEFF_UPPER,
-    INVALID_LABEL,
-    REPEAT_STEP,
-    ONE_MINUS_EPS,
-    PREV_LOSS_INIT,
-    NUM_CHECKS 
-)
+from robust_speech.adversarial.attacks.attacker import Attacker
 
-class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
+class ImperceptibleASRAttack(Attacker):
     """
-    A Carlini&Wagner attack for ASR models.
-    The algorithm follows non strictly the first attack in https://arxiv.org/abs/1801.01944
-    This implementation is based on the one in advertorch for classification models (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py).
-    It was pruned of elements that aren't present in the ASR CW attack paper above, like tanh rescaling.
+    An implementation of the Imperceptible ASR attack (https://arxiv.org/abs/1903.10346).
+    Based on the ART implementation of Imperceptible (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
 
     Arguments
     ---------
      asr_brain : rs.adversarial.brain.ASRBrain
         the brain object to attack
-     success_only: bool
-        if the adversarial noise should only be returned when the attack is successful.
      targeted: bool
         if the attack is targeted (always true for now).
-     abort_early: bool
-        if set to true, abort early if getting stuck in localmin
      eps: float
         Linf bound applied to the perturbation.
-     learning_rate_phase_1: float
+     learning_rate_1: float
         the learning rate for the attack algorithm in phase 1
-     max_iterations_phase_1: int
+     max_iter_1: int
         the maximum number of iterations in phase 1
-     learning_rate_phase_2: float
+     learning_rate_2: float
         the learning rate for the attack algorithm in phase 2
-     max_iterations_phase_2: int
+     max_iter_2: int
         the maximum number of iterations in phase 2
-     binary_search_steps_phase_2: int
-        number of binary search times to find the optimum in phase 2
-     initial_const_phase_2: float
-        initial value of the constant c in phase 2
      clip_min: float
         mininum value per input dimension (ignored: herefor compatibility).
      clip_max: float
@@ -71,136 +53,469 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
         hop length for computing spectral density
      n_fft: int
         number of FFT bins for computing spectral density.
+    global_max_length: int
+        max length of a perturbation
+    initial_rescale: float
+        initial factor by which to rescale the perturbation
+    num_iter_decrease_eps: int
+        Number of times to increase epsilon in case of success
+    decrease_factor_eps: int
+        Factor by which to decrease epsilon in case of failure
+    alpha: float
+        regularization constant for threshold loss term
+    num_iter_decrease_alpha: int
+        Number of times to decrease alpha in case of failure
+    num_iter_decrease_alpha: int
+        Number of times to increase alpha in case of success
+    decrease_factor_alpha: int
+        Factor by which to decrease alpha in case of failure
+    increase_factor_alpha: int
+        Factor by which to increase alpha in case of success
+    optimizer_1: Optional["torch.optim.Optimizer"]
+        the optimizer to use in phase 1
+    optimizer_2: Optional["torch.optim.Optimizer"]
+        the optimizer to use in phase 2
     """
     def __init__(
-        self, asr_brain, success_only=True,abort_early=True, targeted=True,eps=0.05,
-        learning_rate_phase_1=0.01, max_iterations_phase_1=1000,
-        learning_rate_phase_2=0.01, max_iterations_phase_2=1000,
-        binary_search_steps_phase_2=9, initial_const_phase_2=1e0,
-        clip_min=-1., clip_max=1., train_mode_for_backward=True,
-        win_length = 2048,hop_length = 512,n_fft = 2048,
-        ):
+        self,
+        asr_brain: rs.adversarial.brain.ASRBrain,
+        eps: float = 0.05,
+        max_iter_1: int = 10,
+        max_iter_2: int = 4000,
+        learning_rate_1: float = 0.001,
+        learning_rate_2: float = 5e-4,
+        optimizer_1: Optional["torch.optim.Optimizer"] = None,
+        optimizer_2: Optional["torch.optim.Optimizer"] = None,
+        global_max_length: int = 200000,
+        initial_rescale: float = 1.0,
+        decrease_factor_eps: float = 0.8,
+        num_iter_decrease_eps: int = 1,
+        alpha: float = 1.2,
+        increase_factor_alpha: float = 1.2,
+        num_iter_increase_alpha: int = 20,
+        decrease_factor_alpha: float = 0.8,
+        num_iter_decrease_alpha: int = 20,
+        win_length: int = 2048,
+        hop_length: int = 512,
+        n_fft: int = 2048,
+        targeted : bool = True,
+        train_mode_for_backward : bool = True,
+        clip_min : Optional[float] = None,
+        clip_max : Optional[float] = None
+    ):
 
 
         self.asr_brain = asr_brain
-        self.clip_min = clip_min # ignored
-        self.clip_max = clip_max # ignored
-        self.abort_early = abort_early
-        assert targeted, "CW attack only available for targeted outputs"
-        self.targeted = targeted
-        self.success_only = success_only
-        self.train_mode_for_backward=train_mode_for_backward
-        self.eps=eps
+        self.eps = eps
+        self.max_iter_1 = max_iter_1
+        self.max_iter_2 = max_iter_2
+        self.learning_rate_1 = learning_rate_1
+        self.learning_rate_2 = learning_rate_2
+        self.global_max_length = global_max_length
+        self.initial_rescale = initial_rescale
+        self.decrease_factor_eps = decrease_factor_eps
+        self.num_iter_decrease_eps = num_iter_decrease_eps
+        self.alpha = alpha
+        self.increase_factor_alpha = increase_factor_alpha
+        self.num_iter_increase_alpha = num_iter_increase_alpha
+        self.decrease_factor_alpha = decrease_factor_alpha
+        self.num_iter_decrease_alpha = num_iter_decrease_alpha
         self.win_length = win_length
         self.hop_length = hop_length
         self.n_fft = n_fft
-
-        self.learning_rate = learning_rate_phase_1
-        self.max_iterations = max_iterations_phase_1
-        self.binary_search_steps = 1
-        self.initial_const = 0.
-        self.repeat = False
-
-        self.learning_rate_2 = learning_rate_phase_2
-        self.max_iterations_2 = max_iterations_phase_2
-        self.binary_search_steps_2 = binary_search_steps_phase_2
-        self.initial_const_2 = initial_const_phase_2
-        self.repeat_2 = binary_search_steps_phase_2 >= REPEAT_STEP
         
-        raise NotImplementedError('This attack is under development')
+        self.clip_min = clip_min # ignored
+        self.clip_max = clip_max # ignored
+        assert targeted, "%s attack only available for targeted outputs"%self.__class__.__name__
+        self.targeted = targeted
+        self.train_mode_for_backward=train_mode_for_backward
+        self._optimizer_arg_1 = optimizer_1
+        self._optimizer_arg_2 = optimizer_2
 
-    def _forward_and_update_delta_phase_2(
-            self, optimizer, batch, wavs_init, wav_lengths, delta, loss_coeffs, theta, max_psd_init):
-        optimizer.zero_grad()
-        delta = torch.clamp(delta,-self.eps,self.eps)
-        adv = delta + wavs_init
-        batch.sig = adv,batch.sig[1]
-        predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss1 = self.asr_brain.compute_objectives(predictions,batch,rs.Stage.ATTACK)
-        l2distsq = self._calc_psd_penalty(delta, theta, max_psd_init, wav_lengths)
-        
-        loss = (loss1).sum() + (loss_coeffs * l2distsq).sum()
-        loss.backward()
-        optimizer.step()
-
-        return loss.item(), l2distsq.data, adv.data
-
-    def _calc_psd_penalty(
-        self,
-        delta: "torch.Tensor",
-        theta: List[np.ndarray],
-        max_psd_init: List[np.ndarray],
-        wav_lengths,
-    ) -> "torch.Tensor":
-        """The forward pass of the second stage of the attack.
+    def perturb(self,batch):
         """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
+        else:
+            self.asr_brain.module_eval()
+        save_device = batch.sig[0].device
+        batch = batch.to(self.asr_brain.device)
+        save_input = batch.sig[0]
+        x = torch.clone(save_input)
+        batch.sig = x,batch.sig[1]
+        # First reset delta
+        global_optimal_delta = torch.zeros(batch.batchsize, self.global_max_length).to(self.asr_brain.device)
+        self.global_optimal_delta = nn.Parameter(global_optimal_delta)
+        # Next, reset optimizers
+        if self._optimizer_arg_1 is None:
+            self.optimizer_1 = torch.optim.Adam(params=[self.global_optimal_delta], lr=self.learning_rate_1)
+        else:
+            self.optimizer_1 = self._optimizer_arg_1(  # type: ignore
+                params=[self.global_optimal_delta], lr=self.learning_rate_1
+            )
+
+        if self._optimizer_arg_2 is None:
+            self.optimizer_2 = torch.optim.Adam(params=[self.global_optimal_delta], lr=self.learning_rate_2)
+        else:
+            self.optimizer_2 = self._optimizer_arg_2(  # type: ignore
+                params=[self.global_optimal_delta], lr=self.learning_rate_2
+            )
+
+        # Then compute the batch
+        adv_x = self._generate_batch(batch)
+
+        batch.sig = save_input, batch.sig[1]
+        batch = batch.to(save_device)
+        self.asr_brain.module_eval()
+        return adv_x
+
+    def _generate_batch(self, batch):
+        # First stage of attack
+        original_input = torch.clone(batch.sig[0])
+        successful_adv_input_1st_stage = self._attack_1st_stage(batch)
+        successful_perturbation_1st_stage = successful_adv_input_1st_stage - original_input
+
+
+        if self.max_iter_2==0:
+            return successful_adv_input_1st_stage
+
+        # Compute original masking threshold and maximum psd
+        theta_batch = []
+        original_max_psd_batch = []
+        x = batch.sig[0]
+        lengths = (x.size(1)*batch.sig[1]).long()
+        x = [x[i,:lengths[i]] for i in range(batch.batchsize)]
+        for _, x_i in enumerate(x):
+            theta, original_max_psd = None,None
+            theta, original_max_psd = self._compute_masking_threshold(x_i)
+            theta = theta.transpose(1, 0)
+            theta_batch.append(theta)
+            original_max_psd_batch.append(original_max_psd)
+
+        # Reset delta with new result
+        local_batch_shape = successful_adv_input_1st_stage.shape
+        self.global_optimal_delta.data = torch.zeros(batch.batchsize, self.global_max_length).to(self.asr_brain.device)
+        self.global_optimal_delta.data[
+            : local_batch_shape[0], : local_batch_shape[1]
+        ] = successful_perturbation_1st_stage
+
+        # Second stage of attack
+        successful_adv_input_2nd_stage = self._attack_2nd_stage(
+            batch, theta_batch=theta_batch, original_max_psd_batch=original_max_psd_batch
+        )
+
+        return successful_adv_input_2nd_stage
+
+    def _attack_1st_stage(self, batch) -> Tuple["torch.Tensor", np.ndarray]:
+        """
+        The first stage of the attack.
+        :param x: Samples of shape (nb_samples, seq_length). Note that, it is allowable that sequences in the batch
+                  could have different lengths. A possible example of `x` could be:
+                  `x = np.array([np.array([0.1, 0.2, 0.1, 0.4]), np.array([0.3, 0.1])])`.
+        :param y: Target values of shape (nb_samples). Each sample in `y` is a string and it may possess different
+                  lengths. A possible example of `y` could be: `y = np.array(['SIXTY ONE', 'HELLO'])`. Note that, this
+                  class only supports targeted attack.
+        :return: A tuple of two tensors:
+                    - A tensor holding the candidate adversarial examples.
+                    - An array holding the original inputs.
+        """
+        # Compute local shape
+        local_batch_size = batch.batchsize
+        real_lengths = (batch.sig[1]*batch.sig[0].size(1)).long().detach().cpu().numpy()
+        local_max_length = np.max(real_lengths)
+
+        # Initialize rescale
+        rescale = np.ones([local_batch_size, local_max_length], dtype=np.float32) * self.initial_rescale
+
+        # Reformat input
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
+        original_input = torch.clone(batch.sig[0])
+        for local_batch_size_idx in range(local_batch_size):
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
+
+        # Optimization loop
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
+        trans = [None] * local_batch_size
+        
+
+        for iter_1st_stage_idx in range(self.max_iter_1):
+            # Zero the parameter gradients
+            self.optimizer_1.zero_grad()
+
+            # Call to forward pass
+            loss, local_delta, decoded_output, masked_adv_input, _ = self._forward_1st_stage(
+                original_input=original_input,
+                batch=batch,
+                local_batch_size=local_batch_size,
+                local_max_length=local_max_length,
+                rescale=rescale,
+                input_mask=input_mask,
+                real_lengths=real_lengths,
+            )
+            loss.backward()
+
+            # Get sign of the gradients
+            self.global_optimal_delta.grad = torch.sign(self.global_optimal_delta.grad)
+
+            # Do optimization
+            self.optimizer_1.step()
+
+            # Save the best adversarial example and adjust the rescale coefficient if successful
+            if iter_1st_stage_idx % self.num_iter_decrease_eps == 0:
+                for local_batch_size_idx in range(local_batch_size):
+                    tokens = batch.tokens[local_batch_size_idx].detach().cpu().numpy().reshape(-1)
+                    pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
+                    if len(pred) == len(tokens) and (pred == tokens).all():
+                        # Adjust the rescale coefficient
+                        max_local_delta = np.max(np.abs(local_delta[local_batch_size_idx].detach().cpu().numpy()))
+
+                        if rescale[local_batch_size_idx][0] * self.eps > max_local_delta:
+                            rescale[local_batch_size_idx] = max_local_delta / self.eps
+                        rescale[local_batch_size_idx] *= self.decrease_factor_eps
+
+                        # Save the best adversarial example
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
+                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+
+            # If attack is unsuccessful
+            if iter_1st_stage_idx == self.max_iter_1 - 1:
+                for local_batch_size_idx in range(local_batch_size):
+                    if successful_adv_input[local_batch_size_idx] is None:
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
+                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+
+        result = torch.stack(successful_adv_input)  # type: ignore
+
+        batch.sig = original_input, batch.sig[1]
+        return result
+
+    def _forward_1st_stage(
+        self,
+        original_input: np.ndarray,
+        batch: sb.dataio.batch.PaddedBatch,
+        local_batch_size: int,
+        local_max_length: int,
+        rescale: np.ndarray,
+        input_mask: np.ndarray,
+        real_lengths: np.ndarray,
+    ):
+
+        # Compute perturbed inputs
+        local_delta = self.global_optimal_delta[:local_batch_size, :local_max_length]
+        local_delta_rescale = torch.clamp(local_delta, -self.eps, self.eps).to(self.asr_brain.device)
+        local_delta_rescale *= torch.tensor(rescale).to(self.asr_brain.device)
+        adv_input = local_delta_rescale + torch.tensor(original_input).to(self.asr_brain.device)
+        masked_adv_input = adv_input * torch.tensor(input_mask).to(self.asr_brain.device)
+
+        # Compute loss and decoded output
+        batch.sig = masked_adv_input, batch.sig[1]
+        predictions = self.asr_brain.compute_forward(batch,rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(predictions,batch,rs.Stage.ATTACK)
+        val_predictions = self.asr_brain.compute_forward(batch,sb.Stage.VALID)
+        decoded_output = self.asr_brain.get_tokens(val_predictions)
+        return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale
+
+    def _attack_2nd_stage(
+        self, batch, theta_batch: List[np.ndarray], original_max_psd_batch: List[np.ndarray]
+    ):
+        
+        # Compute local shape
+        local_batch_size = batch.batchsize
+        real_lengths = (batch.sig[1]*batch.sig[0].size(1)).long().detach().cpu().numpy()
+        local_max_length = np.max(real_lengths)
+
+        # Initialize rescale
+        rescale = np.ones([local_batch_size, local_max_length], dtype=np.float32) * self.initial_rescale
+
+        # Reformat input
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
+        original_input = torch.clone(batch.sig[0])
+        for local_batch_size_idx in range(local_batch_size):
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
+
+        # Optimization loop
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
+        trans = [None] * local_batch_size
+
+        # Initialize alpha and rescale
+        alpha = np.array([self.alpha] * local_batch_size, dtype=np.float32)
+        rescale = np.ones([local_batch_size, local_max_length], dtype=np.float32) * self.initial_rescale
+
+        # Reformat input
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
+        original_input = torch.clone(batch.sig[0])
+        for local_batch_size_idx in range(local_batch_size):
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
+
+        # Optimization loop
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
+        best_loss_2nd_stage = [np.inf] * local_batch_size
+        trans = [None] * local_batch_size
+
+        for iter_2nd_stage_idx in range(self.max_iter_2):
+            # Zero the parameter gradients
+            self.optimizer_2.zero_grad()
+
+            # Call to forward pass of the first stage
+            loss_1st_stage, _, decoded_output, masked_adv_input, local_delta_rescale = self._forward_1st_stage(
+                original_input=original_input,
+                batch=batch,
+                local_batch_size=local_batch_size,
+                local_max_length=local_max_length,
+                rescale=rescale,
+                input_mask=input_mask,
+                real_lengths=real_lengths,
+            )
+            
+            # Call to forward pass of the first stage
+            loss_2nd_stage = self._forward_2nd_stage(
+                local_delta_rescale=local_delta_rescale,
+                theta_batch=theta_batch,
+                original_max_psd_batch=original_max_psd_batch,
+                real_lengths=real_lengths,
+            )
+
+            # Total loss
+            loss = loss_1st_stage.type(torch.float32) + torch.tensor(alpha).to(self.asr_brain.device) * loss_2nd_stage
+            loss = torch.mean(loss)
+
+            loss.backward()
+
+            # Do optimization
+            self.optimizer_2.step()
+
+            # Save the best adversarial example and adjust the alpha coefficient
+            for local_batch_size_idx in range(local_batch_size):
+                tokens = batch.tokens[local_batch_size_idx].detach().cpu().numpy().reshape(-1)
+                pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
+                if len(pred) == len(tokens) and (pred == tokens).all():
+                    if loss_2nd_stage[local_batch_size_idx] < best_loss_2nd_stage[local_batch_size_idx]:
+                        # Update best loss at 2nd stage
+                        best_loss_2nd_stage[local_batch_size_idx] = loss_2nd_stage[local_batch_size_idx]
+
+                        # Save the best adversarial example
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
+                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+
+                    # Adjust to increase the alpha coefficient
+                    if iter_2nd_stage_idx % self.num_iter_increase_alpha == 0:
+                        alpha[local_batch_size_idx] *= self.increase_factor_alpha
+
+                # Adjust to decrease the alpha coefficient
+                elif iter_2nd_stage_idx % self.num_iter_decrease_alpha == 0:
+                    alpha[local_batch_size_idx] *= self.decrease_factor_alpha
+                    alpha[local_batch_size_idx] = max(alpha[local_batch_size_idx], 0.0005)
+
+            # If attack is unsuccessful
+            if iter_2nd_stage_idx == self.max_iter_2 - 1:
+                for local_batch_size_idx in range(local_batch_size):
+                    if successful_adv_input[local_batch_size_idx] is None:
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
+                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+
+        result = torch.stack(successful_adv_input)  # type: ignore
+
+        return result
+
+    def _forward_2nd_stage(
+        self,
+        local_delta_rescale: "torch.Tensor",
+        theta_batch: List[np.ndarray],
+        original_max_psd_batch: List[np.ndarray],
+        real_lengths: np.ndarray,
+    ):
 
         # Compute loss for masking threshold
         losses = []
         relu = torch.nn.ReLU()
 
-        for i, _ in enumerate(theta):
+        for i, _ in enumerate(theta_batch):
             psd_transform_delta = self._psd_transform(
-                delta=delta[i, : wav_lengths[i]], max_psd_init=max_psd_init[i]
+                delta=local_delta_rescale[i, : real_lengths[i]], original_max_psd=original_max_psd_batch[i]
             )
-            loss = torch.mean(relu(psd_transform_delta -theta[i].to(self.asr_brain.device)))
+
+            loss = torch.mean(relu(psd_transform_delta - theta_batch[i].to(self.asr_brain.device)))
             losses.append(loss)
 
         losses_stack = torch.stack(losses)
 
         return losses_stack
 
-    def _compute_masking_threshold(self, x: torch.Tensor) -> Tuple[torch.Tensor,torch.Tensor]:
-        """Compute the masking threshold and the maximum psd of the original audio.
+    def _compute_masking_threshold(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the masking threshold and the maximum psd of the original audio.
+        :param x: Samples of shape (seq_length,).
+        :return: A tuple of the masking threshold and the maximum psd.
         """
 
         # First compute the psd matrix
         # Get window for the transformation
-        window = torch.hann_window(self.win_length, periodic=True).to(self.asr_brain.device)
-
+        #window = scipy.signal.get_window("hann", self.win_length, fftbins=True)
+        window = torch.hann_window(self.win_length, periodic=True)
         # Do transformation
+
+        #transformed_x = librosa.core.stft(
+        #    y=x, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, window=window, center=False
+        #)
         transformed_x = torch.stft(
-            input=x, n_fft=self.n_fft, hop_length=self.hop_length,
+            input=x.detach().cpu(), n_fft=self.n_fft, hop_length=self.hop_length,
              win_length=self.win_length, window=window, center=False, return_complex=True
-        )
-        transformed_x *= math.sqrt(8.0 / 3.0)
-        psd = torch.abs(transformed_x / self.win_length)
-        original_max_psd = torch.max(psd * psd)
+        ).numpy()
+        transformed_x *= np.sqrt(8.0 / 3.0)
+
+        psd = abs(transformed_x / self.win_length)
+        original_max_psd = np.max(psd * psd)
         with np.errstate(divide="ignore"):
-            psd = (20 * torch.log10(psd)).clip(min=-200)
-        psd = 96 - torch.max(psd) + psd
+            psd = (20 * np.log10(psd)).clip(min=-200)
+        psd = 96 - np.max(psd) + psd
 
         # Compute freqs and barks
+        #freqs = librosa.core.fft_frequencies(sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
         freqs = torch.fft.rfftfreq(n=self.n_fft, d = 1./16000)
-        barks = 13 * torch.arctan(0.00076 * freqs) + 3.5 * torch.arctan(torch.pow(freqs / 7500.0, 2))
-        
+        barks = 13 * np.arctan(0.00076 * freqs) + 3.5 * np.arctan(pow(freqs / 7500.0, 2))
+
         # Compute quiet threshold
-        ath = torch.zeros(len(barks), dtype=torch.float32) - np.inf
-        bark_idx = torch.argmax((barks > 1).long())
+        ath = np.zeros(len(barks), dtype=np.float32) - np.inf
+        bark_idx = np.argmax(barks > 1)
         ath[bark_idx:] = (
-            3.64 * torch.pow(freqs[bark_idx:] * 0.001, -0.8)
-            - 6.5 * np.exp(-0.6 * torch.pow(0.001 * freqs[bark_idx:] - 3.3, 2))
-            + 0.001 * torch.pow(0.001 * freqs[bark_idx:], 4)
+            3.64 * pow(freqs[bark_idx:] * 0.001, -0.8)
+            - 6.5 * np.exp(-0.6 * pow(0.001 * freqs[bark_idx:] - 3.3, 2))
+            + 0.001 * pow(0.001 * freqs[bark_idx:], 4)
             - 12
         )
 
         # Compute the global masking threshold theta
         theta = []
-        for i in range(psd.size(1)):
+
+        for i in range(psd.shape[1]):
             # Compute masker index
-            masker_idx = argrelextrema(psd[:, i].detach().cpu().numpy(), np.greater)[0]
+            masker_idx = argrelextrema(psd[:, i], np.greater)[0]
+
             if 0 in masker_idx:
                 masker_idx = np.delete(masker_idx, 0)
+
             if len(psd[:, i]) - 1 in masker_idx:
-                masker_idx = np.delete(masker_idx, len(psd[:, i].numpy() - 1))
-            barks_psd = torch.zeros([len(masker_idx), 3], dtype=torch.float32)
+                masker_idx = np.delete(masker_idx, len(psd[:, i]) - 1)
+
+            barks_psd = np.zeros([len(masker_idx), 3], dtype=np.float32)
             barks_psd[:, 0] = barks[masker_idx]
-            barks_psd[:, 1] = 10 * torch.log10(
-                torch.pow(10, psd[:, i][masker_idx - 1] / 10.0)
-                + torch.pow(10, psd[:, i][masker_idx] / 10.0)
-                + torch.pow(10, psd[:, i][masker_idx + 1] / 10.0)
+            barks_psd[:, 1] = 10 * np.log10(
+                pow(10, psd[:, i][masker_idx - 1] / 10.0)
+                + pow(10, psd[:, i][masker_idx] / 10.0)
+                + pow(10, psd[:, i][masker_idx + 1] / 10.0)
             )
-            barks_psd[:, 2] = torch.tensor(masker_idx)
+            barks_psd[:, 2] = masker_idx
 
             for j in range(len(masker_idx)):
                 if barks_psd.shape[0] <= j + 1:
@@ -208,9 +523,9 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
 
                 while barks_psd[j + 1, 0] - barks_psd[j, 0] < 0.5:
                     quiet_threshold = (
-                        3.64 * torch.pow(freqs[int(barks_psd[j, 2])] * 0.001, -0.8)
-                        - 6.5 * torch.exp(-0.6 * torch.pow(0.001 * freqs[int(barks_psd[j, 2])] - 3.3, 2))
-                        + 0.001 * torch.pow(0.001 * freqs[int(barks_psd[j, 2])], 4)
+                        3.64 * pow(freqs[int(barks_psd[j, 2])] * 0.001, -0.8)
+                        - 6.5 * np.exp(-0.6 * pow(0.001 * freqs[int(barks_psd[j, 2])] - 3.3, 2))
+                        + 0.001 * pow(0.001 * freqs[int(barks_psd[j, 2])], 4)
                         - 12
                     )
                     if barks_psd[j, 1] < quiet_threshold:
@@ -231,6 +546,7 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             delta = 1 * (-6.025 - 0.275 * barks_psd[:, 0])
 
             t_s = []
+
             for m in range(barks_psd.shape[0]):
                 d_z = barks - barks_psd[m, 0]
                 zero_idx = np.argmax(d_z > 0)
@@ -239,15 +555,22 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
                 s_f[zero_idx:] = (-27 + 0.37 * max(barks_psd[m, 1] - 40, 0)) * d_z[zero_idx:]
                 t_s.append(barks_psd[m, 1] + delta[m] + s_f)
 
-            t_s_array = torch.stack(t_s,dim=0)
-            theta.append(torch.sum(torch.pow(10, t_s_array / 10.0), dim=0) + torch.pow(10, ath / 10.0))
+            t_s_array = np.array(t_s)
 
-        theta = torch.stack(theta,dim=0)
-        return theta, original_max_psd
+            theta.append(np.sum(pow(10, t_s_array / 10.0), axis=0) + pow(10, ath / 10.0))
 
-    def _psd_transform(self, delta: "torch.Tensor", max_psd_init: "torch.Tensor") -> "torch.Tensor":
-        """Compute the psd matrix of the perturbation.
+        theta = np.array(theta)
+
+        return torch.tensor(theta).to(self.asr_brain.device), original_max_psd
+
+    def _psd_transform(self, delta: "torch.Tensor", original_max_psd: "torch.Tensor") -> "torch.Tensor":
         """
+        Compute the psd matrix of the perturbation.
+        :param delta: The perturbation.
+        :param original_max_psd: The maximum psd of the original audio.
+        :return: The psd matrix.
+        """
+        import torch  # lgtm [py/repeated-import]
 
         # Get window for the transformation
         window_fn = torch.hann_window  # type: ignore
@@ -260,11 +583,11 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             win_length=self.win_length,
             center=False,
             window=window_fn(self.win_length).to(self.asr_brain.device),
-            return_complex=False
         ).to(self.asr_brain.device)
 
         # Take abs of complex STFT results
         transformed_delta = torch.sqrt(torch.sum(torch.square(delta_stft), -1))
+
         # Compute the psd matrix
         psd = (8.0 / 3.0) * transformed_delta / self.win_length
         psd = psd ** 2
@@ -272,101 +595,8 @@ class ImperceptibleASRAttack(ASRCarliniWagnerAttack):
             torch.pow(torch.tensor(10.0).type(torch.float32), torch.tensor(9.6).type(torch.float32)).to(
                 self.asr_brain.device
             )
-            / torch.reshape(max_psd_init.to(self.asr_brain.device), [-1, 1, 1])
+            / torch.reshape(torch.tensor(original_max_psd).to(self.asr_brain.device), [-1, 1, 1])
             * psd.type(torch.float32)
         )
 
         return psd
-
-    def perturb(self, batch):
-        """
-        Compute an adversarial perturbation
-
-        Arguments
-        ---------
-        batch : sb.PaddedBatch
-            The input batch to perturb
-
-        Returns
-        -------
-        the tensor of the perturbed batch
-        """
-        
-        theta_batch = []
-        max_psd_init = []
-
-        save_device = batch.sig[0].device
-        batch = batch.to(self.asr_brain.device)
-        wavs_init, rel_lengths = batch.sig 
-        wavs_init = torch.clone(wavs_init)
-        batch_size = wavs_init.size(0)
-
-        for _, x_i in enumerate(wavs_init):
-            theta, original_max_psd = self._compute_masking_threshold(x_i)
-            theta = theta.transpose(1, 0)
-            theta_batch.append(theta)
-            max_psd_init.append(original_max_psd)
-
-
-        advs_phase_1 = ASRCarliniWagnerAttack.perturb(self,batch)
-
-        if batch_size > 1:
-            raise NotImplementedError("CW attack currently supports only batch size 1")
-        wav_lengths = (rel_lengths.float()*wavs_init.size(1)).long()
-        max_len = wav_lengths.max()
-        coeff_lower_bound = wavs_init.new_zeros(batch_size)
-        coeff_upper_bound = wavs_init.new_ones(batch_size) * CARLINI_COEFF_UPPER
-        loss_coeffs = torch.ones_like(rel_lengths).float() * self.initial_const_2
-        final_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size
-        final_labels = [INVALID_LABEL] * batch_size
-        final_advs = torch.clone(wavs_init)
-
-        final_l2distsqs = torch.FloatTensor(final_l2distsqs).to(wavs_init.device)
-
-        
-        # Start binary search
-        delta = nn.Parameter(torch.clone(advs_phase_1-wavs_init))
-        print(torch.norm(delta))
-        for outer_step in range(self.binary_search_steps_2):
-            optimizer = optim.Adam([delta], lr=self.learning_rate_2)
-            cur_l2distsqs = [CARLINI_L2DIST_UPPER] * batch_size
-            cur_labels = [INVALID_LABEL] * batch_size
-            cur_l2distsqs = torch.FloatTensor(cur_l2distsqs).to(wavs_init.device)
-            prevloss = PREV_LOSS_INIT
-
-            if (self.repeat_2 and outer_step == (self.binary_search_steps_2 - 1)):
-                loss_coeffs = coeff_upper_bound
-            tokens = batch.tokens  
-            if isinstance(tokens,sb.dataio.batch.PaddedData):
-                tokens = tokens[0]
-            for ii in range(self.max_iterations_2):
-                loss, l2distsq, adv = \
-                    self._forward_and_update_delta_phase_2(
-                        optimizer, batch, wavs_init, wav_lengths, delta, loss_coeffs, theta_batch, max_psd_init)
-                if self.abort_early:
-                    if ii % (self.max_iterations_2 // NUM_CHECKS or 1) == 0:
-                        if loss > prevloss * ONE_MINUS_EPS:
-                            break
-                        prevloss = loss
-                adv = torch.clamp(adv - wavs_init,-self.eps,self.eps) + wavs_init
-                if ii % 100 == 0:
-                    self._update_if_smaller_dist_succeed(
-                        adv, batch, l2distsq, batch_size,
-                        cur_l2distsqs, cur_labels,tokens,
-                        final_l2distsqs, final_labels, final_advs)
-                    print(loss, l2distsq)
-            self._update_if_smaller_dist_succeed(
-                adv, batch, l2distsq, batch_size,
-                cur_l2distsqs, cur_labels,tokens,
-                final_l2distsqs, final_labels, final_advs)
-            self._update_loss_coeffs(
-                tokens, cur_labels, batch_size,
-                loss_coeffs, coeff_upper_bound, coeff_lower_bound)
-        if not self.success_only:
-            self._update_unsuccessful(
-                adv, batch, l2distsq, batch_size,
-                final_l2distsqs, final_labels, final_advs
-            )
-        batch.sig = wavs_init, rel_lengths
-        batch = batch.to(save_device)
-        return final_advs.to(save_device)

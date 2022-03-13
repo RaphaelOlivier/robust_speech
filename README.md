@@ -4,6 +4,13 @@ Adversarial attacks and defenses on Speech Recognition  - powered by [SpeechBrai
 
 Developed in the MLSP lab at CMU. Project led by [Raphael Olivier](https://raphaelolivier.github.io) under the supervision of Prof. Bhiksha Raj.
 
+## What is this package for?
+In order to deploy machine learning models in the real world, it is important to make them robust to adversarial perturbations. This includes Automatic Speech Recognition models, which are [well known](https://arxiv.org/abs/2007.06622) to be vulnerable to adversarial examples. Many adversarial attacks and defenses have been developped by various research teams. In order to let users evaluate the robustness of their models, and come up more easily with new defenses, gathering all these attacks under a common codebase can be handy.
+
+Several robustness-oriented packages already exist ([Advertorch](https://github.com/BorealisAI/advertorch), [ART](https://github.com/Trusted-AI/adversarial-robustness-toolbox/tree/main/art), [Foolbox](https://github.com/bethgelab/foolbox), [Cleverhans](https://github.com/cleverhans-lab/cleverhans), etc). However, nearly all of these packages suppose that the model performs image classification. Yet applying standard classification-based attacks is not trivial, as ASR models are typically more complex than a stack of PyTorch layers: they must handle variable length inputs, are trained with tricky losses, contain recurrent networks, etc. Some attacks have been developped with the explicit goal of fooling ASR models (for instance by relying on acoustic models), and these attacks are rarely included in general robustness packages. Out of the packages above, ART supports ASR attacks, and only small subset of them and limited ASR architectures and datasets.
+
+**robust_speech** fills that gap and propose a simple way to evaluate ASR models against Adversarial attacks. It is based on [Speechbrain](https://speechbrain.github.io/), a flexible Speech Toolkit that makes it very easy to load ASR datasets, run ASR models and access their loss, predictions and error rates - all of which are often necessary to run attacks. We have added some useful features and metrics to the Speechbrain Brain class, and we have imported or reproduced multiple general and ASR-specific attacks.
+
 ## Features 
 
 * Run adversarial attacks over a dataset
@@ -21,7 +28,7 @@ Supported attacks:
 * [Imperceptible](https://arxiv.org/abs/1903.10346) 
 * [Genetic](https://arxiv.org/abs/1801.00554)
 * [ACL](https://arxiv.org/abs/2006.07589) for Wav2Vec2
-* (In testing) [MGAA](https://arxiv.org/abs/2108.04204)
+* (In development) [MGAA](https://arxiv.org/abs/2108.04204)
 
 The package provised model classes in the form of Speechbrain Brain classes, that are compatible with the attacks above. Currently implemented:
 * Sequence-to-Sequence models with RNNs and Transformers, also supporting the CTC loss. Compatible with [pretrained](https://huggingface.co/speechbrain/asr-crdnn-rnnlm-librispeech) [speechbrain](https://huggingface.co/speechbrain/asr-crdnn-transformerlm-librispeech) [models](https://huggingface.co/speechbrain/asr-transformer-transformerlm-librispeech).
@@ -89,13 +96,15 @@ root
 ```
 You may change this at will in your custom `.yaml` files or with command line arguments
 ## Incoming features
+* Datasets:
+    * [Speech Commands](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html)
 * Attacks:
     * [Universal](https://arxiv.org/abs/1905.03828)
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
 * Defenses:
     * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
-    * Defensive data augmentation
 * Data poisoning
+* And more!
 
 ## Cite
 Results of adversarial attacks on these models and this dataset will be shorly published in a preprint paper. Incoming...

@@ -111,7 +111,7 @@ if __name__ == "__main__":
             hparams["source_brain_class"],
             hparams["source_brain_hparams_file"],
             run_opts=run_opts,
-            overrides=overrides,
+            overrides={"root": hparams["root"]},
             tokenizer=tokenizer
         )
     attacker = hparams["attack_class"]

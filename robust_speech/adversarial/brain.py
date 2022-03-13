@@ -168,7 +168,7 @@ class EnsembleASRBrain(ASRBrain):
         if name != "asr_brains" and name != "ref_tokens":
             for brain in self.asr_brains:
                 brain.__setattr__(name, value)
-        super(AdvASRBrain, self).__setattr__(name, value)
+        super(EnsembleASRBrain, self).__setattr__(name, value)
 
 
 class AdvASRBrain(ASRBrain):

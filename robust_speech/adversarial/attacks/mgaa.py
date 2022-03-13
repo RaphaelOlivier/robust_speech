@@ -1,4 +1,4 @@
-
+import warnings
 
 import numpy as np
 import torch
@@ -48,8 +48,9 @@ class ASRMGAA(Attacker):
             self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
             rel_eps_iter=1., clip_min=None, clip_max=None,
             ord=np.inf, targeted=False, train_mode_for_backward=True):
-
-        raise NotImplementedError('This attack is under development')
+        
+        warnings.warn(
+            "MGAA attack is currently under development. Accurate results are not guaranteed.", RuntimeWarning)
 
         assert isinstance(
             asr_brain, rs.adversarial.brain.EnsembleASRBrain) and asr_brain.nmodels == 2

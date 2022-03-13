@@ -35,7 +35,6 @@ from transformers.models.wav2vec2.modeling_wav2vec2 import (
     _CONFIG_FOR_DOC,
     _compute_mask_indices
 )
-
 from transformers.models.wav2vec2.configuration_wav2vec2 import Wav2Vec2Config
 from transformers.file_utils import (
     add_start_docstrings_to_model_forward,
@@ -336,7 +335,7 @@ class W2VPretrain(AdvASRBrain):
             return loss, out, mask
         return loss
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns
@@ -352,7 +351,10 @@ class W2VPretrain(AdvASRBrain):
             acc = torch.masked_select(
                 cosine_sim, mask_time_indices.bool()).mean()
             if adv:
-                self.adv_acc_metric.append(acc)
+                if targeted:
+                    self.adv_acc_metric_target.append(acc)
+                else:
+                    self.adv_acc_metric.append(acc)
             else:
                 self.acc_metric.append(acc)
         return loss
@@ -409,7 +411,7 @@ class W2VPretrain(AdvASRBrain):
         # Here we manage mixed precision
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
-                predictions = self.compute_forward_adversarial(
+                predictions, _ = self.compute_forward_adversarial(
                     batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(
                     predictions, batch, sb.Stage.TRAIN
@@ -455,13 +457,16 @@ class W2VPretrain(AdvASRBrain):
         if stage == sb.Stage.VALID or stage == sb.Stage.TEST:
             self.acc_metric = []
             self.adv_acc_metric = []
+            self.adv_acc_metric_target = []
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
+    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
             stage_stats["adv_loss"] = stage_adv_loss
+        if stage_adv_loss_target is not None:
+            stage_stats["adv_loss target"] = stage_adv_loss_target
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
@@ -469,6 +474,9 @@ class W2VPretrain(AdvASRBrain):
             if stage_adv_loss is not None:
                 stage_stats["adv acc"] = sum(
                     self.adv_acc_metric) / len(self.adv_acc_metric)
+            if stage_adv_loss_target is not None:
+                stage_stats["adv acc target"] = sum(
+                    self.adv_acc_metric_target) / len(self.adv_acc_metric_target)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:

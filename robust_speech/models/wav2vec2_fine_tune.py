@@ -10,13 +10,108 @@ import os
 import sys
 import gc
 import torch
+import torch.nn as nn
 import logging
 import speechbrain as sb
 from robust_speech.adversarial.brain import AdvASRBrain
 import robust_speech as rs
-
+from robust_speech.models.wav2vec2_pretrain import AdvWav2Vec2FeatureEncoder
 logger = logging.getLogger(__name__)
 
+from transformers import Wav2Vec2FeatureExtractor
+
+from transformers import Wav2Vec2Model, HubertModel
+from transformers import Wav2Vec2Config, HubertConfig
+
+from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2
+
+class AdvWav2Vec2Model(Wav2Vec2Model):
+    """
+    This class modifies the transformers Wav2Vec2 module in order to replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
+    """
+
+    def __init__(self, config: Wav2Vec2Config):
+        super().__init__(config)
+        self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
+
+HF_models = {"wav2vec2": AdvWav2Vec2Model, "hubert": HubertModel}
+HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
+
+class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
+    """This class inherits the SpeechBrain Wav2Vec2 lobe and replaces the model with an AdvWav2Vec2 model, 
+    which supports backpropagating through the inputs
+
+    Arguments
+    ---------
+    source : str
+        HuggingFace hub name: e.g "facebook/wav2vec2-large-lv60"
+    save_path : str
+        Path (dir) of the downloaded model.
+    output_norm : bool (default: True)
+        If True, a layer_norm (affine) will be applied to the output obtained
+        from the wav2vec model.
+    freeze : bool (default: True)
+        If True, the model is frozen. If False, the model will be trained
+        alongside with the rest of the pipeline.
+    freeze_feature_extractor :  bool (default: False)
+        When freeze = False and freeze_feature_extractor True, the featue_extractor module of the model is Frozen. If False
+        all the wav2vec model will be trained including featue_extractor module.
+    apply_spec_augment : bool (default: False)
+        If True, the model will apply spec augment on the output of feature extractor
+        (inside huggingface Wav2VecModel() class).
+        If False, the model will not apply spec augment. We set this to false to prevent from doing it twice.
+    """
+
+    def __init__(
+        self,
+        source,
+        save_path,
+        output_norm=True,
+        freeze=True,
+        freeze_feature_extractor=False,
+        apply_spec_augment=False,
+    ):
+        nn.Module.__init__(self)
+
+        # Download the extractor from HuggingFace.
+        # The extractor is only used to retrieve the normalisation information
+        self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+            source, cache_dir=save_path
+        )
+
+        # Select specific self-supervised loader (eg. Wav2Vec2, Hubert)
+        if "hubert" in source:
+            config = HF_config.get("hubert")
+            model = HF_models.get("hubert")
+        else:
+            config = HF_config.get("wav2vec2")
+            model = HF_models.get("wav2vec2")
+
+        # Download and load the model
+        self._from_pretrained(
+            source, config=config, model=model, save_path=save_path
+        )
+
+        # set apply_spec_augment
+        self.model.config.apply_spec_augment = apply_spec_augment
+
+        # We check if inputs need to be normalized w.r.t pretrained wav2vec2
+        self.normalize_wav = self.feature_extractor.do_normalize
+
+        self.freeze = freeze
+        self.freeze_feature_extractor = freeze_feature_extractor
+        self.output_norm = output_norm
+        if self.freeze:
+            logger.warning(
+                "speechbrain.lobes.models.huggingface_wav2vec - wav2vec 2.0 is frozen."
+            )
+            self.model.eval()
+            for param in self.model.parameters():
+                param.requires_grad = False
+        else:
+            self.model.train()
+            if self.freeze_feature_extractor:
+                self.model.feature_extractor._freeze_parameters()
 
 # Define training procedure
 class W2VASR(AdvASRBrain):
@@ -55,7 +150,7 @@ class W2VASR(AdvASRBrain):
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
@@ -84,8 +179,12 @@ class W2VASR(AdvASRBrain):
             ]
             target_words = [wrd for wrd in batch.wrd]
             if adv:
-                self.adv_wer_metric.append(ids, predicted_words, target_words)
-                self.adv_cer_metric.append(ids, predicted_words, target_words)
+                if targeted:
+                    self.adv_wer_metric_target.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                else:
+                    self.adv_wer_metric.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
@@ -108,7 +207,7 @@ class W2VASR(AdvASRBrain):
 
     def fit_batch_adversarial(self, batch):
         """Train the parameters given a single batch in input"""
-        predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
         loss.backward()
         if self.check_gradients(loss):
@@ -120,12 +219,14 @@ class W2VASR(AdvASRBrain):
 
         return loss.detach().cpu()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
+    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
-            stage_stats["adv_loss"] = stage_adv_loss
+            stage_stats["adv loss"] = stage_adv_loss
+        if stage_adv_loss_target is not None:
+            stage_stats["adv loss target"] = stage_adv_loss_target
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
@@ -135,6 +236,11 @@ class W2VASR(AdvASRBrain):
                 stage_stats["adv CER"] = self.adv_cer_metric.summarize(
                     "error_rate")
                 stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
+            if stage_adv_loss_target is not None:
+                stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
+                    "error_rate")
+                stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
                     "error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.

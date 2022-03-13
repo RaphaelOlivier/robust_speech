@@ -167,6 +167,8 @@ env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
    noise_snr_high: 15
 
 number_of_epochs: 15
+number_of_ctc_epochs: 5
+ctc_weight: 1.
 valid_search: !ref <decoder>
 test_search: !ref <decoder>
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter

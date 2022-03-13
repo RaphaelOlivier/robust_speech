@@ -17,6 +17,8 @@ pretrained_path: !ref speechbrain/<model_name>
 
 tokenizer: !new:sentencepiece.SentencePieceProcessor
 number_of_epochs: 15
+number_of_ctc_epochs: 5
+ctc_weight: 0.
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <number_of_epochs>
 

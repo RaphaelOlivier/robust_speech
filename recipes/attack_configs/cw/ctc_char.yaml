@@ -8,22 +8,22 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-eps: 0.05
-nb_iter: 5000
+eps: 0.0075
+max_iter: 500
 target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    targeted: True
    decrease_factor_eps: 0.5
-   eps: 0.0075
+   eps: !ref <eps>
    global_max_length: 562480
    initial_rescale: 1.0
    learning_rate: 0.0001
-   max_iter: 100
+   max_iter: !ref <max_iter>
 save_audio: False
-
+attack_name: cw
 # Model information
 model_name: asr-ctcrnn-librispeech
-attack_name: cw
+
 target_brain_class: !name:robust_speech.models.ctc.CTCASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null

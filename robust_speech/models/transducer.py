@@ -113,7 +113,7 @@ class RNNTASR(AdvASRBrain):
             ) = self.hparams.Beamsearcher(x)
             return p_transducer, wav_lens, best_hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
         """Computes the loss (Transducer+(CTC+NLL)) given predictions and targets."""
 
         ids = batch.id
@@ -191,8 +191,12 @@ class RNNTASR(AdvASRBrain):
             ]
             target_words = [wrd.split(" ") for wrd in batch.wrd]
             if adv:
-                self.adv_wer_metric.append(ids, predicted_words, target_words)
-                self.adv_cer_metric.append(ids, predicted_words, target_words)
+                if targeted:
+                    self.adv_wer_metric_target.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                else:
+                    self.adv_wer_metric.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

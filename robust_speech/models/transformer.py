@@ -60,7 +60,6 @@ class TrfASR(AdvASRBrain):
         # output layer for seq2seq log-probabilities
         pred = self.modules.seq_lin(pred)
         p_seq = self.hparams.log_softmax(pred)
-
         # Compute outputs
         hyps = None
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
@@ -72,13 +71,12 @@ class TrfASR(AdvASRBrain):
                 # for the sake of efficiency, we only perform beamsearch with limited capacity
                 # and no LM to give user some idea of how the AM is doing
                 hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
-        elif stage == sb.Stage.TEST:
-
+        else:
             hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
 
         return p_ctc, p_seq, wav_lens, hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         (p_ctc, p_seq, wav_lens, hyps,) = predictions
@@ -120,17 +118,22 @@ class TrfASR(AdvASRBrain):
                 ]
                 target_words = [wrd.split(" ") for wrd in batch.wrd]
                 if adv:
-                    self.adv_wer_metric.append(
-                        ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(
-                        ids, predicted_words, target_words)
+                    if targeted:
+                        self.adv_wer_metric_target.append(ids, predicted_words, target_words)
+                        self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                    else:
+                        self.adv_wer_metric.append(ids, predicted_words, target_words)
+                        self.adv_cer_metric.append(ids, predicted_words, target_words)
                 else:
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
 
             # compute the accuracy of the one-step-forward prediction
             if adv:
-                self.adv_acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
+                if targeted:
+                    self.adv_acc_metric_target.append(p_seq, tokens_eos, tokens_eos_lens)
+                else:
+                    self.adv_acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
             else:
                 self.acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
 
@@ -185,7 +188,7 @@ class TrfASR(AdvASRBrain):
         # if so change the optimizer from Adam to SGD
         self.check_and_reset_optimizer()
 
-        predictions = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
         # normalize the loss by gradient_accumulation step
@@ -212,19 +215,26 @@ class TrfASR(AdvASRBrain):
             self.adv_acc_metric = self.hparams.acc_computer()
             self.adv_cer_metric = self.hparams.cer_computer()
             self.adv_wer_metric = self.hparams.error_rate_computer()
+            self.adv_acc_metric_target = self.hparams.acc_computer()
+            self.adv_cer_metric_target = self.hparams.cer_computer()
+            self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
+    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
         # Gets called at the end of a epoch.
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
-            stage_stats["adv_loss"] = stage_adv_loss
+            stage_stats["adv loss"] = stage_adv_loss
+        if stage_adv_loss_target is not None:
+            stage_stats["adv loss target"] = stage_adv_loss_target
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
             stage_stats["ACC"] = self.acc_metric.summarize()
             if stage_adv_loss is not None:
                 stage_stats["adv ACC"] = self.adv_acc_metric.summarize()
+            if stage_adv_loss_target is not None:
+                stage_stats["adv ACC target"] = self.adv_acc_metric_target.summarize()
             current_epoch = self.hparams.epoch_counter.current
             valid_search_interval = self.hparams.valid_search_interval
             if (
@@ -238,6 +248,11 @@ class TrfASR(AdvASRBrain):
                     stage_stats["adv CER"] = self.adv_cer_metric.summarize(
                         "error_rate")
                     stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                        "error_rate")
+                if stage_adv_loss_target is not None:
+                    stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
+                        "error_rate")
+                    stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
                         "error_rate")
 
         # log stats and save checkpoint at end-of-epoch

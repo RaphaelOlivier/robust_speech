@@ -44,7 +44,7 @@ class ASRBrain(sb.Brain):
         """
         raise NotImplementedError
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
         """Compute loss, to be overridden by sub-classes.
 
         Arguments
@@ -60,6 +60,8 @@ class ASRBrain(sb.Brain):
             Whether this is an adversarial input (used for metric logging)
         reduction : str
             the type of loss reduction to apply (required by some attacks)
+        targeted : bool
+            whether the attack is targeted
 
         Returns
         -------
@@ -143,7 +145,7 @@ class EnsembleASRBrain(ASRBrain):
             return self.asr_brains[self.ref_tokens].get_tokens(predictions[self.ref_tokens])
         return self.asr_brains[self.ref_tokens].get_tokens(predictions)
 
-    def compute_objectives(self, predictions, batch, stage, average=True, model_idx=None, adv=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, average=True, model_idx=None, adv=False, targeted=False, reduction="mean"):
         # concatenate of average objectives
         if isinstance(predictions, PredictionEnsemble) or model_idx is None:  # many predictions
             assert len(predictions) == self.nmodels
@@ -160,7 +162,7 @@ class EnsembleASRBrain(ASRBrain):
             if average:
                 return torch.mean(loss, dim=0)
             return losses
-        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage, adv=adv, reduction=reduction)
+        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction)
 
     def __setattr__(self, name, value):  # useful to set tokenizer
         if name != "asr_brains" and name != "ref_tokens":
@@ -329,8 +331,7 @@ class AdvASRBrain(ASRBrain):
             batch.sig = adv_wavs, batch.sig[1]
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
-        del adv_wavs
-        return res
+        return res, adv_wavs.detach()
 
     def fit_batch(self, batch):
         """Fit one batch, override to do multiple updates.
@@ -412,7 +413,7 @@ class AdvASRBrain(ASRBrain):
         if self.auto_mix_prec:
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                outputs = self.compute_forward_adversarial(
+                outputs, _ = self.compute_forward_adversarial(
                     batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
             self.scaler.scale(loss).backward()
@@ -421,7 +422,7 @@ class AdvASRBrain(ASRBrain):
                 self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            outputs = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+            outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
             loss = self.compute_objectives(
                 outputs, batch, sb.Stage.TRAIN, adv=True)
 
@@ -468,12 +469,22 @@ class AdvASRBrain(ASRBrain):
         else:
             batch_to_attack = batch
 
-        predictions = self.compute_forward_adversarial(
+        predictions, adv_wav = self.compute_forward_adversarial(
             batch_to_attack, stage=stage)
+        advloss, targetloss = None, None
         with torch.no_grad():
+            targeted = target is not None and self.attacker.targeted
             loss = self.compute_objectives(
-                predictions, batch_to_attack, stage=stage, adv=True)
-        return loss.detach()
+                predictions, batch_to_attack, stage=stage, adv=True, targeted = targeted).detach()
+            if targeted:
+                targetloss = loss 
+                batch.sig = adv_wav, batch.sig[1]
+                predictions = self.compute_forward(batch, stage=stage)
+                advloss = self.compute_objectives(predictions, batch, stage=stage, adv=True, targeted = False).detach()
+                batch.sig = batch_to_attack.sig
+            else:
+                advloss = loss
+        return advloss, targetloss
 
     def fit(
         self,
@@ -631,7 +642,7 @@ class AdvASRBrain(ASRBrain):
                         loss, avg_valid_loss
                     )
                     if self.attacker is not None:
-                        adv_loss = self.evaluate_batch_adversarial(
+                        adv_loss, _ = self.evaluate_batch_adversarial(
                             batch, stage=sb.Stage.VALID)
                         avg_valid_adv_loss = self.update_average(
                             adv_loss, avg_valid_adv_loss
@@ -715,6 +726,7 @@ class AdvASRBrain(ASRBrain):
         self.modules.eval()
         avg_test_loss = 0.0
         avg_test_adv_loss = None
+        avg_test_adv_loss_target = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
@@ -727,10 +739,15 @@ class AdvASRBrain(ASRBrain):
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
-                adv_loss = self.evaluate_batch_adversarial(
+                adv_loss,adv_loss_target = self.evaluate_batch_adversarial(
                     batch, stage=sb.Stage.TEST, target=target)
                 avg_test_adv_loss = self.update_average(
                     adv_loss, avg_test_adv_loss)
+                if adv_loss_target:
+                    if avg_test_adv_loss_target is None:
+                        avg_test_adv_loss_target = 0.0
+                    avg_test_adv_loss_target = self.update_average(
+                        adv_loss_target, avg_test_adv_loss_target)
 
             # Debug mode only runs a few batches
             if self.debug and self.step == self.debug_batches:
@@ -739,7 +756,7 @@ class AdvASRBrain(ASRBrain):
             # Only run evaluation "on_stage_end" on main process
         run_on_main(
             self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None],
-            kwargs={"stage_adv_loss": avg_test_adv_loss}
+            kwargs={"stage_adv_loss": avg_test_adv_loss,"stage_adv_loss_target": avg_test_adv_loss_target}
         )
         self.step = 0
         self.on_evaluate_end()
@@ -762,8 +779,10 @@ class AdvASRBrain(ASRBrain):
             self.wer_metric = self.hparams.error_rate_computer()
             self.adv_cer_metric = self.hparams.cer_computer()
             self.adv_wer_metric = self.hparams.error_rate_computer()
+            self.adv_cer_metric_target = self.hparams.cer_computer()
+            self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None):
+    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of a stage.
 
         Useful for computing stage statistics, saving checkpoints, etc.
@@ -782,7 +801,9 @@ class AdvASRBrain(ASRBrain):
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
         if stage_adv_loss is not None:
-            stage_stats["adv_loss"] = stage_adv_loss
+            stage_stats["adv loss"] = stage_adv_loss
+        if stage_adv_loss_target is not None:
+            stage_stats["adv loss target"] = stage_adv_loss_target
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
@@ -792,6 +813,11 @@ class AdvASRBrain(ASRBrain):
                 stage_stats["adv CER"] = self.adv_cer_metric.summarize(
                     "error_rate")
                 stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
+            if stage_adv_loss_target is not None:
+                stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
+                    "error_rate")
+                stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
                     "error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.

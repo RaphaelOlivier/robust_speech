@@ -39,7 +39,7 @@ The package provised model classes in the form of Speechbrain Brain classes, tha
 We also provide data preparation and loading functions for the LibriSpeech package, based on SpeechBrain recipes.
 
 ## Install 
-Before installing robust_speech you should have installed PyTorch (>=1.8.0,<=1.10.1) with cuda support in your environment.
+Before installing robust_speech you should have installed PyTorch (>=1.8.0,<=1.10.1) and cuda support (if you want GPU support) in your environment. Testing was conducting with CUDA 9.2 and 10.2 on a Nvidia RTX 2080Ti. Default options assume GPU support; use the `--device=cpu` option in your scripts if do not have it.
 
 ```
 git clone https://github.com/RaphaelOlivier/robust_speech.git

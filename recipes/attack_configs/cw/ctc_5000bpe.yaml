@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 eps: 0.0075
-max_iter: 500
+max_iter: 1000
 target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    targeted: True

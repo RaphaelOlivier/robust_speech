@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 eps: 0.0075
-max_iter: 500
+max_iter: 1000
 target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    targeted: True
@@ -30,7 +30,7 @@ target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref <root>/trainings/<model_name>/tokenizer
+pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 

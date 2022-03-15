@@ -20,7 +20,7 @@ target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref speechbrain/<asr-crdnn-transformerlm-librispeech>
+pretrained_tokenizer_path: !ref speechbrain/asr-crdnn-transformerlm-librispeech
 tokenizer: !new:sentencepiece.SentencePieceProcessor
 # -------------------------------------------------------------
 

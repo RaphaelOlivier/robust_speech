@@ -20,20 +20,20 @@ attack_class: !name:robust_speech.adversarial.attacks.imperceptible.Imperceptibl
    learning_rate_1: 0.0001
    learning_rate_2: 0.0000001
    max_iter_1: 1000
-   max_iter_2: 250
+   max_iter_2: 500
    num_iter_decrease_alpha: 50
-save_audio: False
+save_audio: True
+attack_name: imperceptible
 
 # Model information
 model_name: asr-ctcrnn-librispeech
-attack_name: imperceptible
 target_brain_class: !name:robust_speech.models.ctc.CTCASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref <root>/trainings/<model_name>/tokenizer
+pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 

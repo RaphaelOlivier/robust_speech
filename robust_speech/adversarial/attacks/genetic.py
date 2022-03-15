@@ -33,7 +33,7 @@ class GeneticAttack(Attacker):
         maximum Linf distortion.
     """
 
-    def __init__(self, asr_brain, nb_iter=100, population_size=20, eps=0.01, targeted=False):
+    def __init__(self, asr_brain, nb_iter=100, population_size=10, eps=0.01, targeted=False):
         self.asr_brain = asr_brain
         self.nb_iter = nb_iter
         self.population_size = population_size

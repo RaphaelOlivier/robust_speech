@@ -39,7 +39,7 @@ source_brain_hparams_file:
    - !ref model_configs/<model_name3>.yaml
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref <root>/trainings/<model_name>/tokenizer
+pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 

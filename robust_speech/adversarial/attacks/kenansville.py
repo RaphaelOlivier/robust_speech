@@ -37,7 +37,7 @@ class KenansvilleAttack(Attacker):
         the brain object to attack
      targeted: bool
         if the attack is targeted (always true for now).
-     snr_db: float
+     snr: float
         Linf bound applied to the perturbation.
      train_mode_for_backward: bool
         whether to force training mode in backward passes (necessary for RNN models)
@@ -45,13 +45,13 @@ class KenansvilleAttack(Attacker):
 
     """
 
-    def __init__(self, asr_brain, targeted=False, snr_db=100, train_mode_for_backward=False):
+    def __init__(self, asr_brain, targeted=False, snr=100, train_mode_for_backward=False):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         # The last iteration (if we run many steps) repeat the search once.
         assert not targeted, "Kenansville is an untargeted attack"
-        self.snr_db = snr_db
-        self.threshold = 10 ** (-self.snr_db / 10)
+        self.snr = snr
+        self.threshold = 10 ** (-self.snr / 10)
         # not used, for compatibility only
         self.train_mode_for_backward = train_mode_for_backward
 

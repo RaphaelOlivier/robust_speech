@@ -66,8 +66,8 @@ ctc_weight_decode: 0.
 
 ############################## models ################################
 
-batchnorm: !name:speechbrain.nnet.normalization.BatchNorm2d
-    track_running_stats: False # important to not track stats during attacks
+bn2: !name:speechbrain.nnet.normalization.BatchNorm2d
+    momentum: 0.0 # important to not track running stats during evaluation. 
 CNN: !new:speechbrain.lobes.models.convolution.ConvolutionFrontEnd
     input_shape: (8, 10, 80)
     num_blocks: 3
@@ -76,7 +76,7 @@ CNN: !new:speechbrain.lobes.models.convolution.ConvolutionFrontEnd
     kernel_sizes: (3, 3, 1)
     strides: (2, 2, 1)
     residuals: (False, False, False)
-    norm: !ref <batchnorm>
+    norm: !ref <bn2>
 
 Transformer: !new:speechbrain.lobes.models.transformer.TransformerASR.TransformerASR
     input_size: 10240

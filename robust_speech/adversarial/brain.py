@@ -328,10 +328,11 @@ class AdvASRBrain(ASRBrain):
                 adv_wavs = self.attacker.perturb_and_log(batch)
             else:
                 adv_wavs = self.attacker.perturb(batch)
+            adv_wavs=adv_wavs.detach()
             batch.sig = adv_wavs, batch.sig[1]
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
-        return res, adv_wavs.detach()
+        return res, adv_wavs
 
     def fit_batch(self, batch):
         """Fit one batch, override to do multiple updates.

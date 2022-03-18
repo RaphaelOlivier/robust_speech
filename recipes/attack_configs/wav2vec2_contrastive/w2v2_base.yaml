@@ -15,10 +15,10 @@ attack_class: !name:robust_speech.adversarial.attacks.contrastive.ConstrastiveAS
   eps: !ref <eps>
   nb_iter: !ref <nb_iter>
 save_audio: False
+attack_name: contrastive
 
 # Model information
 model_name: wav2vec2-base
-attack_name: contrastive
 target_brain_class: !name:robust_speech.models.wav2vec2_pretrain.W2VPretrain
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null

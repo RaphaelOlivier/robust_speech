@@ -102,7 +102,7 @@ class RNNTASR(AdvASRBrain):
                 return p_transducer, wav_lens
 
         elif stage == sb.Stage.VALID:
-            best_hyps, scores, _, _ = self.hparams.Greedysearcher(x)
+            best_hyps, scores, _, _ = self.hparams.valid_search(x)
             return p_transducer, wav_lens, best_hyps
         else:
             (
@@ -110,7 +110,7 @@ class RNNTASR(AdvASRBrain):
                 best_scores,
                 nbest_hyps,
                 nbest_scores,
-            ) = self.hparams.Beamsearcher(x)
+            ) = self.hparams.test_search(x)
             return p_transducer, wav_lens, best_hyps
 
     def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):

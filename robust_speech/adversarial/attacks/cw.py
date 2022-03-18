@@ -1,5 +1,6 @@
 from typing import Tuple, List, Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -63,7 +64,8 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         targeted: bool = True,
         train_mode_for_backward: bool = True,
         clip_min: Optional[float] = None,
-        clip_max: Optional[float] = None
+        clip_max: Optional[float] = None,
+        const: float = 1.0
     ):
         super(ASRCarliniWagnerAttack, self).__init__(
             asr_brain,
@@ -79,3 +81,36 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
             clip_min=clip_min,
             clip_max=clip_max
         )
+        self.const=const
+
+    def _forward_1st_stage(
+        self,
+        original_input: np.ndarray,
+        batch: sb.dataio.batch.PaddedBatch,
+        local_batch_size: int,
+        local_max_length: int,
+        rescale: np.ndarray,
+        input_mask: np.ndarray,
+        real_lengths: np.ndarray,
+    ):
+
+        # Compute perturbed inputs
+        local_delta = self.global_optimal_delta[:
+                                                local_batch_size, :local_max_length]
+        local_delta_rescale = torch.clamp(
+            local_delta, -self.eps, self.eps).to(self.asr_brain.device)
+        local_delta_rescale *= torch.tensor(rescale).to(self.asr_brain.device)
+        adv_input = local_delta_rescale + \
+            torch.tensor(original_input).to(self.asr_brain.device)
+        masked_adv_input = adv_input * \
+            torch.tensor(input_mask).to(self.asr_brain.device)
+
+        # Compute loss and decoded output
+        batch.sig = masked_adv_input, batch.sig[1]
+        predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(
+            predictions, batch, rs.Stage.ATTACK)
+        loss = self.const * loss + torch.norm(local_delta_rescale)
+        val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
+        decoded_output = self.asr_brain.get_tokens(val_predictions)
+        return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale

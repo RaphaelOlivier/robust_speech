@@ -1,6 +1,6 @@
 root: !PLACEHOLDER
 model_name: asr-ctcrnn-librispeech
-output_folder: !ref <root>/models/<model_name>
+output_folder: !ref <root>/trainings/<model_name>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 train_log: !ref <output_folder>/train_log.txt

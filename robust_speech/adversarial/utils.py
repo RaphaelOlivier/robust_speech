@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torchaudio
 import speechbrain as sb
@@ -28,13 +29,27 @@ def make_batch_from_waveform(wavform, wrd, tokens, hparams):
     }
     return PaddedBatch([dic])
 
+def find_closest_length_string(string, str_list):
+    """ Find the sentence in str_list whose length is the closest to string"""
+    n = len(string)
+    lens = [len(s) for s in str_list]
+    dist=np.inf
+    k=None 
+    for i,s in enumerate(str_list):
+        d=abs(len(s)-n)
+        if d<dist:
+            dist=d 
+            k=i
+    return str_list[k]
+
 
 def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
     """ Make a padded batch from a raw waveform, words and tokens"""
     assert batch.batchsize == 1, "targeted attacks only support batch size 1"
+    if isinstance(sent,list): # list of possible targets to choose from
+        sent = find_closest_length_string(batch.wrd[0],sent)
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
         tokens = tokenizer.encode_sequence(list(sent))
-
     else:
         tokens = tokenizer.encode_as_ids(sent)
 

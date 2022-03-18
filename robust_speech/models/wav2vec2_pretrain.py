@@ -349,7 +349,7 @@ class W2VPretrain(AdvASRBrain):
             )
             #acc = cosine_sim[mask_time_indices].mean()
             acc = torch.masked_select(
-                cosine_sim, mask_time_indices.bool()).mean()
+                cosine_sim, mask_time_indices.bool()).mean().detach()
             if adv:
                 if targeted:
                     self.adv_acc_metric_target.append(acc)

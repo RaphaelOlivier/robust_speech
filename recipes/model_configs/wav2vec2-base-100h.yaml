@@ -1,0 +1,106 @@
+# ################################
+# Model: wav2vec2 + DNN + CTC
+# Augmentation: SpecAugment
+# Authors: Sung-Lin Yeh 2021
+# ################################
+
+root: !PLACEHOLDER
+model_name: wav2vec2-base-100h
+output_folder: !ref <root>/trainings/<model_name>
+wer_file: !ref <output_folder>/wer.txt
+save_folder: !ref <output_folder>
+train_log: !ref <output_folder>/train_log.txt
+
+pretrained_path: !ref <output_folder>
+
+# URL for the base english wav2vec2 model.
+wav2vec2_hub: facebook/wav2vec2-base-100h
+
+sample_rate: 16000
+number_of_epochs: 1
+# Model parameters
+activation: !name:torch.nn.LeakyReLU
+dnn_layers: 2
+dnn_neurons: 768
+freeze_wav2vec: True
+
+# Outputs
+output_neurons: 31  # BPE size, index(blank/eos/bos) = 0
+
+# Decoding parameters
+blank_index: 0
+bos_index: 1
+eos_index: 2
+
+#
+# Functions and classes
+#
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+   limit: !ref <number_of_epochs>
+
+augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
+   sample_rate: !ref <sample_rate>
+   speeds: [95, 100, 105]
+
+enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+   input_shape: [null, null, 768]
+   activation: !ref <activation>
+   dnn_blocks: !ref <dnn_layers>
+   dnn_neurons: !ref <dnn_neurons>
+
+wav2vec2: !new:robust_speech.models.wav2vec2_fine_tune.AdvHuggingFaceWav2Vec2
+   source: !ref <wav2vec2_hub>
+   output_norm: True
+   freeze: !ref <freeze_wav2vec>
+   save_path: !ref <save_folder>/wav2vec2_checkpoint
+
+#####
+# Uncomment this block if you prefer to use a Fairseq pretrained model instead
+# of a HuggingFace one. Here, we provide an URL that is obtained from the
+# Fairseq github for the multilingual XLSR.
+#
+#wav2vec2_url: https://dl.fbaipublicfiles.com/fairseq/wav2vec/wav2vec_vox_960h_pl.pt
+#wav2vec2: !new:speechbrain.lobes.models.fairseq_wav2vec.FairseqWav2Vec2
+#    pretrained_path: !ref <wav2vec2_url>
+#    output_norm: True
+#    freeze: False
+#    save_path: !ref <save_folder>/wav2vec2_checkpoint/model.pt
+
+ctc_lin: !new:speechbrain.nnet.linear.Linear
+   input_size: !ref <dnn_neurons>
+   n_neurons: !ref <output_neurons>
+
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+   apply_log: True
+
+ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
+   blank_index: !ref <blank_index>
+
+modules:
+   wav2vec2: !ref <wav2vec2>
+   enc: !ref <enc>
+   ctc_lin: !ref <ctc_lin>
+
+model: !new:torch.nn.ModuleList
+   - [!ref <enc>, !ref <ctc_lin>]
+
+tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
+
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+   save_file: !ref <train_log>
+
+error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
+
+cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
+   split_tokens: True
+
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    loadables:
+      wav2vec2: !ref <wav2vec2>
+      model: !ref <model>
+      tokenizer: !ref <tokenizer>
+    paths:
+      wav2vec2: !ref <pretrained_path>/wav2vec2.ckpt
+      model: !ref <pretrained_path>/model.ckpt
+      tokenizer: !ref <pretrained_path>/tokenizer.ckpt
+    collect_in: !ref <output_folder>

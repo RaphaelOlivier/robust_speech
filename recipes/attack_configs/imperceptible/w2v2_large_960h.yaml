@@ -8,21 +8,23 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
+eps: 1
+target_sentence: ["THIS IS A SENTENCE OF MEDIUM LENGTH THAT WE USE AS TARGET", "A SHORT TARGET SENTENCE", "HERE IS A RATHER LONG TEST STRING THAT WE USE AS TARGET FOR THE LONGEST UTTERANCES IN LIBRISPEECH WHICH CAN CONTAIN DOZENS OF WORDS"]
 attack_class: !name:robust_speech.adversarial.attacks.imperceptible.ImperceptibleASRAttack
    targeted: True
    decrease_factor_alpha: 0.5
    decrease_factor_eps: 0.5
-   eps: 0.0075
+   eps: !ref <eps>
    global_max_length: 562480
    increase_factor_alpha: 2.0
    initial_rescale: 1.0
    learning_rate_1: 0.0001
    learning_rate_2: 0.0000001
    max_iter_1: 1000
-   max_iter_2: 500
+   max_iter_2: 4000
    num_iter_decrease_alpha: 50
-save_audio: True
+   train_mode_for_backward: False
+save_audio: False
 attack_name: imperceptible
 
 # Model information

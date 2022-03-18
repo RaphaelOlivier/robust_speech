@@ -8,9 +8,10 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-eps: 0.0075
-max_iter: 1000
-target_sentence: I AM A FRENCH STUDENT IN AN AMERICAN UNIVERSITY
+eps: 10
+max_iter: 4000
+const: 10
+target_sentence: ["THIS IS A SENTENCE OF MEDIUM LENGTH THAT WE USE AS TARGET", "A SHORT TARGET SENTENCE", "HERE IS A RATHER LONG TEST STRING THAT WE USE AS TARGET FOR THE LONGEST UTTERANCES IN LIBRISPEECH WHICH CAN CONTAIN DOZENS OF WORDS"]
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    targeted: True
    decrease_factor_eps: 0.5
@@ -19,6 +20,8 @@ attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    initial_rescale: 1.0
    learning_rate: 0.0001
    max_iter: !ref <max_iter>
+   const: !ref <const>
+   train_mode_for_backward: False
 save_audio: False
 attack_name: cw
 

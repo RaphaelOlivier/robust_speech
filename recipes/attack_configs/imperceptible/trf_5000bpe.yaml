@@ -18,8 +18,8 @@ attack_class: !name:robust_speech.adversarial.attacks.imperceptible.Imperceptibl
    global_max_length: 562480
    increase_factor_alpha: 2.0
    initial_rescale: 1.0
-   learning_rate_1: 0.0001
-   learning_rate_2: 0.0000001
+   learning_rate_1: 0.002
+   learning_rate_2: 0.000005
    max_iter_1: 1000
    max_iter_2: 4000
    num_iter_decrease_alpha: 50

@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 eps: 0.01
-nb_iter: 500
+nb_iter: 1000
 attack_class: !name:robust_speech.adversarial.attacks.genetic.GeneticAttack
   targeted: False
   eps: !ref <eps>

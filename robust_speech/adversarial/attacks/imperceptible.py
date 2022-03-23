@@ -288,6 +288,7 @@ class ImperceptibleASRAttack(Attacker):
                     pred = np.array(
                         decoded_output[local_batch_size_idx]).reshape(-1)
                     if len(pred) == len(tokens) and (pred == tokens).all():
+                        print("Found one")
                         # Adjust the rescale coefficient
                         max_local_delta = np.max(
                             np.abs(local_delta[local_batch_size_idx].detach().cpu().numpy()))
@@ -339,8 +340,11 @@ class ImperceptibleASRAttack(Attacker):
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
         loss = self.asr_brain.compute_objectives(
             predictions, batch, rs.Stage.ATTACK)
+        self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         decoded_output = self.asr_brain.get_tokens(val_predictions)
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
         return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale
 
     def _attack_2nd_stage(

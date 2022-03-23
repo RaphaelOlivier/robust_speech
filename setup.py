@@ -29,7 +29,7 @@ setup(
     install_requires=[
         "torch>=1.7,<=1.11",
         "speechbrain==0.5.11",
-        "transformers",
+        "transformers>=4.15.0",
         "torchvision",
         "advertorch @ git+https://github.com/BorealisAI/advertorch.git"
     ],

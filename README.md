@@ -98,9 +98,11 @@ You may change this at will in your custom `.yaml` files or with command line ar
 ## Incoming features
 * Datasets:
     * [Speech Commands](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html)
+    * [Common Voice](https://commonvoice.mozilla.org/en)
 * Attacks:
     * [Universal](https://arxiv.org/abs/1905.03828)
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
+    * [Targeted Black Box](https://arxiv.org/abs/1805.07820)
 * Defenses:
     * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
 * Data poisoning

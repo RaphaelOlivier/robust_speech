@@ -42,7 +42,6 @@ class KenansvilleAttack(Attacker):
      train_mode_for_backward: bool
         whether to force training mode in backward passes (necessary for RNN models)
 
-
     """
 
     def __init__(self, asr_brain, targeted=False, snr=100, train_mode_for_backward=False):
@@ -95,5 +94,4 @@ class KenansvilleAttack(Attacker):
             x_rfft[x_psd_index[:j]] = 0
             x = torch.fft.irfft(x_rfft, len(x)).type(x.dtype)
             wavs[i, :n] = x
-
         return wavs

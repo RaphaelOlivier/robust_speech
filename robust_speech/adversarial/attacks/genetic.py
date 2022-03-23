@@ -131,7 +131,7 @@ class GeneticAttack(Attacker):
             predictions = self.asr_brain.compute_forward(
                 batches[i], stage=rs.Stage.ATTACK)
             loss = self.asr_brain.compute_objectives(
-                predictions, batches[i], stage=rs.Stage.ATTACK, reduction="none")
+                predictions, batches[i], stage=rs.Stage.ATTACK, reduction="batch")
             scores.append(loss.detach())
         scores = torch.stack(scores, dim=1)  # (batch_size x pop_size)
         scores = scores / scores.max(dim=1, keepdim=True)[0]

@@ -274,7 +274,6 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         # have long sentences. For more versatily, we sample on the entire sequence.
         # value.
         full_sentence_indices = np.ones((batch_size, sequence_length))
-
         # print(np.sum(mask_time_indices, axis=1))
         negative_sample_indices = torch.tensor(
             transformers.models.wav2vec2.modeling_wav2vec2._sample_negative_indices(

@@ -111,6 +111,9 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         loss = self.asr_brain.compute_objectives(
             predictions, batch, rs.Stage.ATTACK)
         loss = self.const * loss + torch.norm(local_delta_rescale)
+        self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         decoded_output = self.asr_brain.get_tokens(val_predictions)
+        if self.train_mode_for_backward:
+            self.asr_brain.module_train()
         return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale

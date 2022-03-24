@@ -108,5 +108,8 @@ You may change this at will in your custom `.yaml` files or with command line ar
 * Data poisoning
 * And more!
 
+## Credits
+Snippets of code have been copy-pasted from open-source packages [SpeechBrain](https://github.com/speechbrain/speechbrain), [Advertorch](https://github.com/BorealisAI/advertorch) and [ART](https://github.com/Trusted-AI/adversarial-robustness-toolbox/tree/main/art). This is specified in the files where it happens
+
 ## Cite
 Results of adversarial attacks on these models and this dataset will be shorly published in a preprint paper. Incoming...

@@ -10,7 +10,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # Attack information
 eps: 0.003
 nb_iter: 100
-attack_class: !name:robust_speech.adversarial.attacks.contrastive.ContrastiveASRAttack
+attack_class: !name:robust_speech.adversarial.attacks.wav2vec2.ContrastiveASRAttack
   targeted: False
   eps: !ref <eps>
   nb_iter: !ref <nb_iter>

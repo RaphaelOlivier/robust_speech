@@ -109,3 +109,25 @@ def load_audio(path, hparams, savedir="."):
         "audio_normalizer", AudioNormalizer()
     )
     return audio_normalizer(signal, sr)
+
+def rand_assign(delta,ord,eps):
+    delta.data.uniform_(-1,1)
+    if ord == np.inf:
+        delta.data=eps*delta.data
+    elif ord == 2:
+        delta.data = l2_clamp_or_normalize(delta.data,eps)
+    return delta.data
+
+def l2_clamp_or_normalize(x,eps=None):
+    xnorm = torch.norm(x,dim=list(range(1,x.dim())))
+    if eps:
+        coeff = torch.minimum(eps/xnorm,torch.ones_like(xnorm)).unsqueeze(1)
+    else:
+        coeff = 1./xnorm
+    return coeff*x
+
+def linf_clamp(x,eps):
+    if isinstance(eps,torch.Tensor) and eps.dim()==1:
+        eps=eps.unsqueeze(1)
+    return torch.clamp(x,min=-eps,max=eps)
+    

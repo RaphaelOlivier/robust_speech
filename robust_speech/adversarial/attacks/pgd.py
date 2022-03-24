@@ -102,7 +102,6 @@ def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
 class ASRPGDAttack(Attacker):
    """
    Implementation of the PGD attack (https://arxiv.org/abs/1706.06083)
-   Based on the Advertorch implementation (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/iterative_projected_gradient.py)
    The attack performs nb_iter steps of size eps_iter, while always staying
    within eps from the initial point.
 

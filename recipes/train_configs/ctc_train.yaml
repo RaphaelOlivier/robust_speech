@@ -39,7 +39,7 @@ data_folder: !ref <root>/data/LibriSpeech
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 
-train_splits: ["train-clean-100"]
+train_splits: ["train-clean-100","train-clean-360","train-other-500"]
 dev_splits: ["dev-clean"]
 test_splits: ["test-clean"]
 skip_prep: True

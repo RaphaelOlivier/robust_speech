@@ -1,13 +1,11 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from advertorch.attacks.base import Attack, LabelMixin
 from advertorch.attacks.utils import rand_init_delta
-from advertorch.utils import clamp
 from robust_speech.adversarial.metrics import SNRComputer, AudioSaver
 
 
-class Attacker(Attack, LabelMixin):
+class Attacker:
     """
     Abstract class for running attacks and logging results (SNR and audio files)
 

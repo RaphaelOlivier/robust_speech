@@ -1,7 +1,7 @@
 
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 import robust_speech as rs
-from advertorch.attacks import Attack
+from robust_speech.adversarial.attacks.attacker import Attacker
 from speechbrain.utils.distributed import run_on_main
 import speechbrain as sb
 from speechbrain.dataio.dataloader import LoopedLoader
@@ -285,7 +285,7 @@ class AdvASRBrain(ASRBrain):
          transferring adversarial attacks between models: the noise is computed on the nested (source) 
          brain and evaluated on the main (target) brain.
         """
-        if isinstance(attacker, Attack):  # attacker object already initiated
+        if isinstance(attacker, Attacker):  # attacker object already initiated
             self.attacker = attacker
         elif attacker is not None:  # attacker class
             brain_to_attack = type(self)(

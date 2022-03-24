@@ -2,10 +2,6 @@
 
 import torch
 
-#from advertorch.utils import calc_l2distsq
-from advertorch.utils import replicate_input
-from advertorch.attacks.base import Attack
-from advertorch.attacks.base import LabelMixin
 from robust_speech.adversarial.attacks.attacker import Attacker
 
 
@@ -17,12 +13,6 @@ def is_successful(y1, y2, targeted):
         else:
             equal = y1 == y2
     return targeted == equal
-
-
-def calc_l2distsq(x, y, mask):
-    d = ((x - y)**2) * mask
-    # / mask.view(mask.shape[0], -1).sum(dim=1)
-    return d.view(d.shape[0], -1).sum(dim=1)
 
 
 class KenansvilleAttack(Attacker):
@@ -68,7 +58,7 @@ class KenansvilleAttack(Attacker):
         the tensor of the perturbed batch
         """
         wavs, rel_lengths = batch.sig
-        wavs = replicate_input(wavs)
+        wavs = wavs.detach().clone()
         batch_size = wavs.size(0)
         wav_lengths = (rel_lengths.float()*wavs.size(1)).long()
 

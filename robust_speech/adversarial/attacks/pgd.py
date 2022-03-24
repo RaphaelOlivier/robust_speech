@@ -2,11 +2,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from advertorch.attacks.base import Attack, LabelMixin
 from advertorch.utils import clamp
 from advertorch.utils import normalize_by_pnorm
 from advertorch.utils import clamp_by_pnorm
-from advertorch.utils import is_float_or_torch_tensor
 from advertorch.utils import batch_multiply
 from advertorch.utils import batch_clamp
 from advertorch.utils import batch_l1_proj
@@ -174,8 +172,9 @@ class ASRPGDAttack(Attacker):
       self.asr_brain = asr_brain
       self.l1_sparsity = l1_sparsity
       self.train_mode_for_backward = train_mode_for_backward
-      assert is_float_or_torch_tensor(self.rel_eps_iter)
-      assert is_float_or_torch_tensor(self.eps)
+
+      assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(self.rel_eps_iter, float)
+      assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
    def perturb(self, batch):
       """

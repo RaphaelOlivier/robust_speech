@@ -3,14 +3,12 @@ import warnings
 import numpy as np
 import torch
 import torch.nn as nn
-from advertorch.utils import is_float_or_torch_tensor
 
 import speechbrain as sb
 
 import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import perturb_iterative
 
-from advertorch.attacks.base import Attack, LabelMixin
 from robust_speech.adversarial.attacks.attacker import Attacker
 
 
@@ -66,8 +64,8 @@ class ASRMGAA(Attacker):
         self.targeted = targeted
         self.train_mode_for_backward = train_mode_for_backward
 
-        assert is_float_or_torch_tensor(self.rel_eps_iter)
-        assert is_float_or_torch_tensor(self.eps)
+        assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(self.rel_eps_iter, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def perturb(self, batch):
         """

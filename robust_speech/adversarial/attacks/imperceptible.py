@@ -1,11 +1,3 @@
-"""
-An implementation of the Imperceptible ASR attack (https://arxiv.org/abs/1903.10346).
-Based on a mixture of the Advertorch CW attack (https://github.com/BorealisAI/advertorch/blob/master/advertorch/attacks/carlini_wagner.py)
-and the ART implementation of Imperceptible (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
-This attack is currently not achieving its expected results and is under debugging.
-"""
-
-
 from typing import Tuple, List, Optional
 
 from scipy.signal import argrelextrema

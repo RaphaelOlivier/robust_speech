@@ -7,7 +7,7 @@ import torch.nn as nn
 import speechbrain as sb
 
 import robust_speech as rs
-from robust_speech.adversarial.attacks.pgd import perturb_iterative
+from robust_speech.adversarial.attacks.pgd import pgd_loop
 
 from robust_speech.adversarial.attacks.attacker import Attacker
 
@@ -95,7 +95,7 @@ class ASRMGAA(Attacker):
             batch.sig = x+delta, batch.sig[1]
             train_adv = self.nested_attack.perturb(batch)
             batch.sig = x, batch.sig[1]
-            test_adv = perturb_iterative(
+            test_adv = pgd_loop(
                 batch, self.asr_brain, nb_iter=1,
                 eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
                 minimize=self.targeted, ord=self.ord,

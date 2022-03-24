@@ -4,10 +4,9 @@ Wav2Vec2 specific attacks
 
 import torch
 import torch.nn as nn
-from advertorch.attacks.utils import rand_init_delta
-from advertorch.utils import clamp
+from robust_speech.adversarial.utils import rand_assign
 import speechbrain as sb
-from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, perturb_iterative
+from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, pgd_loop
 from robust_speech.models.wav2vec2_pretrain import AdvHuggingFaceWav2Vec2Pretrain
 import robust_speech as rs
 
@@ -83,16 +82,16 @@ class ContrastiveASRAttack(ASRPGDAttack):
         if self.rand_init:
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
-            rand_init_delta(
-                delta, x, self.ord, self.eps, clip_min, clip_max)
-            delta.data = clamp(
+            rand_assign(
+                delta, self.ord, self.eps)
+            delta.data = torch.clamp(
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
         # fixing the quantized representation of the batch for contrastive adversarial learning
         _, out, _ = self.asr_brain.compute_forward(batch, stage=sb.Stage.VALID)
         q_repr = out.projected_quantized_states.detach(), out.codevector_perplexity.detach()
         batch.quantized_representation = q_repr
-        wav_adv = perturb_iterative(
+        wav_adv = pgd_loop(
             batch, self.asr_brain, nb_iter=self.nb_iter,
             eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
             minimize=self.targeted, ord=self.ord,
@@ -176,9 +175,9 @@ class ASRFeatureAdversary(ASRPGDAttack):
         if self.rand_init:
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
-            rand_init_delta(
-                delta, x, self.ord, self.eps, clip_min, clip_max)
-            delta.data = clamp(
+            rand_assign(
+                delta, self.ord, self.eps)
+            delta.data = torch.clamp(
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
         # fixing the quantized representation of the batch for contrastive adversarial learning
@@ -199,7 +198,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
                 loss = torch.square(predictions[0]-self.init_features).sum()
                 return loss
         
-        wav_adv = perturb_iterative(
+        wav_adv = pgd_loop(
             batch, NestedClassForFeatureAdversary(self.asr_brain.modules.wav2vec2.model.wav2vec2,batch), nb_iter=self.nb_iter,
             eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
             minimize=self.targeted, ord=self.ord,

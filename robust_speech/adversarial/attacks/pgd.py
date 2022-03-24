@@ -2,13 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from advertorch.utils import clamp
-from advertorch.utils import normalize_by_pnorm
-from advertorch.utils import clamp_by_pnorm
-from advertorch.utils import batch_multiply
-from advertorch.utils import batch_clamp
-from advertorch.utils import batch_l1_proj
-from advertorch.attacks.utils import rand_init_delta
+from robust_speech.adversarial.utils import rand_assign, l2_clamp_or_normalize, linf_clamp
 
 import robust_speech as rs
 
@@ -25,7 +19,7 @@ def reverse_bound_from_rel_bound(batch, rel, ord=2):
    return torch.tensor(epss).to(wavs.device)
 
 
-def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
+def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
                       delta_init=None, minimize=False, ord=np.inf,
                       clip_min=None, clip_max=None,
                       l1_sparsity=None):
@@ -68,7 +62,9 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
       delta = delta_init
    else:
       delta = torch.zeros_like(wav_init)
-
+   if isinstance(eps_iter,torch.Tensor):
+      assert eps_iter.dim()==1
+      eps_iter=eps_iter.unsqueeze(1)
    delta.requires_grad_()
    for ii in range(nb_iter):
       batch.sig = wav_init+delta, wav_lens
@@ -80,48 +76,26 @@ def perturb_iterative(batch, asr_brain, nb_iter, eps, eps_iter,
       loss.backward()
       if ord == np.inf:
          grad_sign = delta.grad.data.sign()
-         delta.data = delta.data + batch_multiply(eps_iter, grad_sign)
-         delta.data = batch_clamp(eps, delta.data)
-         delta.data = clamp(wav_init.data + delta.data, clip_min, clip_max
+         delta.data = delta.data + eps_iter * grad_sign
+         delta.data = linf_clamp(delta.data,eps)
+         delta.data = torch.clamp(wav_init.data + delta.data, clip_min, clip_max
                               ) - wav_init.data
 
       elif ord == 2:
          grad = delta.grad.data
-         grad = normalize_by_pnorm(grad)
-         delta.data = delta.data + batch_multiply(eps_iter, grad)
-         delta.data = clamp(wav_init.data + delta.data, clip_min, clip_max
+         grad = l2_clamp_or_normalize(grad)
+         delta.data = delta.data + eps_iter * grad
+         delta.data = torch.clamp(wav_init.data + delta.data, clip_min, clip_max
                               ) - wav_init.data
          if eps is not None:
-               delta.data = clamp_by_pnorm(delta.data, ord, eps)
-      elif ord == 1:
-         grad = delta.grad.data
-         abs_grad = torch.abs(grad)
-
-         batch_size = grad.size(0)
-         view = abs_grad.view(batch_size, -1)
-         view_size = view.size(1)
-         if l1_sparsity is None:
-               vals, idx = view.topk(1)
-         else:
-               vals, idx = view.topk(
-                  int(np.round((1 - l1_sparsity) * view_size)))
-
-         out = torch.zeros_like(view).scatter_(1, idx, vals)
-         out = out.view_as(grad)
-         grad = grad.sign() * (out > 0).float()
-         grad = normalize_by_pnorm(grad, p=1)
-         delta.data = delta.data + batch_multiply(eps_iter, grad)
-
-         delta.data = batch_l1_proj(delta.data.cpu(), eps)
-         delta.data = delta.data.to(wav_init.device)
-         delta.data = clamp(wav_init.data + delta.data, clip_min, clip_max
-                              ) - wav_init.data
+               delta.data = l2_clamp_or_normalize(delta.data, eps)
       else:
-         error = "Only ord = inf, ord = 1 and ord = 2 have been implemented"
-         raise NotImplementedError(error)
+         raise NotImplementedError("PGD attack only supports ord=2 or ord=np.inf")
       delta.grad.data.zero_()
       # print(loss)
-   wav_adv = clamp(wav_init + delta, clip_min, clip_max)
+   if isinstance(eps_iter,torch.Tensor):
+      eps_iter=eps_iter.squeeze(1)
+   wav_adv = torch.clamp(wav_init + delta, clip_min, clip_max)
    return wav_adv
 
 
@@ -161,8 +135,8 @@ class ASRPGDAttack(Attacker):
          rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
          ord=np.inf, l1_sparsity=None, targeted=False, train_mode_for_backward=True):
 
-      self.clip_min = clip_min
-      self.clip_max = clip_max
+      self.clip_min = clip_min if clip_min is not None else -10
+      self.clip_max = clip_max if clip_max is not None else 10
       self.eps = eps
       self.nb_iter = nb_iter
       self.rel_eps_iter = rel_eps_iter
@@ -203,12 +177,13 @@ class ASRPGDAttack(Attacker):
       if self.rand_init:
          clip_min = self.clip_min if self.clip_min is not None else -0.1
          clip_max = self.clip_max if self.clip_max is not None else 0.1
-         rand_init_delta(
-               delta, x, self.ord, self.eps, clip_min, clip_max)
-         delta.data = clamp(
+         
+         rand_assign(
+               delta, self.ord, self.eps)
+         delta.data = torch.clamp(
                x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
-      wav_adv = perturb_iterative(
+      wav_adv = pgd_loop(
          batch, self.asr_brain, nb_iter=self.nb_iter,
          eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
          minimize=self.targeted, ord=self.ord,

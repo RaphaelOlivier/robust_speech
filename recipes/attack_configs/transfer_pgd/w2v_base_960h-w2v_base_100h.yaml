@@ -8,28 +8,21 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-eps: 1
-max_iter: 4000
-const: 10
-target_sentence: ["THIS IS A SENTENCE OF MEDIUM LENGTH THAT WE USE AS TARGET", "A SHORT TARGET SENTENCE", "HERE IS A RATHER LONG TEST STRING THAT WE USE AS TARGET FOR THE LONGEST UTTERANCES IN LIBRISPEECH WHICH CAN CONTAIN DOZENS OF WORDS"]
-attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
-   targeted: True
-   decrease_factor_eps: 0.5
-   eps: !ref <eps>
-   global_max_length: 562480
-   initial_rescale: 1.0
-   learning_rate: 0.002
-   max_iter: !ref <max_iter>
-   const: !ref <const>
-   train_mode_for_backward: False
+snr: 25
+nb_iter: 100
+attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
+  targeted: False
+  snr: !ref <snr>
+  nb_iter: !ref <nb_iter>
+  train_mode_for_backward: False
 save_audio: False
-attack_name: transfer/cw
+attack_name: transfer/pgd
 
 # Model information
-model_name: asr-ctcrnn-librispeech
-target_brain_class: !name:robust_speech.models.ctc.CTCASR
+model_name: wav2vec2-base-960h
+target_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
-model_name2: wav2vec2-base-960h
+model_name2: wav2vec2-base-100h
 source_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
 source_brain_hparams_file: !ref model_configs/<model_name2>.yaml
 

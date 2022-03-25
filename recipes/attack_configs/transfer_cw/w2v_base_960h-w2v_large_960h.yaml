@@ -21,6 +21,7 @@ attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
    learning_rate: 0.002
    max_iter: !ref <max_iter>
    const: !ref <const>
+   #train_mode_for_backward: False
 save_audio: False
 attack_name: transfer/cw
 

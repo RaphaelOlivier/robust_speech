@@ -16,15 +16,20 @@ from robust_speech.adversarial.attacks.pgd import pgd_loop
 
 class ASRMGAA(Attacker):
     """
-    Implementation of the Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
-    This attack encapsulates another attack (typically PGD) and only retains the part of the perturbation that is relevant for transfable attacks.
+    Implementation of the Meta Gradient Adversarial Attack
+    (https://arxiv.org/abs/2108.04204).
+    This attack encapsulates another attack (typically PGD)
+    and only retains the part of the perturbation that is relevant for transfable attacks.
     It requires multiple models, i.e. ASR brains.
 
     Arguments
     ---------
      asr_brain: robust_speech.adversarial.brain.EnsembleAsrBrain
-        the brain objects. It should be an EnsembleAsrBrain object where the first brain is the meta model and the second is the train model.
-        That second brain is typically also an EnsembleAsrBrain to improve transferability.
+        the brain objects. It should be an EnsembleAsrBrain object
+         where the first brain is the meta model
+         and the second is the train model.
+        That second brain is typically also an EnsembleAsrBrain
+         to improve transferability.
      nested_attack_class: robust_speech.adversarial.attacks.attacker.Attacker
         the nested adversarial attack class.
      nb_iter: int
@@ -40,7 +45,8 @@ class ASRMGAA(Attacker):
      targeted: bool
         if the attack is targeted
      train_mode_for_backward: bool
-        whether to force training mode in backward passes (necessary for RNN models)
+        whether to force training mode in backward passes
+        (necessary for RNN models)
 
     """
 
@@ -59,7 +65,8 @@ class ASRMGAA(Attacker):
     ):
 
         warnings.warn(
-            "MGAA attack is currently under development. Accurate results are not guaranteed.",
+            "MGAA attack is currently under development. \
+            Accurate results are not guaranteed.",
             RuntimeWarning,
         )
 

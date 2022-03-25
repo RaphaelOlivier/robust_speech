@@ -1,12 +1,15 @@
-"""A Wav2Vec2 Pretraining system with librispeech supporting adversarial attacks, and specifically the contrastive attack.
+"""A Wav2Vec2 Pretraining system with librispeech supporting adversarial attacks, 
+and specifically the contrastive attack.
 The HuggingFace implementation of the wav2vec 2.0 pretraining is used and wrapped
 to fit properly the SpeechBrain framework.
 
 Contrary to ASR models this one requires some additional work over SpeechBrain
 (https://github.com/speechbrain/speechbrain/blob/develop/recipes/CommonVoice/self-supervised-learning/wav2vec2/train.py)
 in order to:
-    -support loading of pretrained models from Huggingface (Speechbrain handles it for Wav2Vec2 for ASR but not pretraining)
-    -support the quantized_representation argument to fix the quantized labels used by Wav2Vec2 (required for the contrastive attack).
+    -support loading of pretrained models from Huggingface 
+    (Speechbrain handles it for Wav2Vec2 for ASR but not pretraining)
+    -support the quantized_representation argument to fix the quantized labels
+     used by Wav2Vec2 (required for the contrastive attack).
     -backpropagate gradients to the inputs
 Some transformers and SpeechBrain models have been rewritten below for that purpose.
 """
@@ -42,7 +45,8 @@ logger = logging.getLogger(__name__)
 class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
     """
     Slight modification of the HF feature extractor.
-    The original class assumes that input is a leaf tensor, which when running attacks isn't always the case.
+    The original class assumes that input is a leaf tensor,
+    which when running attacks isn't always the case.
     """
 
     def forward(self, input_values):
@@ -99,7 +103,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         quantized_representation=None,
     ):
         """
-        New argument quantized_representation contains an optional precomputed value for (quantized_features, codevector_perplexity).
+        New argument quantized_representation contains an optional
+        precomputed value for (quantized_features, codevector_perplexity).
         If available, this value is not recomputed in the foward pass.
 
         Returns:
@@ -148,7 +153,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
 
             # for training, we sample negatives
             # 3. sample K negatives (distractors) quantized states for contrastive loss
-            # if attention_mask is passed, make sure that padded feature vectors cannot be sampled
+            # if attention_mask is passed,
+            # make sure that padded feature vectors cannot be sampled
             # sample negative quantized vectors BTC => (BxT)C
             negative_quantized_features = quantized_features.view(-1, hidden_size)[
                 sampled_negative_indices.long().view(-1)
@@ -166,7 +172,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
                 self.config.contrastive_logits_temperature,
             )
 
-            # 5. if a negative vector is identical to the positive (i.e. when codebook utilization is low),
+            # 5. if a negative vector is identical to the positive
+            # (i.e. when codebook utilization is low),
             # its cosine similarity will be masked
             neg_is_pos = (quantized_features == negative_quantized_features).all(-1)
 

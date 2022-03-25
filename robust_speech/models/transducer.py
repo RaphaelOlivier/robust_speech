@@ -3,7 +3,8 @@ The system employs an encoder, a decoder, and an joint network
 between them. Decoding is performed with beamsearch coupled with a neural
 language model.
 
-Inspired from SpeechBrain Transducer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transducer/train.py)
+Inspired from SpeechBrain Transducer 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transducer/train.py)
 """
 import logging
 import os

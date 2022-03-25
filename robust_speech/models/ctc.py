@@ -7,7 +7,8 @@ LibriSpeech dataset (960 h).
 
 Inspired from both SpeechBrain Wav2Vec2
 (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
-and Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
+and Seq2Seq 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
 
 """
 

@@ -21,10 +21,13 @@ EPS_NUM_STRIDES = 4
 
 class GeneticAttack(Attacker):
     """
-    Implementation of the Black-Box genetic adversarial attack for ASR models (https://arxiv.org/abs/1801.00554)
-    The original implementation (https://github.com/nesl/adversarial_audio) was slightly changed:
+    Implementation of the Black-Box genetic adversarial attack for ASR models
+    (https://arxiv.org/abs/1801.00554)
+    The original implementation (https://github.com/nesl/adversarial_audio)
+     was slightly changed:
         -untargeted attacks are supported
-        -mutations occur in float space rather than byte space (for smoother integration to pytorch)
+        -mutations occur in float space rather than byte space
+        (for smoother integration to pytorch)
 
     Arguments
     ---------

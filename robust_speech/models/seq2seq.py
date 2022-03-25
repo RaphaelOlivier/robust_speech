@@ -3,7 +3,8 @@ The system employs an encoder, a decoder, and an attention mechanism
 between them. Decoding is performed with beamsearch coupled with a neural
 language model.
 
-Inspired from SpeechBrain Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
+Inspired from SpeechBrain Seq2Seq 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
 """
 import speechbrain as sb
 import torch

@@ -18,7 +18,8 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
     """
     A Carlini&Wagner attack for ASR models.
     The algorithm follows the first attack in https://arxiv.org/abs/1801.01944
-    Based on the ART implementation of Imperceptible (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
+    Based on the ART implementation of Imperceptible
+    (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
 
     Arguments
     ---------

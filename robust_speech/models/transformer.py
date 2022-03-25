@@ -1,9 +1,10 @@
 """A Transformer ASR system with librispeech supporting adversarial attacks.
 The system employs an encoder, a decoder, and an attention mechanism
-between them. Decoding is performed with (CTC/Att joint) beamsearch coupled with a neural
-language model.
+between them. Decoding is performed with (CTC/Att joint) beamsearch 
+coupled with a neural language model.
 
-Inspired from SpeechBrain Transformer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transformer/train.py)
+Inspired from SpeechBrain Transformer 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transformer/train.py)
 """
 import logging
 import os

@@ -2,7 +2,8 @@
 The system employs wav2vec2 as its encoder. Decoding is performed with
 ctc greedy decoder.
 
-Inspired from SpeechBrain Wav2Vec2 (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
+Inspired from SpeechBrain Wav2Vec2 
+(https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
 """
 
 import gc
@@ -31,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 class AdvWav2Vec2Model(Wav2Vec2Model):
     """
-    This class modifies the transformers Wav2Vec2 module in order to replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
+    This class modifies the transformers Wav2Vec2 module
+     in order to replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
     """
 
     def __init__(self, config: Wav2Vec2Config):
@@ -44,7 +46,8 @@ HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
 
 
 class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
-    """This class inherits the SpeechBrain Wav2Vec2 lobe and replaces the model with an AdvWav2Vec2 model,
+    """This class inherits the SpeechBrain Wav2Vec2 lobe and
+    replaces the model with an AdvWav2Vec2 model,
     which supports backpropagating through the inputs
 
     Arguments
@@ -60,12 +63,14 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         If True, the model is frozen. If False, the model will be trained
         alongside with the rest of the pipeline.
     freeze_feature_extractor :  bool (default: False)
-        When freeze = False and freeze_feature_extractor True, the featue_extractor module of the model is Frozen. If False
+        When freeze = False and freeze_feature_extractor True,
+        the featue_extractor module of the model is Frozen. If False
         all the wav2vec model will be trained including featue_extractor module.
     apply_spec_augment : bool (default: False)
         If True, the model will apply spec augment on the output of feature extractor
         (inside huggingface Wav2VecModel() class).
-        If False, the model will not apply spec augment. We set this to false to prevent from doing it twice.
+        If False, the model will not apply spec augment.
+        We set this to false to prevent from doing it twice.
     """
 
     def __init__(

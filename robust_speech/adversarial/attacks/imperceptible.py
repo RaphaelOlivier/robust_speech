@@ -19,8 +19,10 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 
 class ImperceptibleASRAttack(Attacker):
     """
-    An implementation of the Imperceptible ASR attack (https://arxiv.org/abs/1903.10346).
-    Based on the ART implementation of Imperceptible (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
+    An implementation of the Imperceptible ASR attack
+    (https://arxiv.org/abs/1903.10346).
+    Based on the ART implementation of Imperceptible
+    (https://github.com/Trusted-AI/adversarial-robustness-toolbox/blob/main/art/attacks/evasion/imperceptible_asr/imperceptible_asr_pytorch.py)
 
     Arguments
     ---------
@@ -568,7 +570,8 @@ class ImperceptibleASRAttack(Attacker):
         # Do transformation
 
         # transformed_wav = librosa.core.stft(
-        #    y=x, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, window=window, center=False
+        #    y=x, n_fft=self.n_fft, hop_length=self.hop_length,
+        #    win_length=self.win_length, window=window, center=False
         # )
         transformed_wav = torch.stft(
             input=wav.detach().cpu(),
@@ -588,7 +591,8 @@ class ImperceptibleASRAttack(Attacker):
         psd = 96 - np.max(psd) + psd
 
         # Compute freqs and barks
-        # freqs = librosa.core.fft_frequencies(sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
+        # freqs = librosa.core.fft_frequencies(
+        #    sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
         freqs = torch.fft.rfftfreq(n=self.n_fft, d=1.0 / 16000)
         barks = 13 * np.arctan(0.00076 * freqs) + 3.5 * np.arctan(
             pow(freqs / 7500.0, 2)

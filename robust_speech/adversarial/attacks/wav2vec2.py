@@ -123,8 +123,11 @@ class ContrastiveASRAttack(ASRPGDAttack):
 class ASRFeatureAdversary(ASRPGDAttack):
     """
     Implementation of an attack for Wav2Vec2.
-    This attack tries to maximize the L2 distance between the context of the natural and adversarial input.
-    This makes it somehow similar to a Feature adversary (https://arxiv.org/pdf/1511.05122.pdf) but in an untargeted way
+    This attack tries to maximize the L2 distance
+    between the context of the natural and adversarial input.
+    This makes it somehow similar to a Feature adversary
+    (https://arxiv.org/pdf/1511.05122.pdf)
+     but in an untargeted way
 
     Arguments
     ---------
@@ -147,14 +150,16 @@ class ASRFeatureAdversary(ASRPGDAttack):
      targeted: bool
         if the attack is targeted.
      train_mode_for_backward: bool
-        whether to force training mode in backward passes (necessary for RNN models)
+        whether to force training mode in backward passes
+        (necessary for RNN models)
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self._check_for_contrastive_loss():
             raise ValueError(
-                "Feature Adversary attack can only be applied to wav2vec2-based models that support fixing quantized representations"
+                "Feature Adversary attack can only be applied to wav2vec2-based models\
+                 that support fixing quantized representations"
             )
 
     def _check_for_contrastive_loss(self):

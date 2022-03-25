@@ -96,7 +96,8 @@ class Attacker:
 
 class RandomAttack(Attacker):
     """
-    An attack based on entirely random noise, which can be used as a baseline with various noise bounds.
+    An attack based on entirely random noise,
+    which can be used as a baseline with various noise bounds.
     The attack returns a noisy input within eps from the initial point.
 
     Arguments

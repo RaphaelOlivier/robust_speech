@@ -9,9 +9,12 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 
 class KenansvilleAttack(Attacker):
     """
-    Implementation of the Kenansville Attack (https://arxiv.org/abs/1910.05262).
-    This attack is model independant and only considers the input audio and its Power Spectral Density.
-    The implementation is based on the Armory one (https://github.com/twosixlabs/armory/blob/master/armory/art_experimental/attacks/kenansville_dft.py)
+    Implementation of the Kenansville Attack
+    (https://arxiv.org/abs/1910.05262).
+    This attack is model independant and only considers the input audio
+    and its Power Spectral Density.
+    The implementation is based on the Armory one
+    (https://github.com/twosixlabs/armory/blob/master/armory/art_experimental/attacks/kenansville_dft.py)
 
     Arguments
     ---------
@@ -22,7 +25,8 @@ class KenansvilleAttack(Attacker):
      snr: float
         Linf bound applied to the perturbation.
      train_mode_for_backward: bool
-        whether to force training mode in backward passes (necessary for RNN models)
+        whether to force training mode in backward passes
+        (necessary for RNN models)
 
     """
 

@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 class ASRBrain(sb.Brain):
     """
-    Intermediate abstract brain class that specifies some methods for ASR models that can be attacked.
+    Intermediate abstract brain class that specifies some methods for ASR models
+     that can be attacked.
     See sb.Brain for more details.
     """
 
@@ -38,7 +39,8 @@ class ASRBrain(sb.Brain):
         batch : torch.Tensor or tensors
             An element from the dataloader, including inputs for processing.
         stage : Union[sb.Stage, rs.Stage]
-            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+            The stage of the experiment:
+            sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
 
         Returns
         -------
@@ -46,7 +48,8 @@ class ASRBrain(sb.Brain):
             The outputs after all processing is complete.
             Directly passed to ``compute_objectives()``.
             In VALID or TEST stage, this should contain the predicted tokens.
-            In ATTACK stage, batch.sig should be in the computation graph (no device change, no .detach())
+            In ATTACK stage, batch.sig should be in the computation graph
+            (no device change, no .detach())
         """
         raise NotImplementedError
 
@@ -63,7 +66,8 @@ class ASRBrain(sb.Brain):
         batch : torch.Tensor or tensors
             An element from the dataloader, including targets for comparison.
         stage : Union[sb.Stage, rs.Stage]
-            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+            The stage of the experiment:
+            sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
         adv : bool
             Whether this is an adversarial input (used for metric logging)
         reduction : str
@@ -115,7 +119,8 @@ class PredictionEnsemble:
 class EnsembleASRBrain(ASRBrain):
     """
     Ensemble of multiple brains.
-    This class is used for attacks that compute adversarial noise simultaneously on multiple models.
+    This class is used for attacks that compute adversarial noise
+    simultaneously on multiple models.
     """
 
     def __init__(self, asr_brains, ref_tokens=0):
@@ -146,7 +151,8 @@ class EnsembleASRBrain(ASRBrain):
 
         :param predictions: model predictions
         :param all: whether to extract all tokens or just one
-        :param model_idx: which model to extract tokens from (defaults to self.ref_tokens)
+        :param model_idx: which model to extract tokens from
+        (defaults to self.ref_tokens)
         """
         if isinstance(predictions, PredictionEnsemble):
             assert len(predictions) == self.nmodels
@@ -215,7 +221,8 @@ class EnsembleASRBrain(ASRBrain):
 
 class AdvASRBrain(ASRBrain):
     """
-    Intermediate abstract class that specifies some methods for ASR models that can be evaluated on attacks or trained adversarially.
+    Intermediate abstract class that specifies some methods for ASR models
+    that can be evaluated on attacks or trained adversarially.
     See sb.Brain for more details.
 
     Arguments
@@ -322,9 +329,11 @@ class AdvASRBrain(ASRBrain):
         """
         Initialize attacker class.
         Attackers take a brain as argument. If the attacker is not already instantiated,
-         then it will receive a copy of the current object (without an attacker!), sharing modules.
-         If the attacker is already instanciated it may contain a different brain. This is useful for
-         transferring adversarial attacks between models: the noise is computed on the nested (source)
+         then it will receive a copy of the current object (without an attacker!),
+         sharing modules. If the attacker is already instanciated
+          it may contain a different brain. This is useful for
+         transferring adversarial attacks between models:
+         the noise is computed on the nested (source)
          brain and evaluated on the main (target) brain.
         """
         if isinstance(attacker, Attacker):  # attacker object already initiated
@@ -438,7 +447,8 @@ class AdvASRBrain(ASRBrain):
         return loss.detach().cpu()
 
     def fit_batch_adversarial(self, batch):
-        """Fit one batch with an adversarial objective, override to do multiple updates.
+        """Fit one batch with an adversarial objective,
+        override to do multiple updates.
 
         The default implementation depends on a few methods being defined
         with a particular behavior:
@@ -461,7 +471,8 @@ class AdvASRBrain(ASRBrain):
         detached loss
         """
         warnings.warn(
-            "Adversarial training is currently under development. Use this function at your own discretion.",
+            "Adversarial training is currently under development. \
+            Use this function at your own discretion.",
             RuntimeWarning,
         )
         # Managing automatic mixed precision
@@ -915,7 +926,8 @@ class AdvASRBrain(ASRBrain):
         batch : torch.Tensor or tensors
             An element from the dataloader, including inputs for processing.
         stage : Union[sb.Stage, rs.Stage]
-            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+            The stage of the experiment:
+            sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
 
         Returns
         -------
@@ -923,7 +935,8 @@ class AdvASRBrain(ASRBrain):
             The outputs after all processing is complete.
             Directly passed to ``compute_objectives()``.
             In VALID or TEST stage, this should contain the predicted tokens.
-            In ATTACK stage, batch.sig should be in the computation graph (no device change, no .detach())
+            In ATTACK stage, batch.sig should be in the computation graph
+            (no device change, no .detach())
         """
         raise NotImplementedError
 
@@ -940,7 +953,8 @@ class AdvASRBrain(ASRBrain):
         batch : torch.Tensor or tensors
             An element from the dataloader, including targets for comparison.
         stage : Union[sb.Stage, rs.Stage]
-            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+            The stage of the experiment:
+            sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
         adv : bool
             Whether this is an adversarial input (used for metric logging)
         reduction : str

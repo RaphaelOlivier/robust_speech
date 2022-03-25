@@ -145,7 +145,7 @@ class EnsembleASRBrain(ASRBrain):
             predictions.append(pred)
         return PredictionEnsemble(predictions)
 
-    def get_tokens(self, predictions, all=False, model_idx=None):
+    def get_tokens(self, predictions, all_models=False, model_idx=None):
         """
         Extract tokens from predictions.
 

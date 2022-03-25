@@ -15,13 +15,13 @@ from robust_speech.adversarial.utils import (
 )
 
 
-def reverse_bound_from_rel_bound(batch, rel, ord=2):
+def reverse_bound_from_rel_bound(batch, rel, order=2):
     """From a relative eps bound, reconstruct the absolute bound for the given batch"""
     wavs, wav_lens = batch.sig
     wav_lens = [int(wavs.size(1) * r) for r in wav_lens]
     epss = []
     for i in range(len(wavs)):
-        eps = torch.norm(wavs[i, : wav_lens[i]], p=ord) / rel
+        eps = torch.norm(wavs[i, : wav_lens[i]], p=order) / rel
         epss.append(eps)
     return torch.tensor(epss).to(wavs.device)
 
@@ -34,7 +34,7 @@ def pgd_loop(
     eps_iter,
     delta_init=None,
     minimize=False,
-    ord=np.inf,
+    order=np.inf,
     clip_min=None,
     clip_max=None,
     l1_sparsity=None,
@@ -58,7 +58,7 @@ def pgd_loop(
        mininum value per input dimension.
     clip_max: (optional) float
        maximum value per input dimension.
-    ord: (optional) int
+    order: (optional) int
        the order of maximum distortion (inf or 2).
     targeted: bool
        if the attack is targeted.
@@ -89,7 +89,7 @@ def pgd_loop(
         if minimize:
             loss = -loss
         loss.backward()
-        if ord == np.inf:
+        if order == np.inf:
             grad_sign = delta.grad.data.sign()
             delta.data = delta.data + eps_iter * grad_sign
             delta.data = linf_clamp(delta.data, eps)
@@ -98,7 +98,7 @@ def pgd_loop(
                 - wav_init.data
             )
 
-        elif ord == 2:
+        elif order == 2:
             grad = delta.grad.data
             grad = l2_clamp_or_normalize(grad)
             delta.data = delta.data + eps_iter * grad
@@ -109,7 +109,7 @@ def pgd_loop(
             if eps is not None:
                 delta.data = l2_clamp_or_normalize(delta.data, eps)
         else:
-            raise NotImplementedError("PGD attack only supports ord=2 or ord=np.inf")
+            raise NotImplementedError("PGD attack only supports order=2 or order=np.inf")
         delta.grad.data.zero_()
         # print(loss)
     if isinstance(eps_iter, torch.Tensor):
@@ -140,7 +140,7 @@ class ASRPGDAttack(Attacker):
        mininum value per input dimension.
     clip_max: (optional) float
        maximum value per input dimension.
-    ord: (optional) int
+    order: (optional) int
        the order of maximum distortion (inf or 2).
     targeted: bool
        if the attack is targeted.
@@ -157,7 +157,7 @@ class ASRPGDAttack(Attacker):
         rand_init=True,
         clip_min=None,
         clip_max=None,
-        ord=np.inf,
+        order=np.inf,
         l1_sparsity=None,
         targeted=False,
         train_mode_for_backward=True,
@@ -169,7 +169,7 @@ class ASRPGDAttack(Attacker):
         self.nb_iter = nb_iter
         self.rel_eps_iter = rel_eps_iter
         self.rand_init = rand_init
-        self.ord = ord
+        self.order = order
         self.targeted = targeted
         self.asr_brain = asr_brain
         self.l1_sparsity = l1_sparsity
@@ -208,7 +208,7 @@ class ASRPGDAttack(Attacker):
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
 
-            rand_assign(delta, self.ord, self.eps)
+            rand_assign(delta, self.order, self.eps)
             delta.data = (
                 torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max)
                 - wav_init
@@ -221,7 +221,7 @@ class ASRPGDAttack(Attacker):
             eps=self.eps,
             eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted,
-            ord=self.ord,
+            order=self.order,
             clip_min=self.clip_min,
             clip_max=self.clip_max,
             delta_init=delta,
@@ -271,7 +271,7 @@ class ASRL2PGDAttack(ASRPGDAttack):
         targeted=False,
         train_mode_for_backward=True,
     ):
-        ord = 2
+        order = 2
         super(ASRL2PGDAttack, self).__init__(
             asr_brain=asr_brain,
             eps=eps,
@@ -282,7 +282,7 @@ class ASRL2PGDAttack(ASRPGDAttack):
             clip_max=clip_max,
             targeted=targeted,
             train_mode_for_backward=train_mode_for_backward,
-            ord=ord,
+            order=order,
         )
 
 
@@ -323,7 +323,7 @@ class ASRLinfPGDAttack(ASRPGDAttack):
         targeted=False,
         train_mode_for_backward=True,
     ):
-        ord = np.inf
+        order = np.inf
         super(ASRLinfPGDAttack, self).__init__(
             asr_brain,
             eps=eps,
@@ -334,7 +334,7 @@ class ASRLinfPGDAttack(ASRPGDAttack):
             clip_max=clip_max,
             targeted=targeted,
             train_mode_for_backward=train_mode_for_backward,
-            ord=ord,
+            order=order,
         )
 
 
@@ -405,7 +405,7 @@ class SNRPGDAttack(ASRL2PGDAttack):
         """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=2)
+        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, order=2)
         res = super(SNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)
@@ -479,7 +479,7 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
         """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=np.inf)
+        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, order=np.inf)
         res = super(MaxSNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)

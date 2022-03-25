@@ -36,7 +36,7 @@ class ASRMGAA(Attacker):
         number of test (meta) iterations
      eps: float
         bound applied to the meta perturbation.
-     ord: int
+     order: int
         order of the attack norm
      clip_min: float
         mininum value per input dimension
@@ -59,7 +59,7 @@ class ASRMGAA(Attacker):
         rel_eps_iter=1.0,
         clip_min=None,
         clip_max=None,
-        ord=np.inf,
+        order=np.inf,
         targeted=False,
         train_mode_for_backward=True,
     ):
@@ -82,7 +82,7 @@ class ASRMGAA(Attacker):
         self.eps = eps
         self.nb_iter = nb_iter
         self.rel_eps_iter = rel_eps_iter
-        self.ord = ord
+        self.order = order
         self.targeted = targeted
         self.train_mode_for_backward = train_mode_for_backward
 
@@ -126,7 +126,7 @@ class ASRMGAA(Attacker):
                 eps=self.eps,
                 eps_iter=self.rel_eps_iter * self.eps,
                 minimize=self.targeted,
-                ord=self.ord,
+                order=self.order,
                 clip_min=self.clip_min,
                 clip_max=self.clip_max,
                 delta_init=nn.Parameter(train_adv - x),

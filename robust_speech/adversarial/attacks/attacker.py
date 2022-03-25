@@ -110,7 +110,7 @@ class RandomAttack(Attacker):
         mininum value per input dimension.
      clip_max: (optional) float
         maximum value per input dimension.
-     ord: (optional) int
+     order: (optional) int
          the order of maximum distortion (inf or 2).
      targeted: bool
         if the attack is targeted (not used).
@@ -120,14 +120,14 @@ class RandomAttack(Attacker):
         self,
         asr_brain,
         eps=0.3,
-        ord=np.inf,
+        order=np.inf,
         clip_min=None,
         clip_max=None,
         targeted=False,
     ):
         self.asr_brain = asr_brain
         self.eps = eps
-        self.ord = ord
+        self.order = order
         self.clip_min = clip_min
         self.clip_max = clip_max
         assert not targeted
@@ -152,7 +152,7 @@ class RandomAttack(Attacker):
         delta = nn.Parameter(delta)
         clip_min = self.clip_min if self.clip_min is not None else -10
         clip_max = self.clip_max if self.clip_max is not None else 10
-        rand_assign(delta, self.ord, self.eps)
+        rand_assign(delta, self.order, self.eps)
         delta.data = (
             torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max) - wav_init
         )

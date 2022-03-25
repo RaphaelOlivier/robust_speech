@@ -126,12 +126,12 @@ def load_audio(path, hparams, savedir="."):
     return audio_normalizer(signal, samplerate)
 
 
-def rand_assign(delta, ord, eps):
+def rand_assign(delta, order, eps):
     """Randomly set the data of parameter delta with uniform sampling"""
     delta.data.uniform_(-1, 1)
-    if ord == np.inf:
+    if order == np.inf:
         delta.data = eps * delta.data
-    elif ord == 2:
+    elif order == 2:
         delta.data = l2_clamp_or_normalize(delta.data, eps)
     return delta.data
 

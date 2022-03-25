@@ -35,7 +35,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
         mininum value per input dimension.
      clip_max: (optional) float
         maximum value per input dimension.
-     ord: (optional) int
+     order: (optional) int
          the order of maximum distortion (inf or 2).
      targeted: bool
         if the attack is targeted.
@@ -86,7 +86,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
         if self.rand_init:
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
-            rand_assign(delta, self.ord, self.eps)
+            rand_assign(delta, self.order, self.eps)
             delta.data = (
                 torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max)
                 - wav_init
@@ -107,7 +107,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
             eps=self.eps,
             eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted,
-            ord=self.ord,
+            order=self.order,
             clip_min=self.clip_min,
             clip_max=self.clip_max,
             delta_init=delta,
@@ -145,7 +145,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
         mininum value per input dimension.
      clip_max: (optional) float
         maximum value per input dimension.
-     ord: (optional) int
+     order: (optional) int
          the order of maximum distortion (inf or 2).
      targeted: bool
         if the attack is targeted.
@@ -211,7 +211,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
         if self.rand_init:
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
-            rand_assign(delta, self.ord, self.eps)
+            rand_assign(delta, self.order, self.eps)
             delta.data = (
                 torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max)
                 - wav_init
@@ -256,7 +256,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
             eps=self.eps,
             eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted,
-            ord=self.ord,
+            order=self.order,
             clip_min=self.clip_min,
             clip_max=self.clip_max,
             delta_init=delta,

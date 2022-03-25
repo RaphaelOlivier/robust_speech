@@ -156,7 +156,8 @@ class EnsembleASRBrain(ASRBrain):
                     for i, pred in enumerate(predictions)
                 ]
             if model_idx is not None:
-                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
+                return self.asr_brains[model_idx].get_tokens(
+                    predictions[model_idx])
             return self.asr_brains[self.ref_tokens].get_tokens(
                 predictions[self.ref_tokens]
             )
@@ -302,7 +303,7 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker,
         )
-        self.tokenizer=None 
+        self.tokenizer = None
         self.init_metrics()
 
     def __setattr__(self, name, value, attacker_brain=True):
@@ -313,7 +314,11 @@ class AdvASRBrain(ASRBrain):
             and name != "attacker"
             and attacker_brain
         ):
-            super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
+            super(
+                AdvASRBrain,
+                self.attacker.asr_brain).__setattr__(
+                name,
+                value)
         super(AdvASRBrain, self).__setattr__(name, value)
 
     def init_attacker(
@@ -696,7 +701,8 @@ class AdvASRBrain(ASRBrain):
                 avg_valid_adv_loss = None
                 if self.attacker is not None:
                     avg_valid_adv_loss = 0.0
-                for batch in tqdm(valid_set, dynamic_ncols=True, disable=not enable):
+                for batch in tqdm(valid_set, dynamic_ncols=True,
+                                  disable=not enable):
                     self.step += 1
                     loss = self.evaluate_batch(batch, stage=sb.Stage.VALID)
                     avg_valid_loss = self.update_average(loss, avg_valid_loss)
@@ -770,7 +776,8 @@ class AdvASRBrain(ASRBrain):
         if progressbar is None:
             progressbar = not self.noprogressbar
 
-        if not (isinstance(test_set, DataLoader) or isinstance(test_set, LoopedLoader)):
+        if not (isinstance(test_set, DataLoader)
+                or isinstance(test_set, LoopedLoader)):
             test_loader_kwargs["ckpt_prefix"] = None
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
@@ -785,7 +792,8 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
-        for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+        for batch in tqdm(test_set, dynamic_ncols=True,
+                          disable=not progressbar):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)

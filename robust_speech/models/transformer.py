@@ -121,7 +121,8 @@ class TrfASR(AdvASRBrain):
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
             valid_search_interval = self.hparams.valid_search_interval
-            if current_epoch % valid_search_interval == 0 or (stage == sb.Stage.TEST):
+            if current_epoch % valid_search_interval == 0 or (
+                    stage == sb.Stage.TEST):
                 # Decode token terms to words
                 predicted_words = [
                     self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps

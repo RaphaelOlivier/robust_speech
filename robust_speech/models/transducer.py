@@ -106,14 +106,14 @@ class RNNTASR(AdvASRBrain):
                 return p_transducer, wav_lens
 
         elif stage == sb.Stage.VALID:
-            best_hyps, scores, _, _ = self.hparams.valid_search(encoded)
+            best_hyps, _, _, _ = self.hparams.valid_search(encoded)
             return p_transducer, wav_lens, best_hyps
         else:
             (
                 best_hyps,
-                best_scores,
-                nbest_hyps,
-                nbest_scores,
+                _,
+                _,
+                _,
             ) = self.hparams.test_search(encoded)
             return p_transducer, wav_lens, best_hyps
 

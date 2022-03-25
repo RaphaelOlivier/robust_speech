@@ -92,7 +92,7 @@ def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
 def transcribe_batch(asr_brain, batch):
     """Outputs transcriptions from an input batch"""
     out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST)
-    p_seq, wav_lens, predicted_tokens = out
+    _, _, predicted_tokens = out
     try:
         predicted_words = [
             " ".join(asr_brain.tokenizer.decode_ids(utt_seq))

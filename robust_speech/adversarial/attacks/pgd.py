@@ -210,7 +210,7 @@ class ASRPGDAttack(Attacker):
 
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(wav_init + delta.data, min=self.clip_min, max=self.clip_max)
+                torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max)
                 - wav_init
             )
 

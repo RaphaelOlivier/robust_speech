@@ -53,7 +53,7 @@ class GeneticAttack(Attacker):
     def perturb(self, batch):
         pop_batch, max_wavs, min_wavs = self._gen_population(batch)
 
-        for idx in range(self.nb_iter):
+        for _ in range(self.nb_iter):
             pop_scores = self._score(pop_batch)
             _, elite_indices = torch.topk(
                 pop_scores, ELITE_SIZE, largest=not self.targeted, sorted=True, dim=-1

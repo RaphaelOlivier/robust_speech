@@ -70,9 +70,9 @@ class S2SASR(AdvASRBrain):
                 return p_seq, wav_lens
         else:
             if stage == sb.Stage.VALID:
-                p_tokens, scores = self.hparams.valid_search(encoded, wav_lens)
+                p_tokens, _ = self.hparams.valid_search(encoded, wav_lens)
             else:
-                p_tokens, scores = self.hparams.test_search(encoded, wav_lens)
+                p_tokens, _ = self.hparams.test_search(encoded, wav_lens)
             return p_seq, wav_lens, p_tokens
 
     def compute_objectives(

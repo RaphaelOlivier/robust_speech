@@ -124,9 +124,13 @@ class EnsembleASRBrain(ASRBrain):
 
     @property
     def nmodels(self):
+        """Number of models in the ensemble"""
         return len(self.asr_brains)
 
     def compute_forward(self, batch, stage, model_idx=None):
+        """
+        forward pass of all  or one model(s)
+        """
         # concatenate predictions
         if model_idx is not None:
             return self.asr_brains[model_idx].compute_forward(batch, stage)
@@ -163,12 +167,15 @@ class EnsembleASRBrain(ASRBrain):
         predictions,
         batch,
         stage,
-        average=True,
-        model_idx=None,
         adv=False,
         targeted=False,
         reduction="mean",
+        average=True,
+        model_idx=None,
     ):
+        """
+        Compute the losses of all or one model
+        """
         # concatenate of average objectives
         if (
             isinstance(predictions, PredictionEnsemble) or model_idx is None
@@ -883,10 +890,14 @@ class AdvASRBrain(ASRBrain):
                 self.wer_metric.write_stats(w)
 
     def on_evaluate_start(self, max_key=None, min_key=None):
+        """Run at the beginning of evlauation.
+        Sets attack metrics and loggers"""
         super().on_evaluate_start(max_key=max_key, min_key=min_key)
         if self.attacker is not None:
             self.attacker.on_evaluation_start()
 
     def on_evaluate_end(self):
+        """Run at the beginning of evlauation.
+        Log attack metrics and save perturbed audio"""
         if self.attacker is not None:
             self.attacker.on_evaluation_end(self.hparams.train_logger)

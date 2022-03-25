@@ -1,4 +1,3 @@
-#!/usr/bin/env/python3
 """A Wav2Vec2-based ASR system with librispeech supporting adversarial attacks.
 The system employs wav2vec2 as its encoder. Decoding is performed with
 ctc greedy decoder.
@@ -90,7 +89,8 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
             model = HF_models.get("wav2vec2")
 
         # Download and load the model
-        self._from_pretrained(source, config=config, model=model, save_path=save_path)
+        self._from_pretrained(source, config=config,
+                              model=model, save_path=save_path)
 
         # set apply_spec_augment
         self.model.config.apply_spec_augment = apply_spec_augment
@@ -166,7 +166,8 @@ class W2VASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
+            tokens_eos_lens = torch.cat(
+                [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
 
@@ -181,7 +182,8 @@ class W2VASR(AdvASRBrain):
                 self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
             ]
             target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ") for s in predicted_words]
+            predicted_words = ["".join(s).strip().split(" ")
+                               for s in predicted_words]
             target_words = [t.split(" ") for t in target_words]
             if adv:
                 if targeted:
@@ -192,8 +194,10 @@ class W2VASR(AdvASRBrain):
                         ids, predicted_words, target_words
                     )
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
@@ -216,7 +220,8 @@ class W2VASR(AdvASRBrain):
 
     def fit_batch_adversarial(self, batch):
         """Train the parameters given a single batch in input"""
-        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(
+            batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
         loss.backward()
         if self.check_gradients(loss):
@@ -244,8 +249,10 @@ class W2VASR(AdvASRBrain):
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
             if stage_adv_loss is not None:
-                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                    "error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
             if stage_adv_loss_target is not None:
                 stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
                     "error_rate"
@@ -262,7 +269,8 @@ class W2VASR(AdvASRBrain):
             old_lr_wav2vec, new_lr_wav2vec = self.hparams.lr_annealing_wav2vec(
                 stage_stats["loss"]
             )
-            sb.nnet.schedulers.update_learning_rate(self.model_optimizer, new_lr_model)
+            sb.nnet.schedulers.update_learning_rate(
+                self.model_optimizer, new_lr_model)
             sb.nnet.schedulers.update_learning_rate(
                 self.wav2vec_optimizer, new_lr_wav2vec
             )
@@ -281,7 +289,8 @@ class W2VASR(AdvASRBrain):
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:
@@ -297,5 +306,6 @@ class W2VASR(AdvASRBrain):
         )
 
         if self.checkpointer is not None:
-            self.checkpointer.add_recoverable("wav2vec_opt", self.wav2vec_optimizer)
+            self.checkpointer.add_recoverable(
+                "wav2vec_opt", self.wav2vec_optimizer)
             self.checkpointer.add_recoverable("modelopt", self.model_optimizer)

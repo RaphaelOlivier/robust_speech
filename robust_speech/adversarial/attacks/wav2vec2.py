@@ -1,5 +1,5 @@
 """
-Wav2Vec2 specific attacks
+Wav2Vec2-specific attacks
 """
 
 import speechbrain as sb
@@ -89,7 +89,8 @@ class ContrastiveASRAttack(ASRPGDAttack):
             clip_max = self.clip_max if self.clip_max is not None else 0.1
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(x + delta.data, min=self.clip_min, max=self.clip_max) - x
+                torch.clamp(x + delta.data, min=self.clip_min,
+                            max=self.clip_max) - x
             )
 
         # fixing the quantized representation of the batch for contrastive
@@ -195,7 +196,8 @@ class ASRFeatureAdversary(ASRPGDAttack):
             clip_max = self.clip_max if self.clip_max is not None else 0.1
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(x + delta.data, min=self.clip_min, max=self.clip_max) - x
+                torch.clamp(x + delta.data, min=self.clip_min,
+                            max=self.clip_max) - x
             )
 
         # fixing the quantized representation of the batch for contrastive

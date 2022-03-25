@@ -1,3 +1,7 @@
+"""
+Multiple Brain classes that extend sb.Brain to enable attacks.
+"""
+
 import logging
 import time
 import warnings
@@ -397,7 +401,8 @@ class AdvASRBrain(ASRBrain):
             self.scaler.update()
         else:
             outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=False)
+            loss = self.compute_objectives(
+                outputs, batch, sb.Stage.TRAIN, adv=False)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -444,7 +449,8 @@ class AdvASRBrain(ASRBrain):
         if self.auto_mix_prec:
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+                outputs, _ = self.compute_forward_adversarial(
+                    batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.optimizer)
@@ -452,8 +458,10 @@ class AdvASRBrain(ASRBrain):
                 self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=True)
+            outputs, _ = self.compute_forward_adversarial(
+                batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(
+                outputs, batch, sb.Stage.TRAIN, adv=True)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -573,13 +581,15 @@ class AdvASRBrain(ASRBrain):
         """
 
         if not (
-            isinstance(train_set, DataLoader) or isinstance(train_set, LoopedLoader)
+            isinstance(train_set, DataLoader) or isinstance(
+                train_set, LoopedLoader)
         ):
             train_set = self.make_dataloader(
                 train_set, stage=sb.Stage.TRAIN, **train_loader_kwargs
             )
         if valid_set is not None and not (
-            isinstance(valid_set, DataLoader) or isinstance(valid_set, LoopedLoader)
+            isinstance(valid_set, DataLoader) or isinstance(
+                valid_set, LoopedLoader)
         ):
             valid_set = self.make_dataloader(
                 valid_set,
@@ -624,7 +634,8 @@ class AdvASRBrain(ASRBrain):
                         loss = self.fit_batch_adversarial(batch)
                     else:
                         loss = self.fit_batch(batch)
-                    self.avg_train_loss = self.update_average(loss, self.avg_train_loss)
+                    self.avg_train_loss = self.update_average(
+                        loss, self.avg_train_loss)
                     if self.attacker is not None:
                         t.set_postfix(adv_train_loss=self.avg_train_loss)
                     else:
@@ -761,7 +772,8 @@ class AdvASRBrain(ASRBrain):
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
                     batch, stage=sb.Stage.TEST, target=target
                 )
-                avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                avg_test_adv_loss = self.update_average(
+                    adv_loss, avg_test_adv_loss)
                 if adv_loss_target:
                     if avg_test_adv_loss_target is None:
                         avg_test_adv_loss_target = 0.0
@@ -836,8 +848,10 @@ class AdvASRBrain(ASRBrain):
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
             if stage_adv_loss is not None:
-                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                    "error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
             if stage_adv_loss_target is not None:
                 stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
                     "error_rate"
@@ -861,7 +875,8 @@ class AdvASRBrain(ASRBrain):
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={
+                    "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:

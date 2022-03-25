@@ -1,3 +1,7 @@
+"""
+An abstract attack class and a simple baseline attack.
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -148,6 +152,7 @@ class RandomAttack(Attacker):
         clip_min = self.clip_min if self.clip_min is not None else -10
         clip_max = self.clip_max if self.clip_max is not None else 10
         rand_assign(delta, self.ord, self.eps)
-        delta.data = torch.clamp(x + delta.data, min=clip_min, max=clip_max) - x
+        delta.data = torch.clamp(
+            x + delta.data, min=clip_min, max=clip_max) - x
         x_adv = x + delta.data
         return x_adv

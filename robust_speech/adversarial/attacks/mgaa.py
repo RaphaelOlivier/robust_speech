@@ -1,3 +1,7 @@
+"""
+Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204)
+"""
+
 import warnings
 
 import numpy as np
@@ -12,7 +16,7 @@ from robust_speech.adversarial.attacks.pgd import pgd_loop
 
 class ASRMGAA(Attacker):
     """
-    Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
+    Implementation of the Meta Gradient Adversarial Attack (https://arxiv.org/abs/2108.04204).
     This attack encapsulates another attack (typically PGD) and only retains the part of the perturbation that is relevant for transfable attacks.
     It requires multiple models, i.e. ASR brains.
 
@@ -78,7 +82,8 @@ class ASRMGAA(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(
+            self.eps, float)
 
     def perturb(self, batch):
         """

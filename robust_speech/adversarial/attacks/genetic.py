@@ -1,3 +1,7 @@
+"""
+Genetic adversarial attack (https://arxiv.org/abs/1801.00554)
+"""
+
 import copy
 
 import numpy as np
@@ -54,7 +58,8 @@ class GeneticAttack(Attacker):
             scores_logits = torch.exp((pop_scores) / TEMPERATURE)
             if self.targeted:
                 scores_logits = 1.0 - scores_logits
-            pop_probs = scores_logits / torch.sum(scores_logits, dim=-1, keepdim=True)
+            pop_probs = scores_logits / \
+                torch.sum(scores_logits, dim=-1, keepdim=True)
             elite_sig = self._extract_elite(pop_batch, elite_indices)
             child_sig = self._crossover(
                 pop_batch, pop_probs, self.population_size - ELITE_SIZE
@@ -64,7 +69,8 @@ class GeneticAttack(Attacker):
                 pop_batch, elite_sig, child_sig, min_wavs, max_wavs
             )
 
-        wav_adv = self._extract_best(pop_batch, elite_indices).to(batch.sig[0].device)
+        wav_adv = self._extract_best(
+            pop_batch, elite_indices).to(batch.sig[0].device)
 
         return wav_adv
 
@@ -115,7 +121,8 @@ class GeneticAttack(Attacker):
     def _gen_population(self, batch):
         # from (1,len) to (self.population_size,len)
         size = batch.sig[0].size()
-        new_wavs = batch.sig[0].unsqueeze(0).expand(self.population_size, *size)
+        new_wavs = batch.sig[0].unsqueeze(
+            0).expand(self.population_size, *size)
         max_wavs = torch.clone(new_wavs).transpose(0, 1) + self.eps
         min_wavs = max_wavs - 2 * self.eps
         new_wavs = self._mutation(new_wavs)

@@ -1,4 +1,3 @@
-#!/usr/bin/env/python3
 """A RNN-Transducer ASR system with librispeech supporting adversarial attacks.
 The system employs an encoder, a decoder, and an joint network
 between them. Decoding is performed with beamsearch coupled with a neural
@@ -39,7 +38,8 @@ class RNNTASR(AdvASRBrain):
                 wavs = torch.cat([wavs, wavs_noise], dim=0)
                 wav_lens = torch.cat([wav_lens, wav_lens])
                 batch.sig = wavs, wav_lens
-                tokens_with_bos = torch.cat([tokens_with_bos, tokens_with_bos], dim=0)
+                tokens_with_bos = torch.cat(
+                    [tokens_with_bos, tokens_with_bos], dim=0)
                 token_with_bos_lens = torch.cat(
                     [token_with_bos_lens, token_with_bos_lens]
                 )
@@ -201,8 +201,10 @@ class RNNTASR(AdvASRBrain):
                         ids, predicted_words, target_words
                     )
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

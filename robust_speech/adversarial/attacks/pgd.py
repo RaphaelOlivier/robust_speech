@@ -1,3 +1,7 @@
+"""
+Variations of the PGD attack (https://arxiv.org/abs/1706.06083)
+"""
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -77,7 +81,8 @@ def pgd_loop(
     for ii in range(nb_iter):
         batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
+        loss = asr_brain.compute_objectives(
+            predictions, batch, rs.Stage.ATTACK)
         if minimize:
             loss = -loss
         loss.backward()
@@ -101,7 +106,8 @@ def pgd_loop(
             if eps is not None:
                 delta.data = l2_clamp_or_normalize(delta.data, eps)
         else:
-            raise NotImplementedError("PGD attack only supports ord=2 or ord=np.inf")
+            raise NotImplementedError(
+                "PGD attack only supports ord=2 or ord=np.inf")
         delta.grad.data.zero_()
         # print(loss)
     if isinstance(eps_iter, torch.Tensor):
@@ -170,7 +176,8 @@ class ASRPGDAttack(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(
+            self.eps, float)
 
     def perturb(self, batch):
         """
@@ -202,7 +209,8 @@ class ASRPGDAttack(Attacker):
 
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(x + delta.data, min=self.clip_min, max=self.clip_max) - x
+                torch.clamp(x + delta.data, min=self.clip_min,
+                            max=self.clip_max) - x
             )
 
         wav_adv = pgd_loop(
@@ -446,7 +454,8 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
     def perturb(self, batch):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=np.inf)
+        self.eps = reverse_bound_from_rel_bound(
+            batch, self.rel_eps, ord=np.inf)
         res = super(MaxSNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)

@@ -1,3 +1,7 @@
+"""
+Metrics and loggers for adversarial attacks.
+"""
+
 import os
 
 import torch
@@ -22,10 +26,12 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
 
     length = (audio.size(1) * rel_length).long()
     num = torch.tensor(
-        [torch.square(audio[i, : length[i]]).sum() for i in range(audio.size(0))]
+        [torch.square(audio[i, : length[i]]).sum()
+         for i in range(audio.size(0))]
     )
     den = torch.tensor(
-        [torch.square(perturbation[i, : length[i]]).sum() for i in range(audio.size(0))]
+        [torch.square(perturbation[i, : length[i]]).sum()
+         for i in range(audio.size(0))]
     )
     ratio = 10 * torch.log10(num / den)
     return torch.round(ratio).long()
@@ -79,5 +85,6 @@ class AudioSaver:
             os.path.join(self.save_audio_path, nat_path), wav, self.sample_rate
         )
         torchaudio.save(
-            os.path.join(self.save_audio_path, adv_path), adv_wav, self.sample_rate
+            os.path.join(self.save_audio_path,
+                         adv_path), adv_wav, self.sample_rate
         )

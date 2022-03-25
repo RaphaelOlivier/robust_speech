@@ -1,3 +1,9 @@
+"""
+Various auxliary functions and classes.
+"""
+
+from enum import Enum, auto
+
 import numpy as np
 import speechbrain as sb
 import torch
@@ -7,6 +13,16 @@ from speechbrain.dataio.preprocess import AudioNormalizer
 from speechbrain.pretrained import EncoderDecoderASR
 from speechbrain.pretrained.fetching import fetch
 from speechbrain.utils.data_utils import split_path
+
+
+class Stage(Enum):
+    """Completes the sb.Stage enum with an attack stage"""
+
+    ATTACK = auto()  # run backward passes through the input
+    # predict adversarial example against the attack target (on targeted
+    # attacks)
+    ADVTARGET = auto()
+    ADVTRUTH = auto()  # predict adversarial example against the ground truth
 
 
 def make_batch_from_waveform(wavform, wrd, tokens, hparams):
@@ -96,7 +112,8 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
         hparams_file=hparams["pretrained_model_hparams_file"],
         savedir=hparams["saved_model_folder"],
     )
-    predicted_words, predicted_tokens = asr_model.transcribe_batch(wavs, rel_length)
+    predicted_words, predicted_tokens = asr_model.transcribe_batch(
+        wavs, rel_length)
     return predicted_words[0], predicted_tokens[0]
 
 

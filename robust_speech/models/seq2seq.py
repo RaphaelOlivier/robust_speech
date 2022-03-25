@@ -90,7 +90,8 @@ class S2SASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
+            tokens_eos_lens = torch.cat(
+                [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
 
@@ -126,8 +127,10 @@ class S2SASR(AdvASRBrain):
                         ids, predicted_words, target_words
                     )
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

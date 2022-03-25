@@ -1,16 +1,10 @@
+"""
+Kenansville Attack (https://arxiv.org/abs/1910.05262)
+"""
+
 import torch
 
 from robust_speech.adversarial.attacks.attacker import Attacker
-
-
-def is_successful(y1, y2, targeted):
-    equal = isinstance(y1, type(y2))
-    if equal:
-        if isinstance(y1, torch.Tensor):
-            equal = y1.size() == y2.size() and (y1 == y2).all()
-        else:
-            equal = y1 == y2
-    return targeted == equal
 
 
 class KenansvilleAttack(Attacker):

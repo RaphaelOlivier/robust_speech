@@ -60,7 +60,8 @@ def read_brains(
         )
         if "pretrainer" in brain_hparams:
             run_on_main(brain_hparams["pretrainer"].collect_files)
-            brain_hparams["pretrainer"].load_collected(device=run_opts["device"])
+            brain_hparams["pretrainer"].load_collected(
+                device=run_opts["device"])
         brain.tokenizer = tokenizer
     return brain
 

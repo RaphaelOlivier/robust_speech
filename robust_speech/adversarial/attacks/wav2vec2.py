@@ -9,8 +9,7 @@ import torch.nn as nn
 import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, pgd_loop
 from robust_speech.adversarial.utils import rand_assign
-from robust_speech.models.wav2vec2_pretrain import \
-    AdvHuggingFaceWav2Vec2Pretrain
+from robust_speech.models.wav2vec2_pretrain import AdvHuggingFaceWav2Vec2Pretrain
 
 
 class ContrastiveASRAttack(ASRPGDAttack):
@@ -89,8 +88,8 @@ class ContrastiveASRAttack(ASRPGDAttack):
             clip_max = self.clip_max if self.clip_max is not None else 0.1
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(wav_init + delta.data, min=self.clip_min,
-                            max=self.clip_max) - wav_init
+                torch.clamp(wav_init + delta.data, min=self.clip_min, max=self.clip_max)
+                - wav_init
             )
 
         # fixing the quantized representation of the batch for contrastive
@@ -209,8 +208,8 @@ class ASRFeatureAdversary(ASRPGDAttack):
             clip_max = self.clip_max if self.clip_max is not None else 0.1
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(wav_init + delta.data, min=self.clip_min,
-                            max=self.clip_max) - wav_init
+                torch.clamp(wav_init + delta.data, min=self.clip_min, max=self.clip_max)
+                - wav_init
             )
 
         # fixing the quantized representation of the batch for contrastive

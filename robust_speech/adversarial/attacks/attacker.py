@@ -152,7 +152,8 @@ class RandomAttack(Attacker):
         clip_min = self.clip_min if self.clip_min is not None else -10
         clip_max = self.clip_max if self.clip_max is not None else 10
         rand_assign(delta, self.ord, self.eps)
-        delta.data = torch.clamp(
-            wav_init + delta.data, min=clip_min, max=clip_max) - wav_init
+        delta.data = (
+            torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max) - wav_init
+        )
         wav_adv = wav_init + delta.data
         return wav_adv

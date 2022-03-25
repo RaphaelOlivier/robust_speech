@@ -113,8 +113,7 @@ def prepare_librispeech(
 
         split = splits[split_index]
 
-        wav_lst = get_all_files(os.path.join(
-            data_folder, split), match_and=[".flac"])
+        wav_lst = get_all_files(os.path.join(data_folder, split), match_and=[".flac"])
 
         text_lst = get_all_files(
             os.path.join(data_folder, split), match_and=["trans.txt"]
@@ -175,8 +174,7 @@ def create_lexicon_and_oov_csv(all_texts, data_folder, save_folder):
     lexicon_path = os.path.join(save_folder, "librispeech-lexicon.txt")
 
     if not os.path.isfile(lexicon_path):
-        logger.info("Lexicon file not found. Downloading from %s." %
-                    lexicon_url)
+        logger.info("Lexicon file not found. Downloading from %s." % lexicon_url)
         download_file(lexicon_url, lexicon_path)
 
     # Get list of all words in the transcripts
@@ -208,8 +206,7 @@ def create_lexicon_and_oov_csv(all_texts, data_folder, save_folder):
                 p.strip("0123456789") for p in lexicon_pronunciations[idx]
             ]
             phonemes = " ".join(pronunciation_no_numbers)
-            line = ",".join(
-                [str(idx), str(duration), graphemes, phonemes]) + "\n"
+            line = ",".join([str(idx), str(duration), graphemes, phonemes]) + "\n"
             f.write(line)
     logger.info("Lexicon written to %s." % lexicon_csv_path)
 
@@ -250,8 +247,8 @@ def split_lexicon(data_folder, split_ratio):
     tr_snts = int(0.01 * split_ratio[0] * len(lexicon_lines))
     train_lines = [header] + lexicon_lines[0:tr_snts]
     valid_snts = int(0.01 * split_ratio[1] * len(lexicon_lines))
-    valid_lines = [header] + lexicon_lines[tr_snts: tr_snts + valid_snts]
-    test_lines = [header] + lexicon_lines[tr_snts + valid_snts:]
+    valid_lines = [header] + lexicon_lines[tr_snts : tr_snts + valid_snts]
+    test_lines = [header] + lexicon_lines[tr_snts + valid_snts :]
 
     # Saving files
     with open(os.path.join(data_folder, "lexicon_tr.csv"), "w") as f:
@@ -459,8 +456,7 @@ def dataio_prepare(hparams):
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "descending":
-            train_data = train_data.filtered_sorted(
-                sort_key="duration", reverse=True)
+            train_data = train_data.filtered_sorted(sort_key="duration", reverse=True)
             # when sorting do not shuffle in dataloader ! otherwise is
             # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
@@ -469,8 +465,7 @@ def dataio_prepare(hparams):
             pass
 
         else:
-            raise NotImplementedError(
-                "sorting must be random, ascending or descending")
+            raise NotImplementedError("sorting must be random, ascending or descending")
 
     valid_data = None
     if "valid_csv" in hparams:
@@ -532,8 +527,7 @@ def dataio_prepare(hparams):
             yield char_list
             tokens_list = tokenizer.encode_sequence(char_list)
             yield tokens_list
-            tokens_bos = torch.LongTensor(
-                [hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -546,8 +540,7 @@ def dataio_prepare(hparams):
             # tokenizer has already been loaded
             pass
         else:
-            lab_enc_file = os.path.join(
-                hparams["save_folder"], "label_encoder.txt")
+            lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
             special_labels = {
                 "bos_label": hparams["bos_index"],
@@ -578,8 +571,7 @@ def dataio_prepare(hparams):
             yield wrd
             tokens_list = tokenizer.encode_as_ids(wrd)
             yield tokens_list
-            tokens_bos = torch.LongTensor(
-                [hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos

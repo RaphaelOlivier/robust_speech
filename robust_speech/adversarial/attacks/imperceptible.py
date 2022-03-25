@@ -257,16 +257,13 @@ class ImperceptibleASRAttack(Attacker):
         )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         trans = [None] * local_batch_size
 
         for iter_1st_stage_idx in range(self.max_iter_1):
@@ -292,8 +289,7 @@ class ImperceptibleASRAttack(Attacker):
             loss.backward()
 
             # Get sign of the gradients
-            self.global_optimal_delta.grad = torch.sign(
-                self.global_optimal_delta.grad)
+            self.global_optimal_delta.grad = torch.sign(self.global_optimal_delta.grad)
 
             # Do optimization
             self.optimizer_1.step()
@@ -309,15 +305,13 @@ class ImperceptibleASRAttack(Attacker):
                         .numpy()
                         .reshape(-1)
                     )
-                    pred = np.array(
-                        decoded_output[local_batch_size_idx]).reshape(-1)
+                    pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
                     if len(pred) == len(tokens) and (pred == tokens).all():
                         print("Found one")
                         # Adjust the rescale coefficient
                         max_local_delta = np.max(
                             np.abs(
-                                local_delta[local_batch_size_idx].detach(
-                                ).cpu().numpy()
+                                local_delta[local_batch_size_idx].detach().cpu().numpy()
                             )
                         )
 
@@ -364,8 +358,7 @@ class ImperceptibleASRAttack(Attacker):
     ):
 
         # Compute perturbed inputs
-        local_delta = self.global_optimal_delta[:
-                                                local_batch_size, :local_max_length]
+        local_delta = self.global_optimal_delta[:local_batch_size, :local_max_length]
         local_delta_rescale = torch.clamp(local_delta, -self.eps, self.eps).to(
             self.asr_brain.device
         )
@@ -380,8 +373,7 @@ class ImperceptibleASRAttack(Attacker):
         # Compute loss and decoded output
         batch.sig = masked_adv_input, batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = self.asr_brain.compute_objectives(
-            predictions, batch, rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         decoded_output = self.asr_brain.get_tokens(val_predictions)
@@ -410,16 +402,13 @@ class ImperceptibleASRAttack(Attacker):
         )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         trans = [None] * local_batch_size
 
         # Initialize alpha and rescale
@@ -430,16 +419,13 @@ class ImperceptibleASRAttack(Attacker):
         )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         best_loss_2nd_stage = [np.inf] * local_batch_size
         trans = [None] * local_batch_size
 
@@ -475,8 +461,7 @@ class ImperceptibleASRAttack(Attacker):
             # Total loss
             loss = (
                 loss_1st_stage.type(torch.float32)
-                + torch.tensor(alpha).to(self.asr_brain.device) *
-                loss_2nd_stage
+                + torch.tensor(alpha).to(self.asr_brain.device) * loss_2nd_stage
             )
             loss = torch.mean(loss)
 
@@ -495,8 +480,7 @@ class ImperceptibleASRAttack(Attacker):
                     .numpy()
                     .reshape(-1)
                 )
-                pred = np.array(
-                    decoded_output[local_batch_size_idx]).reshape(-1)
+                pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
                 if len(pred) == len(tokens) and (pred == tokens).all():
                     if (
                         loss_2nd_stage[local_batch_size_idx]
@@ -560,8 +544,7 @@ class ImperceptibleASRAttack(Attacker):
             )
 
             loss = torch.mean(
-                relu(psd_transform_delta -
-                     theta_batch[i].to(self.asr_brain.device))
+                relu(psd_transform_delta - theta_batch[i].to(self.asr_brain.device))
             )
             losses.append(loss)
 
@@ -652,8 +635,7 @@ class ImperceptibleASRAttack(Attacker):
                         3.64 * pow(freqs[int(barks_psd[j, 2])] * 0.001, -0.8)
                         - 6.5
                         * np.exp(
-                            -0.6 *
-                            pow(0.001 * freqs[int(barks_psd[j, 2])] - 3.3, 2)
+                            -0.6 * pow(0.001 * freqs[int(barks_psd[j, 2])] - 3.3, 2)
                         )
                         + 0.001 * pow(0.001 * freqs[int(barks_psd[j, 2])], 4)
                         - 12
@@ -733,8 +715,7 @@ class ImperceptibleASRAttack(Attacker):
                 torch.tensor(9.6).type(torch.float32),
             ).to(self.asr_brain.device)
             / torch.reshape(
-                torch.tensor(original_max_psd).to(
-                    self.asr_brain.device), [-1, 1, 1]
+                torch.tensor(original_max_psd).to(self.asr_brain.device), [-1, 1, 1]
             )
             * psd.type(torch.float32)
         )

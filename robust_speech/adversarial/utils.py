@@ -113,8 +113,7 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
         hparams_file=hparams["pretrained_model_hparams_file"],
         savedir=hparams["saved_model_folder"],
     )
-    predicted_words, predicted_tokens = asr_model.transcribe_batch(
-        wavs, rel_length)
+    predicted_words, predicted_tokens = asr_model.transcribe_batch(wavs, rel_length)
     return predicted_words[0], predicted_tokens[0]
 
 

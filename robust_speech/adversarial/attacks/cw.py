@@ -11,8 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 import robust_speech as rs
-from robust_speech.adversarial.attacks.imperceptible import \
-    ImperceptibleASRAttack
+from robust_speech.adversarial.attacks.imperceptible import ImperceptibleASRAttack
 
 
 class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
@@ -96,8 +95,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
     ):
 
         # Compute perturbed inputs
-        local_delta = self.global_optimal_delta[:
-                                                local_batch_size, :local_max_length]
+        local_delta = self.global_optimal_delta[:local_batch_size, :local_max_length]
         local_delta_rescale = torch.clamp(local_delta, -self.eps, self.eps).to(
             self.asr_brain.device
         )
@@ -112,8 +110,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         # Compute loss and decoded output
         batch.sig = masked_adv_input, batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = self.asr_brain.compute_objectives(
-            predictions, batch, rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
         loss = self.const * loss + torch.norm(local_delta_rescale)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)

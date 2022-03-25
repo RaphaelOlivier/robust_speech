@@ -57,7 +57,7 @@ class KenansvilleAttack(Attacker):
         wav_lengths = (rel_lengths.float() * wavs.size(1)).long()
 
         for i in range(batch_size):
-            wav, len_wav = wavs[i, :wav_lengths[i]], wav_lengths[i]
+            wav, len_wav = wavs[i, : wav_lengths[i]], wav_lengths[i]
             wav_rfft = torch.fft.rfft(wav)
             wav_psd = torch.abs(wav_rfft) ** 2
             if len(wav) % 2:  # odd: DC frequency

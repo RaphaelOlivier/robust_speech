@@ -82,8 +82,7 @@ class ASRMGAA(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(
-            self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def perturb(self, batch):
         """

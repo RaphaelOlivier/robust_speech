@@ -8,8 +8,11 @@ import torch.nn as nn
 
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
-from robust_speech.adversarial.utils import (l2_clamp_or_normalize, linf_clamp,
-                                             rand_assign)
+from robust_speech.adversarial.utils import (
+    l2_clamp_or_normalize,
+    linf_clamp,
+    rand_assign,
+)
 
 
 def reverse_bound_from_rel_bound(batch, rel, ord=2):
@@ -82,8 +85,7 @@ def pgd_loop(
     for _ in range(nb_iter):
         batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = asr_brain.compute_objectives(
-            predictions, batch, rs.Stage.ATTACK)
+        loss = asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
         if minimize:
             loss = -loss
         loss.backward()
@@ -107,8 +109,7 @@ def pgd_loop(
             if eps is not None:
                 delta.data = l2_clamp_or_normalize(delta.data, eps)
         else:
-            raise NotImplementedError(
-                "PGD attack only supports ord=2 or ord=np.inf")
+            raise NotImplementedError("PGD attack only supports ord=2 or ord=np.inf")
         delta.grad.data.zero_()
         # print(loss)
     if isinstance(eps_iter, torch.Tensor):
@@ -177,8 +178,7 @@ class ASRPGDAttack(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(
-            self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def perturb(self, batch):
         """
@@ -210,8 +210,8 @@ class ASRPGDAttack(Attacker):
 
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(wav_init + delta.data, min=self.clip_min,
-                            max=self.clip_max) - wav_init
+                torch.clamp(wav_init + delta.data, min=self.clip_min, max=self.clip_max)
+                - wav_init
             )
 
         wav_adv = pgd_loop(
@@ -479,8 +479,7 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
         """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(
-            batch, self.rel_eps, ord=np.inf)
+        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=np.inf)
         res = super(MaxSNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)

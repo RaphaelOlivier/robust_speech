@@ -105,7 +105,7 @@ class PredictionEnsemble:
     def __init__(self, predictions):
         self.predictions = predictions
 
-    def __iter__(self, i):
+    def __getitem__(self, i):
         return self.predictions[i]
 
     def __len__(self):
@@ -302,6 +302,8 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker,
         )
+        self.tokenizer=None 
+        self.init_metrics()
 
     def __setattr__(self, name, value, attacker_brain=True):
         """Maintain similar attributes for the main and nested brain"""
@@ -339,6 +341,17 @@ class AdvASRBrain(ASRBrain):
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
+
+    def init_metrics(self):
+        self.cer_metric = None
+        self.wer_metric = None
+        self.acc_metric = None
+        self.adv_cer_metric = None
+        self.adv_wer_metric = None
+        self.adv_acc_metric = None
+        self.adv_cer_metric_target = None
+        self.adv_wer_metric_target = None
+        self.adv_acc_metric_target = None
 
     def compute_forward_adversarial(self, batch, stage):
         """Forward pass applied to an adversarial example.
@@ -903,3 +916,51 @@ class AdvASRBrain(ASRBrain):
         Log attack metrics and save perturbed audio"""
         if self.attacker is not None:
             self.attacker.on_evaluation_end(self.hparams.train_logger)
+
+    def compute_forward(self, batch, stage):
+        """Forward pass, to be overridden by sub-classes.
+
+        Arguments
+        ---------
+        batch : torch.Tensor or tensors
+            An element from the dataloader, including inputs for processing.
+        stage : Union[sb.Stage, rs.Stage]
+            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+
+        Returns
+        -------
+        torch.Tensor or Tensors
+            The outputs after all processing is complete.
+            Directly passed to ``compute_objectives()``.
+            In VALID or TEST stage, this should contain the predicted tokens.
+            In ATTACK stage, batch.sig should be in the computation graph (no device change, no .detach())
+        """
+        raise NotImplementedError
+
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
+        """Compute loss, to be overridden by sub-classes.
+
+        Arguments
+        ---------
+        predictions : torch.Tensor or Tensors
+            The output tensor or tensors to evaluate.
+            Comes directly from ``compute_forward()``.
+        batch : torch.Tensor or tensors
+            An element from the dataloader, including targets for comparison.
+        stage : Union[sb.Stage, rs.Stage]
+            The stage of the experiment: sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+        adv : bool
+            Whether this is an adversarial input (used for metric logging)
+        reduction : str
+            the type of loss reduction to apply (required by some attacks)
+        targeted : bool
+            whether the attack is targeted
+
+        Returns
+        -------
+        loss : torch.Tensor
+            A tensor with the computed loss.
+        """
+        raise NotImplementedError

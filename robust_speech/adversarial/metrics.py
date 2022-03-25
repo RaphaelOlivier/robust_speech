@@ -1,11 +1,12 @@
-from speechbrain.utils.metric_stats import MetricStats
 import os
+
 import torch
 import torchaudio
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
+from speechbrain.utils.metric_stats import MetricStats
 
 
-def snr(audio, perturbation, rel_length=torch.tensor([1.])):
+def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     """
     Signal to Noise Ratio computation
 
@@ -20,22 +21,23 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.])):
     """
 
     length = (audio.size(1) * rel_length).long()
-    num = torch.tensor([torch.square(audio[i, :length[i]]).sum()
-                        for i in range(audio.size(0))])
-    den = torch.tensor([torch.square(perturbation[i, :length[i]]).sum()
-                        for i in range(audio.size(0))])
+    num = torch.tensor(
+        [torch.square(audio[i, : length[i]]).sum() for i in range(audio.size(0))]
+    )
+    den = torch.tensor(
+        [torch.square(perturbation[i, : length[i]]).sum() for i in range(audio.size(0))]
+    )
     ratio = 10 * torch.log10(num / den)
     return torch.round(ratio).long()
 
 
 class SNRComputer(MetricStats):
-    """Tracks Signal to Noise Ratio
-    """
+    """Tracks Signal to Noise Ratio"""
 
     def __init__(self, **kwargs):
-
         def metric(batch, adv_wav):
             return snr(batch.sig[0], adv_wav - batch.sig[0], batch.sig[1])
+
         super().__init__(metric, **kwargs)
 
 
@@ -65,15 +67,17 @@ class AudioSaver:
         lengths = (batch.sig[0].size(1) * batch.sig[1]).long()
         for i in range(bs):
             id = audio_ids[i]
-            wav = batch.sig[0][i, :lengths[i]].detach().cpu().unsqueeze(0)
-            adv_wav = adv_sig[i, :lengths[i]].detach().cpu().unsqueeze(0)
+            wav = batch.sig[0][i, : lengths[i]].detach().cpu().unsqueeze(0)
+            adv_wav = adv_sig[i, : lengths[i]].detach().cpu().unsqueeze(0)
             self.save_wav(id, wav, adv_wav)
 
     def save_wav(self, id, wav, adv_wav):
         print(wav.size())
         nat_path = id + "_nat.wav"
         adv_path = id + "_adv.wav"
-        torchaudio.save(os.path.join(self.save_audio_path,
-                                     nat_path), wav, self.sample_rate)
-        torchaudio.save(os.path.join(self.save_audio_path,
-                                     adv_path), adv_wav, self.sample_rate)
+        torchaudio.save(
+            os.path.join(self.save_audio_path, nat_path), wav, self.sample_rate
+        )
+        torchaudio.save(
+            os.path.join(self.save_audio_path, adv_path), adv_wav, self.sample_rate
+        )

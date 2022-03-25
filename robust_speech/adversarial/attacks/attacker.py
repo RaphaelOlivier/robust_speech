@@ -1,8 +1,9 @@
 import numpy as np
 import torch
 import torch.nn as nn
+
+from robust_speech.adversarial.metrics import AudioSaver, SNRComputer
 from robust_speech.adversarial.utils import rand_assign
-from robust_speech.adversarial.metrics import SNRComputer, AudioSaver
 
 
 class Attacker:
@@ -43,8 +44,11 @@ class Attacker:
             path to the folder in which to save audio files
         """
         snr = self.snr_metric.summarize()
-        snr = {"average": snr["average"],
-               'min_score': snr['min_score'], 'max_score': snr['max_score']}
+        snr = {
+            "average": snr["average"],
+            "min_score": snr["min_score"],
+            "max_score": snr["max_score"],
+        }
         logger.log_stats(
             stats_meta={},
             test_stats={"Adversarial SNR": snr},
@@ -108,7 +112,13 @@ class RandomAttack(Attacker):
     """
 
     def __init__(
-        self, asr_brain, eps=0.3, ord=np.inf, clip_min=None, clip_max=None, targeted=False
+        self,
+        asr_brain,
+        eps=0.3,
+        ord=np.inf,
+        clip_min=None,
+        clip_max=None,
+        targeted=False,
     ):
         self.asr_brain = asr_brain
         self.eps = eps
@@ -138,7 +148,6 @@ class RandomAttack(Attacker):
         clip_min = self.clip_min if self.clip_min is not None else -10
         clip_max = self.clip_max if self.clip_max is not None else 10
         rand_assign(delta, self.ord, self.eps)
-        delta.data = torch.clamp(
-            x + delta.data, min=clip_min, max=clip_max) - x
+        delta.data = torch.clamp(x + delta.data, min=clip_min, max=clip_max) - x
         x_adv = x + delta.data
         return x_adv

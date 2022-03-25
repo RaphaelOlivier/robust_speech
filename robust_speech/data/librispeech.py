@@ -7,22 +7,19 @@ and Char tokenizers (https://github.com/speechbrain/speechbrain/blob/develop/rec
 in order to handle both cases.
 """
 
-import os
 import csv
 import logging
+import os
 import random
 from collections import Counter
-import torch
-import speechbrain as sb
 from pathlib import Path
-import torchaudio
+
 import sentencepiece
+import speechbrain as sb
+import torch
+import torchaudio
+from speechbrain.dataio.dataio import load_pkl, merge_csvs, save_pkl
 from speechbrain.utils.data_utils import download_file, get_all_files
-from speechbrain.dataio.dataio import (
-    load_pkl,
-    save_pkl,
-    merge_csvs,
-)
 
 logger = logging.getLogger(__name__)
 OPT_FILE = "opt_librispeech_prepare.pkl"
@@ -116,9 +113,7 @@ def prepare_librispeech(
 
         split = splits[split_index]
 
-        wav_lst = get_all_files(
-            os.path.join(data_folder, split), match_and=[".flac"]
-        )
+        wav_lst = get_all_files(os.path.join(data_folder, split), match_and=[".flac"])
 
         text_lst = get_all_files(
             os.path.join(data_folder, split), match_and=["trans.txt"]
@@ -133,14 +128,20 @@ def prepare_librispeech(
             n_sentences = len(wav_lst)
 
         create_csv(
-            save_folder, wav_lst, text_dict, split, n_sentences,
+            save_folder,
+            wav_lst,
+            text_dict,
+            split,
+            n_sentences,
         )
 
     # Merging csv file if needed
     if merge_lst and merge_name is not None:
         merge_files = [split_libri + ".csv" for split_libri in merge_lst]
         merge_csvs(
-            data_folder=save_folder, csv_lst=merge_files, merged_csv=merge_name,
+            data_folder=save_folder,
+            csv_lst=merge_files,
+            merged_csv=merge_name,
         )
 
     # Create lexicon.csv and oov.csv
@@ -173,9 +174,7 @@ def create_lexicon_and_oov_csv(all_texts, data_folder, save_folder):
     lexicon_path = os.path.join(save_folder, "librispeech-lexicon.txt")
 
     if not os.path.isfile(lexicon_path):
-        logger.info(
-            "Lexicon file not found. Downloading from %s." % lexicon_url
-        )
+        logger.info("Lexicon file not found. Downloading from %s." % lexicon_url)
         download_file(lexicon_url, lexicon_path)
 
     # Get list of all words in the transcripts
@@ -207,9 +206,7 @@ def create_lexicon_and_oov_csv(all_texts, data_folder, save_folder):
                 p.strip("0123456789") for p in lexicon_pronunciations[idx]
             ]
             phonemes = " ".join(pronunciation_no_numbers)
-            line = (
-                ",".join([str(idx), str(duration), graphemes, phonemes]) + "\n"
-            )
+            line = ",".join([str(idx), str(duration), graphemes, phonemes]) + "\n"
             f.write(line)
     logger.info("Lexicon written to %s." % lexicon_csv_path)
 
@@ -250,8 +247,8 @@ def split_lexicon(data_folder, split_ratio):
     tr_snts = int(0.01 * split_ratio[0] * len(lexicon_lines))
     train_lines = [header] + lexicon_lines[0:tr_snts]
     valid_snts = int(0.01 * split_ratio[1] * len(lexicon_lines))
-    valid_lines = [header] + lexicon_lines[tr_snts: tr_snts + valid_snts]
-    test_lines = [header] + lexicon_lines[tr_snts + valid_snts:]
+    valid_lines = [header] + lexicon_lines[tr_snts : tr_snts + valid_snts]
+    test_lines = [header] + lexicon_lines[tr_snts + valid_snts :]
 
     # Saving files
     with open(os.path.join(data_folder, "lexicon_tr.csv"), "w") as f:
@@ -263,7 +260,11 @@ def split_lexicon(data_folder, split_ratio):
 
 
 def create_csv(
-    save_folder, wav_lst, text_dict, split, select_n_sentences,
+    save_folder,
+    wav_lst,
+    text_dict,
+    split,
+    select_n_sentences,
 ):
     """
     Create the dataset csv file given a list of wav files.
@@ -438,8 +439,8 @@ def dataio_prepare(hparams):
     train_data = None
     if "train_csv" in hparams:
         train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-            csv_path=hparams["train_csv"], replacements={
-                "data_root": data_folder},
+            csv_path=hparams["train_csv"],
+            replacements={"data_root": data_folder},
         )
 
         train_data = train_data.filtered_sorted(
@@ -455,9 +456,7 @@ def dataio_prepare(hparams):
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "descending":
-            train_data = train_data.filtered_sorted(
-                sort_key="duration", reverse=True
-            )
+            train_data = train_data.filtered_sorted(sort_key="duration", reverse=True)
             # when sorting do not shuffle in dataloader ! otherwise is
             # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
@@ -466,17 +465,15 @@ def dataio_prepare(hparams):
             pass
 
         else:
-            raise NotImplementedError(
-                "sorting must be random, ascending or descending"
-            )
+            raise NotImplementedError("sorting must be random, ascending or descending")
 
     valid_data = None
     if "valid_csv" in hparams:
         valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-            csv_path=hparams["valid_csv"], replacements={
-                "data_root": data_folder},
+            csv_path=hparams["valid_csv"],
+            replacements={"data_root": data_folder},
         )
-        #valid_data = valid_data.filtered_sorted(sort_key="duration")
+        # valid_data = valid_data.filtered_sorted(sort_key="duration")
 
         valid_data = valid_data.filtered_sorted(
             key_max_value={"duration": hparams["avoid_if_longer_than"]}
@@ -519,6 +516,7 @@ def dataio_prepare(hparams):
 
     # 3. Define text pipeline:
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):  # char encoder
+
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
             "wrd", "char_list", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
@@ -529,8 +527,7 @@ def dataio_prepare(hparams):
             yield char_list
             tokens_list = tokenizer.encode_sequence(char_list)
             yield tokens_list
-            tokens_bos = torch.LongTensor(
-                [hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -543,8 +540,7 @@ def dataio_prepare(hparams):
             # tokenizer has already been loaded
             pass
         else:
-            lab_enc_file = os.path.join(
-                hparams["save_folder"], "label_encoder.txt")
+            lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
             special_labels = {
                 "bos_label": hparams["bos_index"],
@@ -575,8 +571,7 @@ def dataio_prepare(hparams):
             yield wrd
             tokens_list = tokenizer.encode_as_ids(wrd)
             yield tokens_list
-            tokens_bos = torch.LongTensor(
-                [hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -587,16 +582,16 @@ def dataio_prepare(hparams):
 
         # 4. Set output:
         sb.dataio.dataset.set_output_keys(
-            datasets, ["id", "sig", "wrd",
-                       "tokens_bos", "tokens_eos", "tokens"],
+            datasets,
+            ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
         )
 
     train_batch_sampler = None
     valid_batch_sampler = None
     if "dynamic_batching" in hparams and hparams["dynamic_batching"]:
-        from speechbrain.dataio.sampler import DynamicBatchSampler  # noqa
-        from speechbrain.dataio.dataloader import SaveableDataLoader  # noqa
         from speechbrain.dataio.batch import PaddedBatch  # noqa
+        from speechbrain.dataio.dataloader import SaveableDataLoader  # noqa
+        from speechbrain.dataio.sampler import DynamicBatchSampler  # noqa
 
         dynamic_hparams = hparams["dynamic_batch_sampler"]
 
@@ -624,4 +619,11 @@ def dataio_prepare(hparams):
                 batch_ordering=dynamic_hparams["batch_ordering"],
             )
 
-    return train_data, valid_data, test_datasets, train_batch_sampler, valid_batch_sampler, tokenizer
+    return (
+        train_data,
+        valid_data,
+        test_datasets,
+        train_batch_sampler,
+        valid_batch_sampler,
+        tokenizer,
+    )

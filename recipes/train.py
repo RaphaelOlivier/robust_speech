@@ -1,4 +1,3 @@
-
 """
 Training script for robust-speech models.
 It handles adversarial training using the hparams.attacker object,
@@ -15,16 +14,19 @@ Example:
 """
 
 
-import robust_speech as rs
-from pathlib import Path
-from hyperpyyaml import load_hyperpyyaml
-from speechbrain.utils.distributed import run_on_main
-from robust_speech.adversarial.brain import AdvASRBrain
-import speechbrain as sb
+import logging
 import os
 import sys
-import logging
-logger = logging.getLogger('speechbrain.dataio.sampler')
+from pathlib import Path
+
+import speechbrain as sb
+from hyperpyyaml import load_hyperpyyaml
+from speechbrain.utils.distributed import run_on_main
+
+import robust_speech as rs
+from robust_speech.adversarial.brain import AdvASRBrain
+
+logger = logging.getLogger("speechbrain.dataio.sampler")
 logger.setLevel(logging.WARNING)  # avoid annoying logs
 
 if __name__ == "__main__":
@@ -74,9 +76,14 @@ if __name__ == "__main__":
         hparams["pretrainer"].load_collected(device=run_opts["device"])
 
     # here we create the datasets objects as well as tokenization and encoding
-    train_data, valid_data, test_datasets, train_bsampler, valid_bsampler, tokenizer = dataio_prepare(
-        hparams
-    )
+    (
+        train_data,
+        valid_data,
+        test_datasets,
+        train_bsampler,
+        valid_bsampler,
+        tokenizer,
+    ) = dataio_prepare(hparams)
     # Trainer initialization
     brain_class = hparams["brain_class"]
 

@@ -11,38 +11,26 @@ in order to:
     -backpropagate gradients to the inputs
 Some transformers and SpeechBrain models have been rewritten below for that purpose.
 """
-import sys
-import torch
 import logging
+import sys
+
 import numpy as np
-import torch
-
-import torch.nn.functional as F
-
 import speechbrain as sb
-
-from robust_speech.adversarial.brain import AdvASRBrain
-import robust_speech as rs
-
+import torch
+import torch.nn.functional as F
 import transformers
-
+from speechbrain.lobes.models.huggingface_wav2vec import \
+    HuggingFaceWav2Vec2Pretrain
 from transformers import Wav2Vec2ForPreTraining
-
-from transformers.models.wav2vec2.modeling_wav2vec2 import (
-    Wav2Vec2ForPreTrainingOutput,
-    Wav2Vec2FeatureExtractor,
-    WAV_2_VEC_2_INPUTS_DOCSTRING,
-    _CONFIG_FOR_DOC,
-    _compute_mask_indices
-)
+from transformers.file_utils import (add_start_docstrings_to_model_forward,
+                                     replace_return_docstrings)
 from transformers.models.wav2vec2.configuration_wav2vec2 import Wav2Vec2Config
-from transformers.file_utils import (
-    add_start_docstrings_to_model_forward,
-    replace_return_docstrings,
-)
+from transformers.models.wav2vec2.modeling_wav2vec2 import (
+    _CONFIG_FOR_DOC, WAV_2_VEC_2_INPUTS_DOCSTRING, Wav2Vec2FeatureExtractor,
+    Wav2Vec2ForPreTrainingOutput, _compute_mask_indices)
 
-from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain
-
+import robust_speech as rs
+from robust_speech.adversarial.brain import AdvASRBrain
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +44,9 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
     def forward(self, input_values):
         hidden_states = input_values[:, None]
         # make sure hidden_states require grad for gradient_checkpointing
-        if self._requires_grad and self.training and hidden_states.is_leaf:  # not always true when attacking
+        if (
+            self._requires_grad and self.training and hidden_states.is_leaf
+        ):  # not always true when attacking
             hidden_states.requires_grad = True
 
         for conv_layer in self.conv_layers:
@@ -90,8 +80,9 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         self.wav2vec2.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
     @add_start_docstrings_to_model_forward(WAV_2_VEC_2_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=Wav2Vec2ForPreTrainingOutput,
-                               config_class=_CONFIG_FOR_DOC)
+    @replace_return_docstrings(
+        output_type=Wav2Vec2ForPreTrainingOutput, config_class=_CONFIG_FOR_DOC
+    )
     def forward(
         self,
         input_values,
@@ -111,7 +102,9 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         --------
         """
 
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if mask_time_indices is not None:
             mask_time_indices = mask_time_indices.to(torch.bool)
@@ -171,8 +164,7 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
 
             # 5. if a negative vector is identical to the positive (i.e. when codebook utilization is low),
             # its cosine similarity will be masked
-            neg_is_pos = (quantized_features ==
-                          negative_quantized_features).all(-1)
+            neg_is_pos = (quantized_features == negative_quantized_features).all(-1)
 
             if neg_is_pos.any():
                 logits[1:][neg_is_pos] = float("-inf")
@@ -180,25 +172,35 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             # 6. compute contrastive loss \mathbf{L}_m = cross_entropy(logs) =
             # -log(exp(sim(c_t, q_t)/\kappa) / \sum_{\sim{q}} exp(sim(c_t, \sim{q})/\kappa))
             logits = logits.transpose(0, 2).reshape(-1, logits.size(0))
-            target = ((1 - mask_time_indices.long())
-                      * -100).transpose(0, 1).flatten()
+            target = ((1 - mask_time_indices.long()) * -100).transpose(0, 1).flatten()
 
             contrastive_loss = torch.nn.functional.cross_entropy(
-                logits.float(), target, reduction="sum")
+                logits.float(), target, reduction="sum"
+            )
             # 7. compute diversity loss: \mathbf{L}_d
-            num_codevectors = self.config.num_codevectors_per_group * \
-                self.config.num_codevector_groups
-            diversity_loss = ((num_codevectors - codevector_perplexity) /
-                              num_codevectors) * mask_time_indices.sum()
+            num_codevectors = (
+                self.config.num_codevectors_per_group
+                * self.config.num_codevector_groups
+            )
+            diversity_loss = (
+                (num_codevectors - codevector_perplexity) / num_codevectors
+            ) * mask_time_indices.sum()
 
             # 8. \mathbf{L} = \mathbf{L}_m + \alpha * \mathbf{L}_d
             loss = contrastive_loss + self.config.diversity_loss_weight * diversity_loss
         if not return_dict:
             if loss is not None:
-                return (loss, transformer_features, quantized_features,
-                        codevector_perplexity) + outputs[2:]
-            return (transformer_features, quantized_features,
-                    codevector_perplexity) + outputs[2:]
+                return (
+                    loss,
+                    transformer_features,
+                    quantized_features,
+                    codevector_perplexity,
+                ) + outputs[2:]
+            return (
+                transformer_features,
+                quantized_features,
+                codevector_perplexity,
+            ) + outputs[2:]
 
         return Wav2Vec2ForPreTrainingOutput(
             loss=loss,
@@ -243,7 +245,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             save_path,
             mask_prob=mask_prob,
             mask_length=mask_length,
-            normalize_wav=normalize_wav
+            normalize_wav=normalize_wav,
         )
         self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
 
@@ -271,7 +273,9 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             mask_length=self.mask_length,
         )
         torch_mask_time_indices = torch.tensor(
-            mask_time_indices, device=wav.device, dtype=torch.long,
+            mask_time_indices,
+            device=wav.device,
+            dtype=torch.long,
         )
 
         # 2. Sample the negative samples from the entire sequence.
@@ -294,10 +298,11 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
                 wav,
                 mask_time_indices=torch_mask_time_indices,
                 sampled_negative_indices=negative_sample_indices,
-                quantized_representation=quantized_representation
+                quantized_representation=quantized_representation,
             ),
             torch_mask_time_indices,
         )
+
 
 # Define training procedure
 
@@ -323,13 +328,11 @@ class W2VPretrain(AdvASRBrain):
         # used saved quantized representation (prior to attack)
         if hasattr(batch, "quantized_representation"):
             out, mask = self.modules.wav2vec2(
-                wavs,
-                quantized_representation=batch.quantized_representation
+                wavs, quantized_representation=batch.quantized_representation
             )
         else:
             # compute quantized representation on the fly
-            out, mask = self.modules.wav2vec2(
-                wavs, quantized_representation=None)
+            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None)
 
         if stage == rs.Stage.ATTACK:
             loss = out.contrastive_loss
@@ -340,8 +343,9 @@ class W2VPretrain(AdvASRBrain):
             return loss, out, mask
         return loss
 
-    def compute_objectives(self, predictions, batch, stage,
-                           adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
         """Computes the loss (CTC+NLL) given predictions and targets."""
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns
@@ -353,9 +357,12 @@ class W2VPretrain(AdvASRBrain):
             cosine_sim = torch.cosine_similarity(
                 out.projected_states, out.projected_quantized_states, dim=-1
             )
-            #acc = cosine_sim[mask_time_indices].mean()
-            acc = torch.masked_select(
-                cosine_sim, mask_time_indices.bool()).mean().detach()
+            # acc = cosine_sim[mask_time_indices].mean()
+            acc = (
+                torch.masked_select(cosine_sim, mask_time_indices.bool())
+                .mean()
+                .detach()
+            )
             if adv:
                 if targeted:
                     self.adv_acc_metric_target.append(acc)
@@ -372,14 +379,10 @@ class W2VPretrain(AdvASRBrain):
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
                 predictions = self.compute_forward(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(
-                    predictions, batch, sb.Stage.TRAIN
-                )
+                loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
             # normalize the loss by gradient_accumulation step
-            self.scaler.scale(
-                loss / self.hparams.gradient_accumulation
-            ).backward()
+            self.scaler.scale(loss / self.hparams.gradient_accumulation).backward()
 
             if self.step % self.hparams.gradient_accumulation == 0:
                 # gradient clipping & early stop if loss is not fini
@@ -417,16 +420,11 @@ class W2VPretrain(AdvASRBrain):
         # Here we manage mixed precision
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
-                predictions, _ = self.compute_forward_adversarial(
-                    batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(
-                    predictions, batch, sb.Stage.TRAIN
-                )
+                predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
             # normalize the loss by gradient_accumulation step
-            self.scaler.scale(
-                loss / self.hparams.gradient_accumulation
-            ).backward()
+            self.scaler.scale(loss / self.hparams.gradient_accumulation).backward()
 
             if self.step % self.hparams.gradient_accumulation == 0:
                 # gradient clipping & early stop if loss is not fini
@@ -465,8 +463,9 @@ class W2VPretrain(AdvASRBrain):
             self.adv_acc_metric = []
             self.adv_acc_metric_target = []
 
-    def on_stage_end(self, stage, stage_loss, epoch,
-                     stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(
+        self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
+    ):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
@@ -479,11 +478,13 @@ class W2VPretrain(AdvASRBrain):
         else:
             stage_stats["acc"] = sum(self.acc_metric) / len(self.acc_metric)
             if stage_adv_loss is not None:
-                stage_stats["adv acc"] = sum(
-                    self.adv_acc_metric) / len(self.adv_acc_metric)
+                stage_stats["adv acc"] = sum(self.adv_acc_metric) / len(
+                    self.adv_acc_metric
+                )
             if stage_adv_loss_target is not None:
-                stage_stats["adv acc target"] = sum(
-                    self.adv_acc_metric_target) / len(self.adv_acc_metric_target)
+                stage_stats["adv acc target"] = sum(self.adv_acc_metric_target) / len(
+                    self.adv_acc_metric_target
+                )
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -509,7 +510,6 @@ class W2VPretrain(AdvASRBrain):
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={
-                    "Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )

@@ -6,13 +6,15 @@ language model.
 
 Inspired from SpeechBrain Transformer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transformer/train.py)
 """
+import logging
 import os
 import sys
-import torch
-import logging
+
 import speechbrain as sb
-from robust_speech.adversarial.brain import AdvASRBrain
+import torch
+
 import robust_speech as rs
+from robust_speech.adversarial.brain import AdvASRBrain
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,7 @@ class TrfASR(AdvASRBrain):
         )
 
         p_ctc = None
-        if self.hparams.ctc_weight > 0.:
+        if self.hparams.ctc_weight > 0.0:
             # output layer for ctc log-probabilities
             logits = self.modules.ctc_lin(enc_out)
             p_ctc = self.hparams.log_softmax(logits)
@@ -76,11 +78,17 @@ class TrfASR(AdvASRBrain):
 
         return p_ctc, p_seq, wav_lens, hyps
 
-    def compute_objectives(self, predictions, batch, stage,
-                           adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
-        (p_ctc, p_seq, wav_lens, hyps,) = predictions
+        (
+            p_ctc,
+            p_seq,
+            wav_lens,
+            hyps,
+        ) = predictions
 
         ids = batch.id
         tokens_eos, tokens_eos_lens = batch.tokens_eos
@@ -88,20 +96,19 @@ class TrfASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat(
-                [tokens_eos_lens, tokens_eos_lens], dim=0
-            )
+            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-        loss_seq = 0.
-        if self.hparams.ctc_weight < 1.:
+        loss_seq = 0.0
+        if self.hparams.ctc_weight < 1.0:
             loss_seq = self.hparams.seq_cost(
                 p_seq, tokens_eos, length=tokens_eos_lens, reduction=reduction
             )
-        loss_ctc = 0.
-        if self.hparams.ctc_weight > 0.:
+        loss_ctc = 0.0
+        if self.hparams.ctc_weight > 0.0:
             loss_ctc = self.hparams.ctc_cost(
-                p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction)
+                p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
+            )
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq
@@ -110,9 +117,7 @@ class TrfASR(AdvASRBrain):
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
             valid_search_interval = self.hparams.valid_search_interval
-            if current_epoch % valid_search_interval == 0 or (
-                stage == sb.Stage.TEST
-            ):
+            if current_epoch % valid_search_interval == 0 or (stage == sb.Stage.TEST):
                 # Decode token terms to words
                 predicted_words = [
                     self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps
@@ -121,14 +126,14 @@ class TrfASR(AdvASRBrain):
                 if adv:
                     if targeted:
                         self.adv_wer_metric_target.append(
-                            ids, predicted_words, target_words)
+                            ids, predicted_words, target_words
+                        )
                         self.adv_cer_metric_target.append(
-                            ids, predicted_words, target_words)
+                            ids, predicted_words, target_words
+                        )
                     else:
-                        self.adv_wer_metric.append(
-                            ids, predicted_words, target_words)
-                        self.adv_cer_metric.append(
-                            ids, predicted_words, target_words)
+                        self.adv_wer_metric.append(ids, predicted_words, target_words)
+                        self.adv_cer_metric.append(ids, predicted_words, target_words)
                 else:
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
@@ -137,10 +142,10 @@ class TrfASR(AdvASRBrain):
             if adv:
                 if targeted:
                     self.adv_acc_metric_target.append(
-                        p_seq, tokens_eos, tokens_eos_lens)
+                        p_seq, tokens_eos, tokens_eos_lens
+                    )
                 else:
-                    self.adv_acc_metric.append(
-                        p_seq, tokens_eos, tokens_eos_lens)
+                    self.adv_acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
             else:
                 self.acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
 
@@ -195,8 +200,7 @@ class TrfASR(AdvASRBrain):
         # if so change the optimizer from Adam to SGD
         self.check_and_reset_optimizer()
 
-        predictions, _ = self.compute_forward_adversarial(
-            batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
         # normalize the loss by gradient_accumulation step
@@ -227,8 +231,9 @@ class TrfASR(AdvASRBrain):
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch,
-                     stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(
+        self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
+    ):
         # Gets called at the end of a epoch.
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
@@ -246,23 +251,20 @@ class TrfASR(AdvASRBrain):
                 stage_stats["adv ACC target"] = self.adv_acc_metric_target.summarize()
             current_epoch = self.hparams.epoch_counter.current
             valid_search_interval = self.hparams.valid_search_interval
-            if (
-                current_epoch % valid_search_interval == 0
-                or stage == sb.Stage.TEST
-            ):
+            if current_epoch % valid_search_interval == 0 or stage == sb.Stage.TEST:
                 stage_stats["WER"] = self.wer_metric.summarize("error_rate")
                 stage_stats["CER"] = self.cer_metric.summarize("error_rate")
 
                 if stage_adv_loss is not None:
-                    stage_stats["adv CER"] = self.adv_cer_metric.summarize(
-                        "error_rate")
-                    stage_stats["adv WER"] = self.adv_wer_metric.summarize(
-                        "error_rate")
+                    stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
+                    stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
                 if stage_adv_loss_target is not None:
-                    stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
-                        "error_rate")
-                    stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
-                        "error_rate")
+                    stage_stats[
+                        "adv CER target"
+                    ] = self.adv_cer_metric_target.summarize("error_rate")
+                    stage_stats[
+                        "adv WER target"
+                    ] = self.adv_wer_metric_target.summarize("error_rate")
 
         # log stats and save checkpoint at end-of-epoch
         if stage == sb.Stage.VALID and sb.utils.distributed.if_main_process():
@@ -298,8 +300,7 @@ class TrfASR(AdvASRBrain):
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={
-                    "Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:

@@ -1,15 +1,13 @@
 import warnings
 
 import numpy as np
+import speechbrain as sb
 import torch
 import torch.nn as nn
 
-import speechbrain as sb
-
 import robust_speech as rs
-from robust_speech.adversarial.attacks.pgd import pgd_loop
-
 from robust_speech.adversarial.attacks.attacker import Attacker
+from robust_speech.adversarial.attacks.pgd import pgd_loop
 
 
 class ASRMGAA(Attacker):
@@ -43,15 +41,28 @@ class ASRMGAA(Attacker):
     """
 
     def __init__(
-            self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
-            rel_eps_iter=1., clip_min=None, clip_max=None,
-            ord=np.inf, targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        nested_attack_class,
+        eps=0.3,
+        nb_iter=40,
+        rel_eps_iter=1.0,
+        clip_min=None,
+        clip_max=None,
+        ord=np.inf,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
 
         warnings.warn(
-            "MGAA attack is currently under development. Accurate results are not guaranteed.", RuntimeWarning)
+            "MGAA attack is currently under development. Accurate results are not guaranteed.",
+            RuntimeWarning,
+        )
 
-        assert isinstance(
-            asr_brain, rs.adversarial.brain.EnsembleASRBrain) and asr_brain.nmodels == 2
+        assert (
+            isinstance(asr_brain, rs.adversarial.brain.EnsembleASRBrain)
+            and asr_brain.nmodels == 2
+        )
         self.nested_attack = nested_attack_class(asr_brain.asr_brains[1])
         self.asr_brain = asr_brain.asr_brains[0]
 
@@ -65,9 +76,9 @@ class ASRMGAA(Attacker):
         self.train_mode_for_backward = train_mode_for_backward
 
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
-            self.rel_eps_iter, float)
-        assert isinstance(self.eps, torch.Tensor) or isinstance(
-            self.eps, float)
+            self.rel_eps_iter, float
+        )
+        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def perturb(self, batch):
         """
@@ -98,11 +109,17 @@ class ASRMGAA(Attacker):
             train_adv = self.nested_attack.perturb(batch)
             batch.sig = x, batch.sig[1]
             test_adv = pgd_loop(
-                batch, self.asr_brain, nb_iter=1,
-                eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
-                minimize=self.targeted, ord=self.ord,
-                clip_min=self.clip_min, clip_max=self.clip_max,
-                delta_init=nn.Parameter(train_adv - x), l1_sparsity=False
+                batch,
+                self.asr_brain,
+                nb_iter=1,
+                eps=self.eps,
+                eps_iter=self.rel_eps_iter * self.eps,
+                minimize=self.targeted,
+                ord=self.ord,
+                clip_min=self.clip_min,
+                clip_max=self.clip_max,
+                delta_init=nn.Parameter(train_adv - x),
+                l1_sparsity=False,
             )
             delta = test_adv - train_adv
 

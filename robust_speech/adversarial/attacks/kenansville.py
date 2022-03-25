@@ -1,5 +1,3 @@
-
-
 import torch
 
 from robust_speech.adversarial.attacks.attacker import Attacker
@@ -34,8 +32,9 @@ class KenansvilleAttack(Attacker):
 
     """
 
-    def __init__(self, asr_brain, targeted=False, snr=100,
-                 train_mode_for_backward=False):
+    def __init__(
+        self, asr_brain, targeted=False, snr=100, train_mode_for_backward=False
+    ):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         # The last iteration (if we run many steps) repeat the search once.

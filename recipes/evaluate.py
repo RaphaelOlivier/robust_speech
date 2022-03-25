@@ -1,4 +1,3 @@
-
 """
 Evaluation script supporting adversarial attacks.
 Similar to the training script without the brain.fit() call, with one key difference:
@@ -18,35 +17,40 @@ python evaluate.py attack_configs/pgd/attack.yaml\
 """
 import os
 import sys
-import speechbrain as sb
-from robust_speech.adversarial.brain import AdvASRBrain
-from speechbrain.utils.distributed import run_on_main
-from hyperpyyaml import load_hyperpyyaml
 from pathlib import Path
+
+import speechbrain as sb
+from hyperpyyaml import load_hyperpyyaml
+from speechbrain.utils.distributed import run_on_main
+
 import robust_speech as rs
+from robust_speech.adversarial.brain import AdvASRBrain
 
 
 def read_brains(
-        brain_classes,
-        brain_hparams,
-        attacker=None,
-        run_opts={},
-        overrides={},
-        tokenizer=None
+    brain_classes,
+    brain_hparams,
+    attacker=None,
+    run_opts={},
+    overrides={},
+    tokenizer=None,
 ):
     if isinstance(brain_classes, list):
         brain_list = []
         assert len(brain_classes) == len(brain_hparams)
         for bc, bf in zip(brain_classes, brain_hparams):
-            br = read_brains(bc, bf, run_opts=run_opts,
-                             overrides=overrides, tokenizer=tokenizer)
+            br = read_brains(
+                bc, bf, run_opts=run_opts, overrides=overrides, tokenizer=tokenizer
+            )
             brain_list.append(br)
         brain = rs.adversarial.brain.EnsembleASRBrain(brain_list)
     else:
         if isinstance(brain_hparams, str):
             with open(brain_hparams) as fin:
                 brain_hparams = load_hyperpyyaml(fin, overrides)
-        checkpointer = brain_hparams["checkpointer"] if "checkpointer" in brain_hparams else None
+        checkpointer = (
+            brain_hparams["checkpointer"] if "checkpointer" in brain_hparams else None
+        )
         brain = brain_classes(
             modules=brain_hparams["modules"],
             hparams=brain_hparams,
@@ -56,8 +60,7 @@ def read_brains(
         )
         if "pretrainer" in brain_hparams:
             run_on_main(brain_hparams["pretrainer"].collect_files)
-            brain_hparams["pretrainer"].load_collected(
-                device=run_opts["device"])
+            brain_hparams["pretrainer"].load_collected(device=run_opts["device"])
         brain.tokenizer = tokenizer
     return brain
 
@@ -103,9 +106,7 @@ if __name__ == "__main__":
     dataio_prepare = hparams["dataio_prepare_fct"]
 
     # here we create the datasets objects as well as tokenization and encoding
-    _, _, test_datasets, _, _, tokenizer = dataio_prepare(
-        hparams
-    )
+    _, _, test_datasets, _, _, tokenizer = dataio_prepare(hparams)
     source_brain = None
     if "source_brain_class" in hparams:  # loading source model
         source_brain = read_brains(
@@ -113,7 +114,7 @@ if __name__ == "__main__":
             hparams["source_brain_hparams_file"],
             run_opts=run_opts,
             overrides={"root": hparams["root"]},
-            tokenizer=tokenizer
+            tokenizer=tokenizer,
         )
     attacker = hparams["attack_class"]
     if source_brain:
@@ -124,14 +125,18 @@ if __name__ == "__main__":
 
     # Target model initialization
     target_brain_class = hparams["target_brain_class"]
-    target_hparams = hparams["target_brain_hparams_file"] if hparams["target_brain_hparams_file"] else hparams
+    target_hparams = (
+        hparams["target_brain_hparams_file"]
+        if hparams["target_brain_hparams_file"]
+        else hparams
+    )
     target_brain = read_brains(
         target_brain_class,
         target_hparams,
         attacker=attacker,
         run_opts=run_opts,
         overrides={"root": hparams["root"]},
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
     )
     target_brain.logger = hparams["logger"]
     target_brain.hparams.train_logger = hparams["logger"]
@@ -144,7 +149,9 @@ if __name__ == "__main__":
         target_brain.evaluate(
             test_datasets[k],
             test_loader_kwargs=hparams["test_dataloader_opts"],
-            save_audio_path=hparams["save_audio_path"] if hparams["save_audio"] else None,
+            save_audio_path=hparams["save_audio_path"]
+            if hparams["save_audio"]
+            else None,
             sample_rate=hparams["sample_rate"],
-            target=hparams["target_sentence"] if "target_sentence" in hparams else None
+            target=hparams["target_sentence"] if "target_sentence" in hparams else None,
         )

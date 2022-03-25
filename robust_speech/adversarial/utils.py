@@ -1,16 +1,16 @@
 import numpy as np
+import speechbrain as sb
 import torch
 import torchaudio
-import speechbrain as sb
 from speechbrain.dataio.batch import PaddedBatch  # noqa
-from speechbrain.utils.data_utils import split_path
-from speechbrain.pretrained.fetching import fetch
 from speechbrain.dataio.preprocess import AudioNormalizer
 from speechbrain.pretrained import EncoderDecoderASR
+from speechbrain.pretrained.fetching import fetch
+from speechbrain.utils.data_utils import split_path
 
 
 def make_batch_from_waveform(wavform, wrd, tokens, hparams):
-    """ Make a padded batch from a raw waveform, words and tokens"""
+    """Make a padded batch from a raw waveform, words and tokens"""
     sig = wavform
     if len(tokens) == 0:  # dummy tokens
         tokens = [3, 4]
@@ -25,13 +25,13 @@ def make_batch_from_waveform(wavform, wrd, tokens, hparams):
         "tokens_bos": tokens_bos,
         "tokens_eos": tokens_eos,
         "tokens": tokens,
-        "wrd": wrd
+        "wrd": wrd,
     }
     return PaddedBatch([dic])
 
 
 def find_closest_length_string(string, str_list):
-    """ Find the sentence in str_list whose length is the closest to string"""
+    """Find the sentence in str_list whose length is the closest to string"""
     n = len(string)
     lens = [len(s) for s in str_list]
     dist = np.inf
@@ -45,7 +45,7 @@ def find_closest_length_string(string, str_list):
 
 
 def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
-    """ Make a padded batch from a raw waveform, words and tokens"""
+    """Make a padded batch from a raw waveform, words and tokens"""
     assert batch.batchsize == 1, "targeted attacks only support batch size 1"
     if isinstance(sent, list):  # list of possible targets to choose from
         sent = find_closest_length_string(batch.wrd[0], sent)
@@ -94,11 +94,9 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
     asr_model = EncoderDecoderASR.from_hparams(
         source=hparams["pretrained_model_path"],
         hparams_file=hparams["pretrained_model_hparams_file"],
-        savedir=hparams["saved_model_folder"]
+        savedir=hparams["saved_model_folder"],
     )
-    predicted_words, predicted_tokens = asr_model.transcribe_batch(
-        wavs, rel_length
-    )
+    predicted_words, predicted_tokens = asr_model.transcribe_batch(wavs, rel_length)
     return predicted_words[0], predicted_tokens[0]
 
 
@@ -106,9 +104,7 @@ def load_audio(path, hparams, savedir="."):
     source, fl = split_path(path)
     path = fetch(fl, source=source, savedir=savedir)
     signal, sr = torchaudio.load(str(path), channels_first=False)
-    audio_normalizer = hparams.get(
-        "audio_normalizer", AudioNormalizer()
-    )
+    audio_normalizer = hparams.get("audio_normalizer", AudioNormalizer())
     return audio_normalizer(signal, sr)
 
 
@@ -126,7 +122,7 @@ def l2_clamp_or_normalize(x, eps=None):
     if eps:
         coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
     else:
-        coeff = 1. / xnorm
+        coeff = 1.0 / xnorm
     return coeff * x
 
 

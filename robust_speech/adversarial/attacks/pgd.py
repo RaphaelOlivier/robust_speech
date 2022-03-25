@@ -2,11 +2,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from robust_speech.adversarial.utils import rand_assign, l2_clamp_or_normalize, linf_clamp
-
 import robust_speech as rs
-
 from robust_speech.adversarial.attacks.attacker import Attacker
+from robust_speech.adversarial.utils import (l2_clamp_or_normalize, linf_clamp,
+                                             rand_assign)
 
 
 def reverse_bound_from_rel_bound(batch, rel, ord=2):
@@ -14,15 +13,24 @@ def reverse_bound_from_rel_bound(batch, rel, ord=2):
     wav_lens = [int(wavs.size(1) * r) for r in wav_lens]
     epss = []
     for i in range(len(wavs)):
-        eps = torch.norm(wavs[i, :wav_lens[i]], p=ord) / rel
+        eps = torch.norm(wavs[i, : wav_lens[i]], p=ord) / rel
         epss.append(eps)
     return torch.tensor(epss).to(wavs.device)
 
 
-def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
-             delta_init=None, minimize=False, ord=np.inf,
-             clip_min=None, clip_max=None,
-             l1_sparsity=None):
+def pgd_loop(
+    batch,
+    asr_brain,
+    nb_iter,
+    eps,
+    eps_iter,
+    delta_init=None,
+    minimize=False,
+    ord=np.inf,
+    clip_min=None,
+    clip_max=None,
+    l1_sparsity=None,
+):
     """
     Iteratively maximize the loss over the input.
 
@@ -69,8 +77,7 @@ def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
     for ii in range(nb_iter):
         batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = asr_brain.compute_objectives(
-            predictions, batch, rs.Stage.ATTACK)
+        loss = asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
         if minimize:
             loss = -loss
         loss.backward()
@@ -78,20 +85,23 @@ def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
             grad_sign = delta.grad.data.sign()
             delta.data = delta.data + eps_iter * grad_sign
             delta.data = linf_clamp(delta.data, eps)
-            delta.data = torch.clamp(wav_init.data + delta.data, clip_min, clip_max
-                                     ) - wav_init.data
+            delta.data = (
+                torch.clamp(wav_init.data + delta.data, clip_min, clip_max)
+                - wav_init.data
+            )
 
         elif ord == 2:
             grad = delta.grad.data
             grad = l2_clamp_or_normalize(grad)
             delta.data = delta.data + eps_iter * grad
-            delta.data = torch.clamp(wav_init.data + delta.data, clip_min, clip_max
-                                     ) - wav_init.data
+            delta.data = (
+                torch.clamp(wav_init.data + delta.data, clip_min, clip_max)
+                - wav_init.data
+            )
             if eps is not None:
                 delta.data = l2_clamp_or_normalize(delta.data, eps)
         else:
-            raise NotImplementedError(
-                "PGD attack only supports ord=2 or ord=np.inf")
+            raise NotImplementedError("PGD attack only supports ord=2 or ord=np.inf")
         delta.grad.data.zero_()
         # print(loss)
     if isinstance(eps_iter, torch.Tensor):
@@ -131,9 +141,19 @@ class ASRPGDAttack(Attacker):
     """
 
     def __init__(
-            self, asr_brain, eps=0.3, nb_iter=40,
-            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            ord=np.inf, l1_sparsity=None, targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        eps=0.3,
+        nb_iter=40,
+        rel_eps_iter=0.1,
+        rand_init=True,
+        clip_min=None,
+        clip_max=None,
+        ord=np.inf,
+        l1_sparsity=None,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
 
         self.clip_min = clip_min if clip_min is not None else -10
         self.clip_max = clip_max if clip_max is not None else 10
@@ -148,9 +168,9 @@ class ASRPGDAttack(Attacker):
         self.train_mode_for_backward = train_mode_for_backward
 
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
-            self.rel_eps_iter, float)
-        assert isinstance(self.eps, torch.Tensor) or isinstance(
-            self.eps, float)
+            self.rel_eps_iter, float
+        )
+        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def perturb(self, batch):
         """
@@ -180,17 +200,23 @@ class ASRPGDAttack(Attacker):
             clip_min = self.clip_min if self.clip_min is not None else -0.1
             clip_max = self.clip_max if self.clip_max is not None else 0.1
 
-            rand_assign(
-                delta, self.ord, self.eps)
-            delta.data = torch.clamp(
-                x + delta.data, min=self.clip_min, max=self.clip_max) - x
+            rand_assign(delta, self.ord, self.eps)
+            delta.data = (
+                torch.clamp(x + delta.data, min=self.clip_min, max=self.clip_max) - x
+            )
 
         wav_adv = pgd_loop(
-            batch, self.asr_brain, nb_iter=self.nb_iter,
-            eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
-            minimize=self.targeted, ord=self.ord,
-            clip_min=self.clip_min, clip_max=self.clip_max,
-            delta_init=delta, l1_sparsity=self.l1_sparsity
+            batch,
+            self.asr_brain,
+            nb_iter=self.nb_iter,
+            eps=self.eps,
+            eps_iter=self.rel_eps_iter * self.eps,
+            minimize=self.targeted,
+            ord=self.ord,
+            clip_min=self.clip_min,
+            clip_max=self.clip_max,
+            delta_init=delta,
+            l1_sparsity=self.l1_sparsity,
         )
 
         batch.sig = save_input, batch.sig[1]
@@ -225,15 +251,30 @@ class ASRL2PGDAttack(ASRPGDAttack):
     """
 
     def __init__(
-            self, asr_brain, eps=0.3, nb_iter=40,
-            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        eps=0.3,
+        nb_iter=40,
+        rel_eps_iter=0.1,
+        rand_init=True,
+        clip_min=None,
+        clip_max=None,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
         ord = 2
         super(ASRL2PGDAttack, self).__init__(
-            asr_brain=asr_brain, eps=eps, nb_iter=nb_iter,
-            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward,
-            ord=ord)
+            asr_brain=asr_brain,
+            eps=eps,
+            nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter,
+            rand_init=rand_init,
+            clip_min=clip_min,
+            clip_max=clip_max,
+            targeted=targeted,
+            train_mode_for_backward=train_mode_for_backward,
+            ord=ord,
+        )
 
 
 class ASRLinfPGDAttack(ASRPGDAttack):
@@ -262,15 +303,30 @@ class ASRLinfPGDAttack(ASRPGDAttack):
     """
 
     def __init__(
-            self, asr_brain, eps=0.001, nb_iter=40,
-            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        eps=0.001,
+        nb_iter=40,
+        rel_eps_iter=0.1,
+        rand_init=True,
+        clip_min=None,
+        clip_max=None,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
         ord = np.inf
         super(ASRLinfPGDAttack, self).__init__(
-            asr_brain, eps=eps, nb_iter=nb_iter,
-            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward,
-            ord=ord)
+            asr_brain,
+            eps=eps,
+            nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter,
+            rand_init=rand_init,
+            clip_min=clip_min,
+            clip_max=clip_max,
+            targeted=targeted,
+            train_mode_for_backward=train_mode_for_backward,
+            ord=ord,
+        )
 
 
 class SNRPGDAttack(ASRL2PGDAttack):
@@ -300,15 +356,30 @@ class SNRPGDAttack(ASRL2PGDAttack):
     """
 
     def __init__(
-            self, asr_brain, snr=40, nb_iter=40,
-            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        snr=40,
+        nb_iter=40,
+        rel_eps_iter=0.1,
+        rand_init=True,
+        clip_min=None,
+        clip_max=None,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
         super(SNRPGDAttack, self).__init__(
-            asr_brain=asr_brain, eps=1.0, nb_iter=nb_iter,
-            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward)
+            asr_brain=asr_brain,
+            eps=1.0,
+            nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter,
+            rand_init=rand_init,
+            clip_min=clip_min,
+            clip_max=clip_max,
+            targeted=targeted,
+            train_mode_for_backward=train_mode_for_backward,
+        )
         assert isinstance(snr, int)
-        self.rel_eps = torch.pow(torch.tensor(10.), float(snr) / 20)
+        self.rel_eps = torch.pow(torch.tensor(10.0), float(snr) / 20)
 
     def perturb(self, batch):
         save_device = batch.sig[0].device
@@ -347,21 +418,35 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
     """
 
     def __init__(
-            self, asr_brain, snr=40, nb_iter=40,
-            rel_eps_iter=0.1, rand_init=True, clip_min=None, clip_max=None,
-            targeted=False, train_mode_for_backward=True):
+        self,
+        asr_brain,
+        snr=40,
+        nb_iter=40,
+        rel_eps_iter=0.1,
+        rand_init=True,
+        clip_min=None,
+        clip_max=None,
+        targeted=False,
+        train_mode_for_backward=True,
+    ):
         super(MaxSNRPGDAttack, self).__init__(
-            asr_brain=asr_brain, eps=1.0, nb_iter=nb_iter,
-            rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
-            clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward)
+            asr_brain=asr_brain,
+            eps=1.0,
+            nb_iter=nb_iter,
+            rel_eps_iter=rel_eps_iter,
+            rand_init=rand_init,
+            clip_min=clip_min,
+            clip_max=clip_max,
+            targeted=targeted,
+            train_mode_for_backward=train_mode_for_backward,
+        )
         assert isinstance(snr, int)
-        self.rel_eps = torch.pow(torch.tensor(10.), float(snr) / 20)
+        self.rel_eps = torch.pow(torch.tensor(10.0), float(snr) / 20)
 
     def perturb(self, batch):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(
-            batch, self.rel_eps, ord=np.inf)
+        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=np.inf)
         res = super(MaxSNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)

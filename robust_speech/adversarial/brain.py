@@ -1,17 +1,19 @@
+import logging
+import time
+import warnings
 
-from robust_speech.adversarial.utils import replace_tokens_in_batch
+import speechbrain as sb
+import torch
+from speechbrain.dataio.dataloader import LoopedLoader
+from speechbrain.utils.distributed import run_on_main
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
-from speechbrain.utils.distributed import run_on_main
-import speechbrain as sb
-from speechbrain.dataio.dataloader import LoopedLoader
-from torch.utils.data import DataLoader
-import torch
-from tqdm import tqdm
-import time
-import logging
-import warnings
-warnings.simplefilter('once', RuntimeWarning)
+from robust_speech.adversarial.utils import replace_tokens_in_batch
+
+warnings.simplefilter("once", RuntimeWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,9 @@ class ASRBrain(sb.Brain):
         """
         raise NotImplementedError
 
-    def compute_objectives(self, predictions, batch, stage,
-                           adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
         """Compute loss, to be overridden by sub-classes.
 
         Arguments
@@ -140,36 +143,57 @@ class EnsembleASRBrain(ASRBrain):
         if isinstance(predictions, PredictionEnsemble):
             assert len(predictions) == self.nmodels
             if all:
-                return [self.asr_brains[i].get_tokens(
-                    pred) for i, pred in enumerate(predictions)]
+                return [
+                    self.asr_brains[i].get_tokens(pred)
+                    for i, pred in enumerate(predictions)
+                ]
             if model_idx is not None:
-                return self.asr_brains[model_idx].get_tokens(
-                    predictions[model_idx])
+                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
             return self.asr_brains[self.ref_tokens].get_tokens(
-                predictions[self.ref_tokens])
+                predictions[self.ref_tokens]
+            )
         return self.asr_brains[self.ref_tokens].get_tokens(predictions)
 
-    def compute_objectives(self, predictions, batch, stage, average=True,
-                           model_idx=None, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self,
+        predictions,
+        batch,
+        stage,
+        average=True,
+        model_idx=None,
+        adv=False,
+        targeted=False,
+        reduction="mean",
+    ):
         # concatenate of average objectives
-        if isinstance(
-                predictions, PredictionEnsemble) or model_idx is None:  # many predictions
+        if (
+            isinstance(predictions, PredictionEnsemble) or model_idx is None
+        ):  # many predictions
             assert len(predictions) == self.nmodels
             losses = []
             for i in range(self.nmodels):
                 # one pred per model or n pred per model
-                ab = self.asr_brains[i] if model_idx is None else self.asr_brains[model_idx]
-                pred = predictions[i] if isinstance(
-                    predictions, PredictionEnsemble) else predictions
+                ab = (
+                    self.asr_brains[i]
+                    if model_idx is None
+                    else self.asr_brains[model_idx]
+                )
+                pred = (
+                    predictions[i]
+                    if isinstance(predictions, PredictionEnsemble)
+                    else predictions
+                )
                 loss = ab.compute_objectives(
-                    pred, batch, stage, adv=adv, reduction=reduction)
+                    pred, batch, stage, adv=adv, reduction=reduction
+                )
                 losses.append(loss)
             losses = torch.stack(losses, dim=0)
             if average:
                 return torch.mean(loss, dim=0)
             return losses
         return self.asr_brains[model_idx].compute_objectives(
-            predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction)
+            predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction
+        )
 
     def __setattr__(self, name, value):  # useful to set tokenizer
         if name != "asr_brains" and name != "ref_tokens":
@@ -240,8 +264,7 @@ class AdvASRBrain(ASRBrain):
         optimizer added to continue training if interrupted.
     attacker : Optional[robust_speech.adversarial.attacker.Attacker]
         If not None, this will run attacks on the nested source brain model
-        (which may share its modules with this brain model)
-"""
+        (which may share its modules with this brain model)"""
 
     def __init__(  # noqa: C901
         self,
@@ -250,7 +273,7 @@ class AdvASRBrain(ASRBrain):
         hparams=None,
         run_opts=None,
         checkpointer=None,
-        attacker=None
+        attacker=None,
     ):
         ASRBrain.__init__(
             self,
@@ -258,7 +281,7 @@ class AdvASRBrain(ASRBrain):
             opt_class=opt_class,
             hparams=hparams,
             run_opts=run_opts,
-            checkpointer=checkpointer
+            checkpointer=checkpointer,
         )
 
         self.init_attacker(
@@ -266,28 +289,22 @@ class AdvASRBrain(ASRBrain):
             opt_class=opt_class,
             hparams=hparams,
             run_opts=run_opts,
-            attacker=attacker
+            attacker=attacker,
         )
 
     def __setattr__(self, name, value, attacker_brain=True):
-        """Maintain similar attributes for the main and nested brain
-        """
-        if hasattr(
-                self, "attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
-            super(
-                AdvASRBrain,
-                self.attacker.asr_brain).__setattr__(
-                name,
-                value)
+        """Maintain similar attributes for the main and nested brain"""
+        if (
+            hasattr(self, "attacker")
+            and self.attacker is not None
+            and name != "attacker"
+            and attacker_brain
+        ):
+            super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
         super(AdvASRBrain, self).__setattr__(name, value)
 
     def init_attacker(
-        self,
-        modules=None,
-        opt_class=None,
-        hparams=None,
-        run_opts=None,
-        attacker=None
+        self, modules=None, opt_class=None, hparams=None, run_opts=None, attacker=None
     ):
         """
         Initialize attacker class.
@@ -306,7 +323,7 @@ class AdvASRBrain(ASRBrain):
                 hparams=hparams,
                 run_opts=run_opts,
                 checkpointer=None,
-                attacker=None
+                attacker=None,
             )
             self.attacker = attacker(brain_to_attack)
         else:
@@ -380,8 +397,7 @@ class AdvASRBrain(ASRBrain):
             self.scaler.update()
         else:
             outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(
-                outputs, batch, sb.Stage.TRAIN, adv=False)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=False)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -421,13 +437,14 @@ class AdvASRBrain(ASRBrain):
         detached loss
         """
         warnings.warn(
-            "Adversarial training is currently under development. Use this function at your own discretion.", RuntimeWarning)
+            "Adversarial training is currently under development. Use this function at your own discretion.",
+            RuntimeWarning,
+        )
         # Managing automatic mixed precision
         if self.auto_mix_prec:
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                outputs, _ = self.compute_forward_adversarial(
-                    batch, sb.Stage.TRAIN)
+                outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
                 loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.optimizer)
@@ -435,10 +452,8 @@ class AdvASRBrain(ASRBrain):
                 self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            outputs, _ = self.compute_forward_adversarial(
-                batch, sb.Stage.TRAIN)
-            loss = self.compute_objectives(
-                outputs, batch, sb.Stage.TRAIN, adv=True)
+            outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN, adv=True)
 
             # normalize the loss by gradient_accumulation step
             (loss / self.hparams.gradient_accumulation).backward()
@@ -479,23 +494,27 @@ class AdvASRBrain(ASRBrain):
         """
         if target is not None and self.attacker.targeted:
             batch_to_attack = replace_tokens_in_batch(
-                batch, target, self.tokenizer, self.hparams)
+                batch, target, self.tokenizer, self.hparams
+            )
         else:
             batch_to_attack = batch
 
         predictions, adv_wav = self.compute_forward_adversarial(
-            batch_to_attack, stage=stage)
+            batch_to_attack, stage=stage
+        )
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted
             loss = self.compute_objectives(
-                predictions, batch_to_attack, stage=stage, adv=True, targeted=targeted).detach()
+                predictions, batch_to_attack, stage=stage, adv=True, targeted=targeted
+            ).detach()
             if targeted:
                 targetloss = loss
                 batch.sig = adv_wav, batch.sig[1]
                 predictions = self.compute_forward(batch, stage=stage)
                 advloss = self.compute_objectives(
-                    predictions, batch, stage=stage, adv=True, targeted=False).detach()
+                    predictions, batch, stage=stage, adv=True, targeted=False
+                ).detach()
                 batch.sig = batch_to_attack.sig
             else:
                 advloss = loss
@@ -554,15 +573,13 @@ class AdvASRBrain(ASRBrain):
         """
 
         if not (
-            isinstance(train_set, DataLoader)
-            or isinstance(train_set, LoopedLoader)
+            isinstance(train_set, DataLoader) or isinstance(train_set, LoopedLoader)
         ):
             train_set = self.make_dataloader(
                 train_set, stage=sb.Stage.TRAIN, **train_loader_kwargs
             )
         if valid_set is not None and not (
-            isinstance(valid_set, DataLoader)
-            or isinstance(valid_set, LoopedLoader)
+            isinstance(valid_set, DataLoader) or isinstance(valid_set, LoopedLoader)
         ):
             valid_set = self.make_dataloader(
                 valid_set,
@@ -607,9 +624,7 @@ class AdvASRBrain(ASRBrain):
                         loss = self.fit_batch_adversarial(batch)
                     else:
                         loss = self.fit_batch(batch)
-                    self.avg_train_loss = self.update_average(
-                        loss, self.avg_train_loss
-                    )
+                    self.avg_train_loss = self.update_average(loss, self.avg_train_loss)
                     if self.attacker is not None:
                         t.set_postfix(adv_train_loss=self.avg_train_loss)
                     else:
@@ -648,17 +663,14 @@ class AdvASRBrain(ASRBrain):
                 avg_valid_adv_loss = None
                 if self.attacker is not None:
                     avg_valid_adv_loss = 0.0
-                for batch in tqdm(
-                    valid_set, dynamic_ncols=True, disable=not enable
-                ):
+                for batch in tqdm(valid_set, dynamic_ncols=True, disable=not enable):
                     self.step += 1
                     loss = self.evaluate_batch(batch, stage=sb.Stage.VALID)
-                    avg_valid_loss = self.update_average(
-                        loss, avg_valid_loss
-                    )
+                    avg_valid_loss = self.update_average(loss, avg_valid_loss)
                     if self.attacker is not None:
                         adv_loss, _ = self.evaluate_batch_adversarial(
-                            batch, stage=sb.Stage.VALID)
+                            batch, stage=sb.Stage.VALID
+                        )
                         avg_valid_adv_loss = self.update_average(
                             adv_loss, avg_valid_adv_loss
                         )
@@ -672,14 +684,11 @@ class AdvASRBrain(ASRBrain):
                 run_on_main(
                     self.on_stage_end,
                     args=[sb.Stage.VALID, avg_valid_loss, epoch],
-                    kwargs={"stage_adv_loss": avg_valid_adv_loss}
+                    kwargs={"stage_adv_loss": avg_valid_adv_loss},
                 )
 
             # Debug mode only runs a few epochs
-            if (
-                self.debug
-                and epoch == self.debug_epochs
-            ):
+            if self.debug and epoch == self.debug_epochs:
                 break
 
     def evaluate(
@@ -691,7 +700,7 @@ class AdvASRBrain(ASRBrain):
         test_loader_kwargs={},
         save_audio_path=None,
         sample_rate=16000,
-        target=None
+        target=None,
     ):
         """Iterate test_set and evaluate brain performance. By default, loads
         the best-performing checkpoint (as recorded using the checkpointer).
@@ -728,10 +737,7 @@ class AdvASRBrain(ASRBrain):
         if progressbar is None:
             progressbar = not self.noprogressbar
 
-        if not (
-            isinstance(test_set, DataLoader)
-            or isinstance(test_set, LoopedLoader)
-        ):
+        if not (isinstance(test_set, DataLoader) or isinstance(test_set, LoopedLoader)):
             test_loader_kwargs["ckpt_prefix"] = None
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
@@ -746,23 +752,22 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
-        for batch in tqdm(
-            test_set, dynamic_ncols=True, disable=not progressbar
-        ):
+        for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
-                    batch, stage=sb.Stage.TEST, target=target)
-                avg_test_adv_loss = self.update_average(
-                    adv_loss, avg_test_adv_loss)
+                    batch, stage=sb.Stage.TEST, target=target
+                )
+                avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
                 if adv_loss_target:
                     if avg_test_adv_loss_target is None:
                         avg_test_adv_loss_target = 0.0
                     avg_test_adv_loss_target = self.update_average(
-                        adv_loss_target, avg_test_adv_loss_target)
+                        adv_loss_target, avg_test_adv_loss_target
+                    )
 
             # Debug mode only runs a few batches
             if self.debug and self.step == self.debug_batches:
@@ -770,9 +775,12 @@ class AdvASRBrain(ASRBrain):
 
             # Only run evaluation "on_stage_end" on main process
         run_on_main(
-            self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None],
-            kwargs={"stage_adv_loss": avg_test_adv_loss,
-                    "stage_adv_loss_target": avg_test_adv_loss_target}
+            self.on_stage_end,
+            args=[sb.Stage.TEST, avg_test_loss, None],
+            kwargs={
+                "stage_adv_loss": avg_test_adv_loss,
+                "stage_adv_loss_target": avg_test_adv_loss_target,
+            },
         )
         self.step = 0
         self.on_evaluate_end()
@@ -798,8 +806,9 @@ class AdvASRBrain(ASRBrain):
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch,
-                     stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(
+        self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
+    ):
         """Gets called at the end of a stage.
 
         Useful for computing stage statistics, saving checkpoints, etc.
@@ -827,15 +836,15 @@ class AdvASRBrain(ASRBrain):
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
             if stage_adv_loss is not None:
-                stage_stats["adv CER"] = self.adv_cer_metric.summarize(
-                    "error_rate")
-                stage_stats["adv WER"] = self.adv_wer_metric.summarize(
-                    "error_rate")
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
             if stage_adv_loss_target is not None:
                 stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
-                    "error_rate")
+                    "error_rate"
+                )
                 stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
-                    "error_rate")
+                    "error_rate"
+                )
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -847,12 +856,12 @@ class AdvASRBrain(ASRBrain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
+                meta={"WER": stage_stats["WER"]},
+                min_keys=["WER"],
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={
-                    "Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as w:

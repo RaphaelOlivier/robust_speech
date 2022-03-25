@@ -6,13 +6,14 @@ language model.
 
 Inspired from SpeechBrain Transducer (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/transducer/train.py)
 """
+import logging
 import os
 import sys
-import torch
-import logging
+
 import speechbrain as sb
-from speechbrain.utils.distributed import run_on_main
+import torch
 from hyperpyyaml import load_hyperpyyaml
+from speechbrain.utils.distributed import run_on_main
 
 import robust_speech as rs
 from robust_speech.adversarial.brain import AdvASRBrain
@@ -38,9 +39,7 @@ class RNNTASR(AdvASRBrain):
                 wavs = torch.cat([wavs, wavs_noise], dim=0)
                 wav_lens = torch.cat([wav_lens, wav_lens])
                 batch.sig = wavs, wav_lens
-                tokens_with_bos = torch.cat(
-                    [tokens_with_bos, tokens_with_bos], dim=0
-                )
+                tokens_with_bos = torch.cat([tokens_with_bos, tokens_with_bos], dim=0)
                 token_with_bos_lens = torch.cat(
                     [token_with_bos_lens, token_with_bos_lens]
                 )
@@ -55,7 +54,8 @@ class RNNTASR(AdvASRBrain):
         else:
             # don't update normalization outside of training!
             feats = self.modules.normalize(
-                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1)
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1
+            )
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -113,8 +113,9 @@ class RNNTASR(AdvASRBrain):
             ) = self.hparams.test_search(x)
             return p_transducer, wav_lens, best_hyps
 
-    def compute_objectives(self, predictions, batch, stage,
-                           adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
         """Computes the loss (Transducer+(CTC+NLL)) given predictions and targets."""
 
         ids = batch.id
@@ -194,14 +195,14 @@ class RNNTASR(AdvASRBrain):
             if adv:
                 if targeted:
                     self.adv_wer_metric_target.append(
-                        ids, predicted_words, target_words)
+                        ids, predicted_words, target_words
+                    )
                     self.adv_cer_metric_target.append(
-                        ids, predicted_words, target_words)
+                        ids, predicted_words, target_words
+                    )
                 else:
-                    self.adv_wer_metric.append(
-                        ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(
-                        ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

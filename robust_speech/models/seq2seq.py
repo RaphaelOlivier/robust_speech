@@ -5,15 +5,16 @@ language model.
 
 Inspired from SpeechBrain Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
 """
-import torch
 import speechbrain as sb
-from robust_speech.adversarial.brain import AdvASRBrain
+import torch
+
 import robust_speech as rs
+from robust_speech.adversarial.brain import AdvASRBrain
+
 # Define training procedure
 
 
 class S2SASR(AdvASRBrain):
-
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
         self.modules.normalize.to(self.device)
@@ -22,7 +23,7 @@ class S2SASR(AdvASRBrain):
             batch = batch.to(self.device)
             wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         tokens_bos, _ = batch.tokens_bos
-        #wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
+        # wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Add augmentation if specified
         if stage == sb.Stage.TRAIN:
             if hasattr(self.modules, "env_corrupt"):
@@ -40,7 +41,8 @@ class S2SASR(AdvASRBrain):
         else:
             # don't update normalization outside of training!
             feats = self.modules.normalize(
-                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1)
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1
+            )
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -68,8 +70,9 @@ class S2SASR(AdvASRBrain):
                 p_tokens, scores = self.hparams.test_search(x, wav_lens)
             return p_seq, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage,
-                           adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(
+        self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"
+    ):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         current_epoch = self.hparams.epoch_counter.current
@@ -87,9 +90,7 @@ class S2SASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat(
-                [tokens_eos_lens, tokens_eos_lens], dim=0
-            )
+            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
 
@@ -99,9 +100,8 @@ class S2SASR(AdvASRBrain):
 
         # Add ctc loss if necessary
         if (
-            (stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK)
-            and current_epoch <= self.hparams.number_of_ctc_epochs
-        ):
+            stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK
+        ) and current_epoch <= self.hparams.number_of_ctc_epochs:
             loss_ctc = self.hparams.ctc_cost(
                 p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
             )
@@ -120,14 +120,14 @@ class S2SASR(AdvASRBrain):
             if adv:
                 if targeted:
                     self.adv_wer_metric_target.append(
-                        ids, predicted_words, target_words)
+                        ids, predicted_words, target_words
+                    )
                     self.adv_cer_metric_target.append(
-                        ids, predicted_words, target_words)
+                        ids, predicted_words, target_words
+                    )
                 else:
-                    self.adv_wer_metric.append(
-                        ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(
-                        ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

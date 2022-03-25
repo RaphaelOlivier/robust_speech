@@ -1,13 +1,13 @@
-from typing import Tuple, List, Optional
-
-from scipy.signal import argrelextrema
 import math
+from typing import List, Optional, Tuple
+
 import numpy as np
+import speechbrain as sb
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from scipy.signal import argrelextrema
 from torch.autograd import Variable
-import speechbrain as sb
 
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
@@ -95,7 +95,7 @@ class ImperceptibleASRAttack(Attacker):
         targeted: bool = True,
         train_mode_for_backward: bool = True,
         clip_min: Optional[float] = None,
-        clip_max: Optional[float] = None
+        clip_max: Optional[float] = None,
     ):
 
         self.asr_brain = asr_brain
@@ -119,7 +119,9 @@ class ImperceptibleASRAttack(Attacker):
 
         self.clip_min = clip_min  # ignored
         self.clip_max = clip_max  # ignored
-        assert targeted, "%s attack only available for targeted outputs" % self.__class__.__name__
+        assert targeted, (
+            "%s attack only available for targeted outputs" % self.__class__.__name__
+        )
         self.targeted = targeted
         self.train_mode_for_backward = train_mode_for_backward
         self._optimizer_arg_1 = optimizer_1
@@ -148,13 +150,15 @@ class ImperceptibleASRAttack(Attacker):
         x = torch.clone(save_input)
         batch.sig = x, batch.sig[1]
         # First reset delta
-        global_optimal_delta = torch.zeros(
-            batch.batchsize, self.global_max_length).to(self.asr_brain.device)
+        global_optimal_delta = torch.zeros(batch.batchsize, self.global_max_length).to(
+            self.asr_brain.device
+        )
         self.global_optimal_delta = nn.Parameter(global_optimal_delta)
         # Next, reset optimizers
         if self._optimizer_arg_1 is None:
             self.optimizer_1 = torch.optim.Adam(
-                params=[self.global_optimal_delta], lr=self.learning_rate_1)
+                params=[self.global_optimal_delta], lr=self.learning_rate_1
+            )
         else:
             self.optimizer_1 = self._optimizer_arg_1(  # type: ignore
                 params=[self.global_optimal_delta], lr=self.learning_rate_1
@@ -162,7 +166,8 @@ class ImperceptibleASRAttack(Attacker):
 
         if self._optimizer_arg_2 is None:
             self.optimizer_2 = torch.optim.Adam(
-                params=[self.global_optimal_delta], lr=self.learning_rate_2)
+                params=[self.global_optimal_delta], lr=self.learning_rate_2
+            )
         else:
             self.optimizer_2 = self._optimizer_arg_2(  # type: ignore
                 params=[self.global_optimal_delta], lr=self.learning_rate_2
@@ -180,7 +185,9 @@ class ImperceptibleASRAttack(Attacker):
         # First stage of attack
         original_input = torch.clone(batch.sig[0])
         successful_adv_input_1st_stage = self._attack_1st_stage(batch)
-        successful_perturbation_1st_stage = successful_adv_input_1st_stage - original_input
+        successful_perturbation_1st_stage = (
+            successful_adv_input_1st_stage - original_input
+        )
 
         if self.max_iter_2 == 0:
             return successful_adv_input_1st_stage
@@ -190,7 +197,7 @@ class ImperceptibleASRAttack(Attacker):
         original_max_psd_batch = []
         x = batch.sig[0]
         lengths = (x.size(1) * batch.sig[1]).long()
-        x = [x[i, :lengths[i]] for i in range(batch.batchsize)]
+        x = [x[i, : lengths[i]] for i in range(batch.batchsize)]
         for _, x_i in enumerate(x):
             theta, original_max_psd = None, None
             theta, original_max_psd = self._compute_masking_threshold(x_i)
@@ -201,14 +208,17 @@ class ImperceptibleASRAttack(Attacker):
         # Reset delta with new result
         local_batch_shape = successful_adv_input_1st_stage.shape
         self.global_optimal_delta.data = torch.zeros(
-            batch.batchsize, self.global_max_length).to(self.asr_brain.device)
+            batch.batchsize, self.global_max_length
+        ).to(self.asr_brain.device)
         self.global_optimal_delta.data[
             : local_batch_shape[0], : local_batch_shape[1]
         ] = successful_perturbation_1st_stage
 
         # Second stage of attack
         successful_adv_input_2nd_stage = self._attack_2nd_stage(
-            batch, theta_batch=theta_batch, original_max_psd_batch=original_max_psd_batch
+            batch,
+            theta_batch=theta_batch,
+            original_max_psd_batch=original_max_psd_batch,
         )
 
         return successful_adv_input_2nd_stage
@@ -228,25 +238,25 @@ class ImperceptibleASRAttack(Attacker):
         """
         # Compute local shape
         local_batch_size = batch.batchsize
-        real_lengths = (batch.sig[1] * batch.sig[0].size(1)
-                        ).long().detach().cpu().numpy()
+        real_lengths = (
+            (batch.sig[1] * batch.sig[0].size(1)).long().detach().cpu().numpy()
+        )
         local_max_length = np.max(real_lengths)
 
         # Initialize rescale
-        rescale = np.ones([local_batch_size, local_max_length],
-                          dtype=np.float32) * self.initial_rescale
+        rescale = (
+            np.ones([local_batch_size, local_max_length], dtype=np.float32)
+            * self.initial_rescale
+        )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         trans = [None] * local_batch_size
 
         for iter_1st_stage_idx in range(self.max_iter_1):
@@ -254,7 +264,13 @@ class ImperceptibleASRAttack(Attacker):
             self.optimizer_1.zero_grad()
 
             # Call to forward pass
-            loss, local_delta, decoded_output, masked_adv_input, _ = self._forward_1st_stage(
+            (
+                loss,
+                local_delta,
+                decoded_output,
+                masked_adv_input,
+                _,
+            ) = self._forward_1st_stage(
                 original_input=original_input,
                 batch=batch,
                 local_batch_size=local_batch_size,
@@ -266,8 +282,7 @@ class ImperceptibleASRAttack(Attacker):
             loss.backward()
 
             # Get sign of the gradients
-            self.global_optimal_delta.grad = torch.sign(
-                self.global_optimal_delta.grad)
+            self.global_optimal_delta.grad = torch.sign(self.global_optimal_delta.grad)
 
             # Do optimization
             self.optimizer_1.step()
@@ -276,31 +291,48 @@ class ImperceptibleASRAttack(Attacker):
             # coefficient if successful
             if iter_1st_stage_idx % self.num_iter_decrease_eps == 0:
                 for local_batch_size_idx in range(local_batch_size):
-                    tokens = batch.tokens[local_batch_size_idx].detach(
-                    ).cpu().numpy().reshape(-1)
-                    pred = np.array(
-                        decoded_output[local_batch_size_idx]).reshape(-1)
+                    tokens = (
+                        batch.tokens[local_batch_size_idx]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                        .reshape(-1)
+                    )
+                    pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
                     if len(pred) == len(tokens) and (pred == tokens).all():
                         print("Found one")
                         # Adjust the rescale coefficient
                         max_local_delta = np.max(
-                            np.abs(local_delta[local_batch_size_idx].detach().cpu().numpy()))
+                            np.abs(
+                                local_delta[local_batch_size_idx].detach().cpu().numpy()
+                            )
+                        )
 
-                        if rescale[local_batch_size_idx][0] * \
-                                self.eps > max_local_delta:
+                        if (
+                            rescale[local_batch_size_idx][0] * self.eps
+                            > max_local_delta
+                        ):
                             rescale[local_batch_size_idx] = max_local_delta / self.eps
                         rescale[local_batch_size_idx] *= self.decrease_factor_eps
 
                         # Save the best adversarial example
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
-                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                            local_batch_size_idx
+                        ]
+                        trans[local_batch_size_idx] = decoded_output[
+                            local_batch_size_idx
+                        ]
 
             # If attack is unsuccessful
             if iter_1st_stage_idx == self.max_iter_1 - 1:
                 for local_batch_size_idx in range(local_batch_size):
                     if successful_adv_input[local_batch_size_idx] is None:
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
-                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                            local_batch_size_idx
+                        ]
+                        trans[local_batch_size_idx] = decoded_output[
+                            local_batch_size_idx
+                        ]
 
         result = torch.stack(successful_adv_input)  # type: ignore
 
@@ -319,21 +351,22 @@ class ImperceptibleASRAttack(Attacker):
     ):
 
         # Compute perturbed inputs
-        local_delta = self.global_optimal_delta[:
-                                                local_batch_size, :local_max_length]
-        local_delta_rescale = torch.clamp(
-            local_delta, -self.eps, self.eps).to(self.asr_brain.device)
+        local_delta = self.global_optimal_delta[:local_batch_size, :local_max_length]
+        local_delta_rescale = torch.clamp(local_delta, -self.eps, self.eps).to(
+            self.asr_brain.device
+        )
         local_delta_rescale *= torch.tensor(rescale).to(self.asr_brain.device)
-        adv_input = local_delta_rescale + \
-            torch.tensor(original_input).to(self.asr_brain.device)
-        masked_adv_input = adv_input * \
-            torch.tensor(input_mask).to(self.asr_brain.device)
+        adv_input = local_delta_rescale + torch.tensor(original_input).to(
+            self.asr_brain.device
+        )
+        masked_adv_input = adv_input * torch.tensor(input_mask).to(
+            self.asr_brain.device
+        )
 
         # Compute loss and decoded output
         batch.sig = masked_adv_input, batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = self.asr_brain.compute_objectives(
-            predictions, batch, rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         decoded_output = self.asr_brain.get_tokens(val_predictions)
@@ -342,48 +375,50 @@ class ImperceptibleASRAttack(Attacker):
         return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale
 
     def _attack_2nd_stage(
-        self, batch, theta_batch: List[np.ndarray], original_max_psd_batch: List[np.ndarray]
+        self,
+        batch,
+        theta_batch: List[np.ndarray],
+        original_max_psd_batch: List[np.ndarray],
     ):
 
         # Compute local shape
         local_batch_size = batch.batchsize
-        real_lengths = (batch.sig[1] * batch.sig[0].size(1)
-                        ).long().detach().cpu().numpy()
+        real_lengths = (
+            (batch.sig[1] * batch.sig[0].size(1)).long().detach().cpu().numpy()
+        )
         local_max_length = np.max(real_lengths)
 
         # Initialize rescale
-        rescale = np.ones([local_batch_size, local_max_length],
-                          dtype=np.float32) * self.initial_rescale
+        rescale = (
+            np.ones([local_batch_size, local_max_length], dtype=np.float32)
+            * self.initial_rescale
+        )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         trans = [None] * local_batch_size
 
         # Initialize alpha and rescale
         alpha = np.array([self.alpha] * local_batch_size, dtype=np.float32)
-        rescale = np.ones([local_batch_size, local_max_length],
-                          dtype=np.float32) * self.initial_rescale
+        rescale = (
+            np.ones([local_batch_size, local_max_length], dtype=np.float32)
+            * self.initial_rescale
+        )
 
         # Reformat input
-        input_mask = np.zeros(
-            [local_batch_size, local_max_length], dtype=np.float32)
+        input_mask = np.zeros([local_batch_size, local_max_length], dtype=np.float32)
         original_input = torch.clone(batch.sig[0])
         for local_batch_size_idx in range(local_batch_size):
-            input_mask[local_batch_size_idx,
-                       : real_lengths[local_batch_size_idx]] = 1
+            input_mask[local_batch_size_idx, : real_lengths[local_batch_size_idx]] = 1
 
         # Optimization loop
-        successful_adv_input: List[Optional["torch.Tensor"]] = [
-            None] * local_batch_size
+        successful_adv_input: List[Optional["torch.Tensor"]] = [None] * local_batch_size
         best_loss_2nd_stage = [np.inf] * local_batch_size
         trans = [None] * local_batch_size
 
@@ -392,7 +427,13 @@ class ImperceptibleASRAttack(Attacker):
             self.optimizer_2.zero_grad()
 
             # Call to forward pass of the first stage
-            loss_1st_stage, _, decoded_output, masked_adv_input, local_delta_rescale = self._forward_1st_stage(
+            (
+                loss_1st_stage,
+                _,
+                decoded_output,
+                masked_adv_input,
+                local_delta_rescale,
+            ) = self._forward_1st_stage(
                 original_input=original_input,
                 batch=batch,
                 local_batch_size=local_batch_size,
@@ -411,8 +452,10 @@ class ImperceptibleASRAttack(Attacker):
             )
 
             # Total loss
-            loss = loss_1st_stage.type(
-                torch.float32) + torch.tensor(alpha).to(self.asr_brain.device) * loss_2nd_stage
+            loss = (
+                loss_1st_stage.type(torch.float32)
+                + torch.tensor(alpha).to(self.asr_brain.device) * loss_2nd_stage
+            )
             loss = torch.mean(loss)
 
             loss.backward()
@@ -423,18 +466,31 @@ class ImperceptibleASRAttack(Attacker):
             # Save the best adversarial example and adjust the alpha
             # coefficient
             for local_batch_size_idx in range(local_batch_size):
-                tokens = batch.tokens[local_batch_size_idx].detach(
-                ).cpu().numpy().reshape(-1)
-                pred = np.array(
-                    decoded_output[local_batch_size_idx]).reshape(-1)
+                tokens = (
+                    batch.tokens[local_batch_size_idx]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .reshape(-1)
+                )
+                pred = np.array(decoded_output[local_batch_size_idx]).reshape(-1)
                 if len(pred) == len(tokens) and (pred == tokens).all():
-                    if loss_2nd_stage[local_batch_size_idx] < best_loss_2nd_stage[local_batch_size_idx]:
+                    if (
+                        loss_2nd_stage[local_batch_size_idx]
+                        < best_loss_2nd_stage[local_batch_size_idx]
+                    ):
                         # Update best loss at 2nd stage
-                        best_loss_2nd_stage[local_batch_size_idx] = loss_2nd_stage[local_batch_size_idx]
+                        best_loss_2nd_stage[local_batch_size_idx] = loss_2nd_stage[
+                            local_batch_size_idx
+                        ]
 
                         # Save the best adversarial example
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
-                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                            local_batch_size_idx
+                        ]
+                        trans[local_batch_size_idx] = decoded_output[
+                            local_batch_size_idx
+                        ]
 
                     # Adjust to increase the alpha coefficient
                     if iter_2nd_stage_idx % self.num_iter_increase_alpha == 0:
@@ -444,14 +500,19 @@ class ImperceptibleASRAttack(Attacker):
                 elif iter_2nd_stage_idx % self.num_iter_decrease_alpha == 0:
                     alpha[local_batch_size_idx] *= self.decrease_factor_alpha
                     alpha[local_batch_size_idx] = max(
-                        alpha[local_batch_size_idx], 0.0005)
+                        alpha[local_batch_size_idx], 0.0005
+                    )
 
             # If attack is unsuccessful
             if iter_2nd_stage_idx == self.max_iter_2 - 1:
                 for local_batch_size_idx in range(local_batch_size):
                     if successful_adv_input[local_batch_size_idx] is None:
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx]
-                        trans[local_batch_size_idx] = decoded_output[local_batch_size_idx]
+                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                            local_batch_size_idx
+                        ]
+                        trans[local_batch_size_idx] = decoded_output[
+                            local_batch_size_idx
+                        ]
 
         result = torch.stack(successful_adv_input)  # type: ignore
 
@@ -471,12 +532,13 @@ class ImperceptibleASRAttack(Attacker):
 
         for i, _ in enumerate(theta_batch):
             psd_transform_delta = self._psd_transform(
-                delta=local_delta_rescale[i, : real_lengths[i]
-                                          ], original_max_psd=original_max_psd_batch[i]
+                delta=local_delta_rescale[i, : real_lengths[i]],
+                original_max_psd=original_max_psd_batch[i],
             )
 
             loss = torch.mean(
-                relu(psd_transform_delta - theta_batch[i].to(self.asr_brain.device)))
+                relu(psd_transform_delta - theta_batch[i].to(self.asr_brain.device))
+            )
             losses.append(loss)
 
         losses_stack = torch.stack(losses)
@@ -484,7 +546,8 @@ class ImperceptibleASRAttack(Attacker):
         return losses_stack
 
     def _compute_masking_threshold(
-            self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        self, x: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the masking threshold and the maximum psd of the original audio.
         :param x: Samples of shape (seq_length,).
@@ -493,7 +556,7 @@ class ImperceptibleASRAttack(Attacker):
 
         # First compute the psd matrix
         # Get window for the transformation
-        #window = scipy.signal.get_window("hann", self.win_length, fftbins=True)
+        # window = scipy.signal.get_window("hann", self.win_length, fftbins=True)
         window = torch.hann_window(self.win_length, periodic=True)
         # Do transformation
 
@@ -501,8 +564,13 @@ class ImperceptibleASRAttack(Attacker):
         #    y=x, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, window=window, center=False
         # )
         transformed_x = torch.stft(
-            input=x.detach().cpu(), n_fft=self.n_fft, hop_length=self.hop_length,
-            win_length=self.win_length, window=window, center=False, return_complex=True
+            input=x.detach().cpu(),
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=False,
+            return_complex=True,
         ).numpy()
         transformed_x *= np.sqrt(8.0 / 3.0)
 
@@ -513,10 +581,11 @@ class ImperceptibleASRAttack(Attacker):
         psd = 96 - np.max(psd) + psd
 
         # Compute freqs and barks
-        #freqs = librosa.core.fft_frequencies(sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
-        freqs = torch.fft.rfftfreq(n=self.n_fft, d=1. / 16000)
-        barks = 13 * np.arctan(0.00076 * freqs) + 3.5 * \
-            np.arctan(pow(freqs / 7500.0, 2))
+        # freqs = librosa.core.fft_frequencies(sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
+        freqs = torch.fft.rfftfreq(n=self.n_fft, d=1.0 / 16000)
+        barks = 13 * np.arctan(0.00076 * freqs) + 3.5 * np.arctan(
+            pow(freqs / 7500.0, 2)
+        )
 
         # Compute quiet threshold
         ath = np.zeros(len(barks), dtype=np.float32) - np.inf
@@ -557,8 +626,10 @@ class ImperceptibleASRAttack(Attacker):
                 while barks_psd[j + 1, 0] - barks_psd[j, 0] < 0.5:
                     quiet_threshold = (
                         3.64 * pow(freqs[int(barks_psd[j, 2])] * 0.001, -0.8)
-                        - 6.5 * np.exp(-0.6 * pow(0.001 *
-                                                  freqs[int(barks_psd[j, 2])] - 3.3, 2))
+                        - 6.5
+                        * np.exp(
+                            -0.6 * pow(0.001 * freqs[int(barks_psd[j, 2])] - 3.3, 2)
+                        )
                         + 0.001 * pow(0.001 * freqs[int(barks_psd[j, 2])], 4)
                         - 12
                     )
@@ -586,21 +657,24 @@ class ImperceptibleASRAttack(Attacker):
                 zero_idx = np.argmax(d_z > 0)
                 s_f = np.zeros(len(d_z), dtype=np.float32)
                 s_f[:zero_idx] = 27 * d_z[:zero_idx]
-                s_f[zero_idx:] = (-27 + 0.37 *
-                                  max(barks_psd[m, 1] - 40, 0)) * d_z[zero_idx:]
+                s_f[zero_idx:] = (-27 + 0.37 * max(barks_psd[m, 1] - 40, 0)) * d_z[
+                    zero_idx:
+                ]
                 t_s.append(barks_psd[m, 1] + delta[m] + s_f)
 
             t_s_array = np.array(t_s)
 
-            theta.append(np.sum(pow(10, t_s_array / 10.0),
-                                axis=0) + pow(10, ath / 10.0))
+            theta.append(
+                np.sum(pow(10, t_s_array / 10.0), axis=0) + pow(10, ath / 10.0)
+            )
 
         theta = np.array(theta)
 
         return torch.tensor(theta).to(self.asr_brain.device), original_max_psd
 
-    def _psd_transform(self, delta: "torch.Tensor",
-                       original_max_psd: "torch.Tensor") -> "torch.Tensor":
+    def _psd_transform(
+        self, delta: "torch.Tensor", original_max_psd: "torch.Tensor"
+    ) -> "torch.Tensor":
         """
         Compute the psd matrix of the perturbation.
         :param delta: The perturbation.
@@ -627,12 +701,15 @@ class ImperceptibleASRAttack(Attacker):
 
         # Compute the psd matrix
         psd = (8.0 / 3.0) * transformed_delta / self.win_length
-        psd = psd ** 2
+        psd = psd**2
         psd = (
-            torch.pow(torch.tensor(10.0).type(torch.float32), torch.tensor(9.6).type(torch.float32)).to(
-                self.asr_brain.device
+            torch.pow(
+                torch.tensor(10.0).type(torch.float32),
+                torch.tensor(9.6).type(torch.float32),
+            ).to(self.asr_brain.device)
+            / torch.reshape(
+                torch.tensor(original_max_psd).to(self.asr_brain.device), [-1, 1, 1]
             )
-            / torch.reshape(torch.tensor(original_max_psd).to(self.asr_brain.device), [-1, 1, 1])
             * psd.type(torch.float32)
         )
 

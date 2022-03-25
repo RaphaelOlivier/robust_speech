@@ -91,15 +91,20 @@ class CTCASR(AdvASRBrain):
                 for utt_seq in predicted_tokens
             ]
             target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ") for s in predicted_words]
+            predicted_words = ["".join(s).strip().split(" ")
+                               for s in predicted_words]
             target_words = [t.split(" ") for t in target_words]
             if adv:
                 if targeted:
-                    self.adv_wer_metric_target.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric_target.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric_target.append(
+                        ids, predicted_words, target_words)
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

@@ -46,7 +46,7 @@ class ASRMGAA(Attacker):
             self, asr_brain, nested_attack_class, eps=0.3, nb_iter=40,
             rel_eps_iter=1., clip_min=None, clip_max=None,
             ord=np.inf, targeted=False, train_mode_for_backward=True):
-        
+
         warnings.warn(
             "MGAA attack is currently under development. Accurate results are not guaranteed.", RuntimeWarning)
 
@@ -64,8 +64,10 @@ class ASRMGAA(Attacker):
         self.targeted = targeted
         self.train_mode_for_backward = train_mode_for_backward
 
-        assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(self.rel_eps_iter, float)
-        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
+        assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
+            self.rel_eps_iter, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(
+            self.eps, float)
 
     def perturb(self, batch):
         """

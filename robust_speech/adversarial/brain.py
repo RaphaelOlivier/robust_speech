@@ -328,7 +328,7 @@ class AdvASRBrain(ASRBrain):
                 adv_wavs = self.attacker.perturb_and_log(batch)
             else:
                 adv_wavs = self.attacker.perturb(batch)
-            adv_wavs=adv_wavs.detach()
+            adv_wavs = adv_wavs.detach()
             batch.sig = adv_wavs, batch.sig[1]
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
@@ -423,7 +423,8 @@ class AdvASRBrain(ASRBrain):
                 self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            outputs, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+            outputs, _ = self.compute_forward_adversarial(
+                batch, sb.Stage.TRAIN)
             loss = self.compute_objectives(
                 outputs, batch, sb.Stage.TRAIN, adv=True)
 
@@ -476,12 +477,13 @@ class AdvASRBrain(ASRBrain):
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted
             loss = self.compute_objectives(
-                predictions, batch_to_attack, stage=stage, adv=True, targeted = targeted).detach()
+                predictions, batch_to_attack, stage=stage, adv=True, targeted=targeted).detach()
             if targeted:
-                targetloss = loss 
+                targetloss = loss
                 batch.sig = adv_wav, batch.sig[1]
                 predictions = self.compute_forward(batch, stage=stage)
-                advloss = self.compute_objectives(predictions, batch, stage=stage, adv=True, targeted = False).detach()
+                advloss = self.compute_objectives(
+                    predictions, batch, stage=stage, adv=True, targeted=False).detach()
                 batch.sig = batch_to_attack.sig
             else:
                 advloss = loss
@@ -740,7 +742,7 @@ class AdvASRBrain(ASRBrain):
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
-                adv_loss,adv_loss_target = self.evaluate_batch_adversarial(
+                adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
                     batch, stage=sb.Stage.TEST, target=target)
                 avg_test_adv_loss = self.update_average(
                     adv_loss, avg_test_adv_loss)
@@ -757,7 +759,8 @@ class AdvASRBrain(ASRBrain):
             # Only run evaluation "on_stage_end" on main process
         run_on_main(
             self.on_stage_end, args=[sb.Stage.TEST, avg_test_loss, None],
-            kwargs={"stage_adv_loss": avg_test_adv_loss,"stage_adv_loss_target": avg_test_adv_loss_target}
+            kwargs={"stage_adv_loss": avg_test_adv_loss,
+                    "stage_adv_loss_target": avg_test_adv_loss_target}
         )
         self.step = 0
         self.on_evaluate_end()

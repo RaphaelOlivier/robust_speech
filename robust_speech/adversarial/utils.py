@@ -29,25 +29,26 @@ def make_batch_from_waveform(wavform, wrd, tokens, hparams):
     }
     return PaddedBatch([dic])
 
+
 def find_closest_length_string(string, str_list):
     """ Find the sentence in str_list whose length is the closest to string"""
     n = len(string)
     lens = [len(s) for s in str_list]
-    dist=np.inf
-    k=None 
-    for i,s in enumerate(str_list):
-        d=abs(len(s)-n)
-        if d<dist:
-            dist=d 
-            k=i
+    dist = np.inf
+    k = None
+    for i, s in enumerate(str_list):
+        d = abs(len(s)-n)
+        if d < dist:
+            dist = d
+            k = i
     return str_list[k]
 
 
 def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
     """ Make a padded batch from a raw waveform, words and tokens"""
     assert batch.batchsize == 1, "targeted attacks only support batch size 1"
-    if isinstance(sent,list): # list of possible targets to choose from
-        sent = find_closest_length_string(batch.wrd[0],sent)
+    if isinstance(sent, list):  # list of possible targets to choose from
+        sent = find_closest_length_string(batch.wrd[0], sent)
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
         tokens = tokenizer.encode_sequence(list(sent))
     else:
@@ -110,24 +111,26 @@ def load_audio(path, hparams, savedir="."):
     )
     return audio_normalizer(signal, sr)
 
-def rand_assign(delta,ord,eps):
-    delta.data.uniform_(-1,1)
+
+def rand_assign(delta, ord, eps):
+    delta.data.uniform_(-1, 1)
     if ord == np.inf:
-        delta.data=eps*delta.data
+        delta.data = eps*delta.data
     elif ord == 2:
-        delta.data = l2_clamp_or_normalize(delta.data,eps)
+        delta.data = l2_clamp_or_normalize(delta.data, eps)
     return delta.data
 
-def l2_clamp_or_normalize(x,eps=None):
-    xnorm = torch.norm(x,dim=list(range(1,x.dim())))
+
+def l2_clamp_or_normalize(x, eps=None):
+    xnorm = torch.norm(x, dim=list(range(1, x.dim())))
     if eps:
-        coeff = torch.minimum(eps/xnorm,torch.ones_like(xnorm)).unsqueeze(1)
+        coeff = torch.minimum(eps/xnorm, torch.ones_like(xnorm)).unsqueeze(1)
     else:
         coeff = 1./xnorm
     return coeff*x
 
-def linf_clamp(x,eps):
-    if isinstance(eps,torch.Tensor) and eps.dim()==1:
-        eps=eps.unsqueeze(1)
-    return torch.clamp(x,min=-eps,max=eps)
-    
+
+def linf_clamp(x, eps):
+    if isinstance(eps, torch.Tensor) and eps.dim() == 1:
+        eps = eps.unsqueeze(1)
+    return torch.clamp(x, min=-eps, max=eps)

@@ -6,6 +6,10 @@ ctc greedy decoder.
 Inspired from SpeechBrain Wav2Vec2 (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
 """
 
+from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2
+from transformers import Wav2Vec2Config, HubertConfig
+from transformers import Wav2Vec2Model, HubertModel
+from transformers import Wav2Vec2FeatureExtractor
 import os
 import sys
 import gc
@@ -18,12 +22,6 @@ import robust_speech as rs
 from robust_speech.models.wav2vec2_pretrain import AdvWav2Vec2FeatureEncoder
 logger = logging.getLogger(__name__)
 
-from transformers import Wav2Vec2FeatureExtractor
-
-from transformers import Wav2Vec2Model, HubertModel
-from transformers import Wav2Vec2Config, HubertConfig
-
-from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2
 
 class AdvWav2Vec2Model(Wav2Vec2Model):
     """
@@ -34,8 +32,10 @@ class AdvWav2Vec2Model(Wav2Vec2Model):
         super().__init__(config)
         self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
+
 HF_models = {"wav2vec2": AdvWav2Vec2Model, "hubert": HubertModel}
 HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
+
 
 class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
     """This class inherits the SpeechBrain Wav2Vec2 lobe and replaces the model with an AdvWav2Vec2 model, 
@@ -114,6 +114,8 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
                 self.model.feature_extractor._freeze_parameters()
 
 # Define training procedure
+
+
 class W2VASR(AdvASRBrain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
@@ -178,15 +180,20 @@ class W2VASR(AdvASRBrain):
                 for utt_seq in predicted_tokens
             ]
             target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ") for s in predicted_words]
+            predicted_words = ["".join(s).strip().split(" ")
+                               for s in predicted_words]
             target_words = [t.split(" ") for t in target_words]
             if adv:
                 if targeted:
-                    self.adv_wer_metric_target.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric_target.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric_target.append(
+                        ids, predicted_words, target_words)
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
@@ -209,7 +216,8 @@ class W2VASR(AdvASRBrain):
 
     def fit_batch_adversarial(self, batch):
         """Train the parameters given a single batch in input"""
-        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(
+            batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
         loss.backward()
         if self.check_gradients(loss):

@@ -79,7 +79,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
             clip_min=clip_min,
             clip_max=clip_max
         )
-        self.const=const
+        self.const = const
 
     def _forward_1st_stage(
         self,

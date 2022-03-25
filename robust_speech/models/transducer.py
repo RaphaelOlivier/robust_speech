@@ -192,11 +192,15 @@ class RNNTASR(AdvASRBrain):
             target_words = [wrd.split(" ") for wrd in batch.wrd]
             if adv:
                 if targeted:
-                    self.adv_wer_metric_target.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric_target.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric_target.append(
+                        ids, predicted_words, target_words)
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)

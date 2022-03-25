@@ -10,6 +10,7 @@ from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, pgd_loop
 from robust_speech.models.wav2vec2_pretrain import AdvHuggingFaceWav2Vec2Pretrain
 import robust_speech as rs
 
+
 class ContrastiveASRAttack(ASRPGDAttack):
     """
     Implementation of a Contrastive attack for Wav2Vec2.
@@ -104,6 +105,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
         self.asr_brain.module_eval()
         return wav_adv.data.to(save_device)
 
+
 class ASRFeatureAdversary(ASRPGDAttack):
     """
     Implementation of an attack for Wav2Vec2.
@@ -186,20 +188,22 @@ class ASRFeatureAdversary(ASRPGDAttack):
         batch.quantized_representation = q_repr
 
         class NestedClassForFeatureAdversary:
-            def __init__(self,wav2vec2,batch):
-                self.wav2vec2=wav2vec2
-                self.init_features=self.wav2vec2(batch.sig[0])[0].detach()
-            def compute_forward(self,batch,stage):
-                assert stage==rs.Stage.ATTACK
-                features=self.wav2vec2(batch.sig[0])[0]
-                return features,None 
+            def __init__(self, wav2vec2, batch):
+                self.wav2vec2 = wav2vec2
+                self.init_features = self.wav2vec2(batch.sig[0])[0].detach()
+
+            def compute_forward(self, batch, stage):
+                assert stage == rs.Stage.ATTACK
+                features = self.wav2vec2(batch.sig[0])[0]
+                return features, None
+
             def compute_objectives(self, predictions, batch, stage):
-                assert stage==rs.Stage.ATTACK
+                assert stage == rs.Stage.ATTACK
                 loss = torch.square(predictions[0]-self.init_features).sum()
                 return loss
-        
+
         wav_adv = pgd_loop(
-            batch, NestedClassForFeatureAdversary(self.asr_brain.modules.wav2vec2.model.wav2vec2,batch), nb_iter=self.nb_iter,
+            batch, NestedClassForFeatureAdversary(self.asr_brain.modules.wav2vec2.model.wav2vec2, batch), nb_iter=self.nb_iter,
             eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
             minimize=self.targeted, ord=self.ord,
             clip_min=self.clip_min, clip_max=self.clip_max,
@@ -210,4 +214,3 @@ class ASRFeatureAdversary(ASRPGDAttack):
         batch = batch.to(save_device)
         self.asr_brain.module_eval()
         return wav_adv.data.to(save_device)
-

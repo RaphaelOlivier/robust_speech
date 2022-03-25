@@ -119,11 +119,15 @@ class TrfASR(AdvASRBrain):
                 target_words = [wrd.split(" ") for wrd in batch.wrd]
                 if adv:
                     if targeted:
-                        self.adv_wer_metric_target.append(ids, predicted_words, target_words)
-                        self.adv_cer_metric_target.append(ids, predicted_words, target_words)
+                        self.adv_wer_metric_target.append(
+                            ids, predicted_words, target_words)
+                        self.adv_cer_metric_target.append(
+                            ids, predicted_words, target_words)
                     else:
-                        self.adv_wer_metric.append(ids, predicted_words, target_words)
-                        self.adv_cer_metric.append(ids, predicted_words, target_words)
+                        self.adv_wer_metric.append(
+                            ids, predicted_words, target_words)
+                        self.adv_cer_metric.append(
+                            ids, predicted_words, target_words)
                 else:
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
@@ -131,9 +135,11 @@ class TrfASR(AdvASRBrain):
             # compute the accuracy of the one-step-forward prediction
             if adv:
                 if targeted:
-                    self.adv_acc_metric_target.append(p_seq, tokens_eos, tokens_eos_lens)
+                    self.adv_acc_metric_target.append(
+                        p_seq, tokens_eos, tokens_eos_lens)
                 else:
-                    self.adv_acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
+                    self.adv_acc_metric.append(
+                        p_seq, tokens_eos, tokens_eos_lens)
             else:
                 self.acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
 
@@ -188,7 +194,8 @@ class TrfASR(AdvASRBrain):
         # if so change the optimizer from Adam to SGD
         self.check_and_reset_optimizer()
 
-        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(
+            batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
         # normalize the loss by gradient_accumulation step

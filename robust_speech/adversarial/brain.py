@@ -135,8 +135,8 @@ class EnsembleASRBrain(ASRBrain):
         if model_idx is not None:
             return self.asr_brains[model_idx].compute_forward(batch, stage)
         predictions = []
-        for ab in self.asr_brains:
-            pred = ab.compute_forward(batch, stage)
+        for asr_brain in self.asr_brains:
+            pred = asr_brain.compute_forward(batch, stage)
             predictions.append(pred)
         return PredictionEnsemble(predictions)
 
@@ -184,7 +184,7 @@ class EnsembleASRBrain(ASRBrain):
             losses = []
             for i in range(self.nmodels):
                 # one pred per model or n pred per model
-                ab = (
+                asr_brain = (
                     self.asr_brains[i]
                     if model_idx is None
                     else self.asr_brains[model_idx]
@@ -194,7 +194,7 @@ class EnsembleASRBrain(ASRBrain):
                     if isinstance(predictions, PredictionEnsemble)
                     else predictions
                 )
-                loss = ab.compute_objectives(
+                loss = asr_brain.compute_objectives(
                     pred, batch, stage, adv=adv, reduction=reduction
                 )
                 losses.append(loss)
@@ -507,9 +507,11 @@ class AdvASRBrain(ASRBrain):
         -------
         detached loss
         """
+        tokenizer = self.tokenizer if hasattr(
+            self, "tokenizer") else self.hparams.tokenizer
         if target is not None and self.attacker.targeted:
             batch_to_attack = replace_tokens_in_batch(
-                batch, target, self.tokenizer, self.hparams
+                batch, target, tokenizer, self.hparams
             )
         else:
             batch_to_attack = batch
@@ -634,8 +636,8 @@ class AdvASRBrain(ASRBrain):
                 initial=self.step,
                 dynamic_ncols=True,
                 disable=not enable,
-            ) as t:
-                for batch in t:
+            ) as pbar:
+                for batch in pbar:
                     self.step += 1
                     if self.attacker is not None:
                         loss = self.fit_batch_adversarial(batch)
@@ -644,9 +646,9 @@ class AdvASRBrain(ASRBrain):
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss)
                     if self.attacker is not None:
-                        t.set_postfix(adv_train_loss=self.avg_train_loss)
+                        pbar.set_postfix(adv_train_loss=self.avg_train_loss)
                     else:
-                        t.set_postfix(train_loss=self.avg_train_loss)
+                        pbar.set_postfix(train_loss=self.avg_train_loss)
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
@@ -886,8 +888,8 @@ class AdvASRBrain(ASRBrain):
                     "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
-            with open(self.hparams.wer_file, "w") as w:
-                self.wer_metric.write_stats(w)
+            with open(self.hparams.wer_file, "w") as wer:
+                self.wer_metric.write_stats(wer)
 
     def on_evaluate_start(self, max_key=None, min_key=None):
         """Run at the beginning of evlauation.

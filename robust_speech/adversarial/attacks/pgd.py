@@ -79,7 +79,7 @@ def pgd_loop(
         assert eps_iter.dim() == 1
         eps_iter = eps_iter.unsqueeze(1)
     delta.requires_grad_()
-    for ii in range(nb_iter):
+    for _ in range(nb_iter):
         batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
         loss = asr_brain.compute_objectives(
@@ -201,8 +201,8 @@ class ASRPGDAttack(Attacker):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         save_input = batch.sig[0]
-        x = torch.clone(save_input)
-        delta = torch.zeros_like(x)
+        wav_init = torch.clone(save_input)
+        delta = torch.zeros_like(wav_init)
         delta = nn.Parameter(delta)
         if self.rand_init:
             clip_min = self.clip_min if self.clip_min is not None else -0.1
@@ -210,8 +210,8 @@ class ASRPGDAttack(Attacker):
 
             rand_assign(delta, self.ord, self.eps)
             delta.data = (
-                torch.clamp(x + delta.data, min=self.clip_min,
-                            max=self.clip_max) - x
+                torch.clamp(wav_init + delta.data, min=self.clip_min,
+                            max=self.clip_max) - wav_init
             )
 
         wav_adv = pgd_loop(

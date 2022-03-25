@@ -57,25 +57,25 @@ class KenansvilleAttack(Attacker):
         wav_lengths = (rel_lengths.float() * wavs.size(1)).long()
 
         for i in range(batch_size):
-            x, n = wavs[i], wav_lengths[i]
-            x_rfft = torch.fft.rfft(x)
-            x_psd = torch.abs(x_rfft) ** 2
-            if len(x) % 2:  # odd: DC frequency
-                x_psd[1:] *= 2
+            wav, len_wav = wavs[i, :wav_lengths[i]], wav_lengths[i]
+            wav_rfft = torch.fft.rfft(wav)
+            wav_psd = torch.abs(wav_rfft) ** 2
+            if len(wav) % 2:  # odd: DC frequency
+                wav_psd[1:] *= 2
             else:  # even: DC and Nyquist frequencies
-                x_psd[1:-1] *= 2
+                wav_psd[1:-1] *= 2
 
             # Scale the threshold based on the power of the signal
             # Find frequencies in order with cumulative perturbation less than threshold
             #     Sort frequencies by power density in ascending order
-            x_psd_index = torch.argsort(x_psd)
-            reordered = x_psd[x_psd_index]
+            wav_psd_index = torch.argsort(wav_psd)
+            reordered = wav_psd[wav_psd_index]
             cumulative = torch.cumsum(reordered, dim=0)
             norm_threshold = self.threshold * cumulative[-1]
             j = torch.searchsorted(cumulative, norm_threshold, right=True)
 
             # Zero out low power frequencies and invert to time domain
-            x_rfft[x_psd_index[:j]] = 0
-            x = torch.fft.irfft(x_rfft, len(x)).type(x.dtype)
-            wavs[i, :n] = x
+            wav_rfft[wav_psd_index[:j]] = 0
+            wav = torch.fft.irfft(wav_rfft, len(wav)).type(wav.dtype)
+            wavs[i, :len_wav] = wav
         return wavs

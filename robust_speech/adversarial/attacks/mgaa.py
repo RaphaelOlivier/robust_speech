@@ -106,13 +106,13 @@ class ASRMGAA(Attacker):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         save_input = batch.sig[0]
-        x = torch.clone(save_input)
-        delta = torch.zeros_like(x)
+        wav_init = torch.clone(save_input)
+        delta = torch.zeros_like(wav_init)
 
         for i in range(self.nb_iter):
-            batch.sig = x + delta, batch.sig[1]
+            batch.sig = wav_init + delta, batch.sig[1]
             train_adv = self.nested_attack.perturb(batch)
-            batch.sig = x, batch.sig[1]
+            batch.sig = wav_init, batch.sig[1]
             test_adv = pgd_loop(
                 batch,
                 self.asr_brain,
@@ -131,4 +131,4 @@ class ASRMGAA(Attacker):
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)
         self.asr_brain.module_eval()
-        return (x + delta).data.to(save_device)
+        return (save_input + delta).data.to(save_device)

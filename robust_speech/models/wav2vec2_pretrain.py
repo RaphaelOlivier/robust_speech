@@ -499,13 +499,13 @@ class W2VPretrain(AdvASRBrain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            lr = self.hparams.noam_annealing.current_lr
+            current_lr = self.hparams.noam_annealing.current_lr
             steps = self.hparams.noam_annealing.n_steps
             optimizer = self.optimizer.__class__.__name__
 
             epoch_stats = {
                 "epoch": epoch,
-                "lr": lr,
+                "lr": current_lr,
                 "steps": steps,
                 "optimizer": optimizer,
             }

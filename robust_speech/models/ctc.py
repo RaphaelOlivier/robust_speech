@@ -55,12 +55,12 @@ class CTCASR(AdvASRBrain):
                 feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1
             )
         if stage == rs.Stage.ATTACK:
-            x = self.modules.enc(feats)
+            encoded = self.modules.enc(feats)
         else:
-            x = self.modules.enc(feats.detach())
+            encoded = self.modules.enc(feats.detach())
         # Compute outputs
         p_tokens = None
-        logits = self.modules.ctc_lin(x)
+        logits = self.modules.ctc_lin(encoded)
         p_ctc = self.hparams.log_softmax(logits)
 
         if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:

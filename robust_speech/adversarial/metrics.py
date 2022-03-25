@@ -70,19 +70,18 @@ class AudioSaver:
 
     def save(self, audio_ids, batch, adv_sig):
         """Save a batch of audio files, both natural and adversarial"""
-        bs = len(audio_ids)
         lengths = (batch.sig[0].size(1) * batch.sig[1]).long()
-        for i in range(bs):
-            id = audio_ids[i]
+        for i in range(len(audio_ids)):
+            audio_id = audio_ids[i]
             wav = batch.sig[0][i, : lengths[i]].detach().cpu().unsqueeze(0)
             adv_wav = adv_sig[i, : lengths[i]].detach().cpu().unsqueeze(0)
-            self.save_wav(id, wav, adv_wav)
+            self.save_wav(audio_id, wav, adv_wav)
 
-    def save_wav(self, id, wav, adv_wav):
+    def save_wav(self, audio_id, wav, adv_wav):
         """Save the original and the adversarial versions of a single audio file"""
         print(wav.size())
-        nat_path = id + "_nat.wav"
-        adv_path = id + "_adv.wav"
+        nat_path = audio_id + "_nat.wav"
+        adv_path = audio_id + "_adv.wav"
         torchaudio.save(
             os.path.join(self.save_audio_path, nat_path), wav, self.sample_rate
         )

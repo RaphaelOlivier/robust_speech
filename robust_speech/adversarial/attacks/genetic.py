@@ -80,8 +80,8 @@ class GeneticAttack(Attacker):
         pop_sig = torch.clamp(
             torch.cat([elite_sig, child_sig], dim=1), min=min_wavs, max=max_wavs
         ).transpose(0, 1)
-        for i, pb in enumerate(batches):
-            pb.sig = pop_sig[i], pb.sig[1]
+        for i, pop_batch in enumerate(batches):
+            pop_batch.sig = pop_sig[i], pop_batch.sig[1]
         return batches
 
     def _extract_best(self, batches, elite_indices):
@@ -109,9 +109,10 @@ class GeneticAttack(Attacker):
             torch.rand(*wav_size, device=wavs.device) < MUTATION_PROB
         ).reshape(-1)
         n_mutations = int(mutation_mask.sum())
-        rg = np.arange(-self.eps, self.eps, self.eps / EPS_NUM_STRIDES)
+        rg_mutations = np.arange(-self.eps, self.eps,
+                                 self.eps / EPS_NUM_STRIDES)
         mutations = torch.tensor(
-            np.random.choice(rg, size=n_mutations), device=wavs.device, dtype=wavs.dtype
+            np.random.choice(rg_mutations, size=n_mutations), device=wavs.device, dtype=wavs.dtype
         )
         wavs = wavs.reshape(-1)
         wavs[mutation_mask] += mutations
@@ -130,9 +131,9 @@ class GeneticAttack(Attacker):
         # new batch
         pop_batches = []
         for i in range(self.population_size):
-            pb = copy.deepcopy(batch)
-            pb.sig = new_wavs[i], pb.sig[1]
-            pop_batches.append(pb.to(self.asr_brain.device))
+            pop_batch = copy.deepcopy(batch)
+            pop_batch.sig = new_wavs[i], pop_batch.sig[1]
+            pop_batches.append(pop_batch.to(self.asr_brain.device))
         return pop_batches, max_wavs, min_wavs
 
     def _score(self, batches):
@@ -149,21 +150,25 @@ class GeneticAttack(Attacker):
         scores = scores / scores.max(dim=1, keepdim=True)[0]
         return scores
 
-    def _crossover(self, batches, pop_probs, n):
+    def _crossover(self, batches, pop_probs, num_crossovers):
         # pop_probs : (batch_size x pop_size)
         batch_size = pop_probs.size(0)
         new_wavs_1 = []
         new_wavs_2 = []
         for i in range(batch_size):
-            rg = np.random.choice(
-                self.population_size, p=pop_probs[i].detach().cpu().numpy(), size=2 * n
+            rg_crossover = np.random.choice(
+                self.population_size, p=pop_probs[i].detach().cpu().numpy(), size=2 * num_crossovers
             )
-            new_wavs_1_i = [batches[k].sig[0][i] for k in rg[:n]]
+            new_wavs_1_i = [batches[k].sig[0][i]
+                            for k in rg_crossover[:num_crossovers]]
             new_wavs_1.append(torch.stack(new_wavs_1_i, 0))
-            new_wavs_2_i = [batches[k].sig[0][i] for k in rg[n:]]
+            new_wavs_2_i = [batches[k].sig[0][i]
+                            for k in rg_crossover[num_crossovers:]]
             new_wavs_2.append(torch.stack(new_wavs_2_i, 0))
-        new_wavs_1 = torch.stack(new_wavs_1, 0)  # (batch_size x n x ...)
-        new_wavs_2 = torch.stack(new_wavs_2, 0)  # (batch_size x n x ...)
+        # (batch_size x num_crossovers x ...)
+        new_wavs_1 = torch.stack(new_wavs_1, 0)
+        # (batch_size x num_crossovers x ...)
+        new_wavs_2 = torch.stack(new_wavs_2, 0)
         mask = torch.rand(new_wavs_1.size()) < 0.5
         new_wavs_1[mask] = new_wavs_2[mask]
 

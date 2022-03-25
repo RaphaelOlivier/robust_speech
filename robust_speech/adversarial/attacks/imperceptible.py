@@ -151,8 +151,8 @@ class ImperceptibleASRAttack(Attacker):
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         save_input = batch.sig[0]
-        x = torch.clone(save_input)
-        batch.sig = x, batch.sig[1]
+        wav_init = torch.clone(save_input)
+        batch.sig = wav_init, batch.sig[1]
         # First reset delta
         global_optimal_delta = torch.zeros(batch.batchsize, self.global_max_length).to(
             self.asr_brain.device
@@ -178,12 +178,12 @@ class ImperceptibleASRAttack(Attacker):
             )
 
         # Then compute the batch
-        adv_x = self._generate_batch(batch)
+        adv_wav = self._generate_batch(batch)
 
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)
         self.asr_brain.module_eval()
-        return adv_x
+        return adv_wav
 
     def _generate_batch(self, batch):
         """
@@ -211,12 +211,12 @@ class ImperceptibleASRAttack(Attacker):
         # Compute original masking threshold and maximum psd
         theta_batch = []
         original_max_psd_batch = []
-        x = batch.sig[0]
-        lengths = (x.size(1) * batch.sig[1]).long()
-        x = [x[i, : lengths[i]] for i in range(batch.batchsize)]
-        for _, x_i in enumerate(x):
+        wav_init = batch.sig[0]
+        lengths = (wav_init.size(1) * batch.sig[1]).long()
+        wavs = [wav_init[i, : lengths[i]] for i in range(batch.batchsize)]
+        for _, wav_i in enumerate(wavs):
             theta, original_max_psd = None, None
-            theta, original_max_psd = self._compute_masking_threshold(x_i)
+            theta, original_max_psd = self._compute_masking_threshold(wav_i)
             theta = theta.transpose(1, 0)
             theta_batch.append(theta)
             original_max_psd_batch.append(original_max_psd)
@@ -242,15 +242,6 @@ class ImperceptibleASRAttack(Attacker):
     def _attack_1st_stage(self, batch) -> Tuple["torch.Tensor", np.ndarray]:
         """
         The first stage of the attack.
-        :param x: Samples of shape (nb_samples, seq_length). Note that, it is allowable that sequences in the batch
-                  could have different lengths. A possible example of `x` could be:
-                  `x = np.array([np.array([0.1, 0.2, 0.1, 0.4]), np.array([0.3, 0.1])])`.
-        :param y: Target values of shape (nb_samples). Each sample in `y` is a string and it may possess different
-                  lengths. A possible example of `y` could be: `y = np.array(['SIXTY ONE', 'HELLO'])`. Note that, this
-                  class only supports targeted attack.
-        :return: A tuple of two tensors:
-                    - A tensor holding the candidate adversarial examples.
-                    - An array holding the original inputs.
         """
         # Compute local shape
         local_batch_size = batch.batchsize
@@ -579,11 +570,11 @@ class ImperceptibleASRAttack(Attacker):
         return losses_stack
 
     def _compute_masking_threshold(
-        self, x: np.ndarray
+        self, wav: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the masking threshold and the maximum psd of the original audio.
-        :param x: Samples of shape (seq_length,).
+        :param wav: Samples of shape (seq_length,).
         :return: A tuple of the masking threshold and the maximum psd.
         """
 
@@ -593,11 +584,11 @@ class ImperceptibleASRAttack(Attacker):
         window = torch.hann_window(self.win_length, periodic=True)
         # Do transformation
 
-        # transformed_x = librosa.core.stft(
+        # transformed_wav = librosa.core.stft(
         #    y=x, n_fft=self.n_fft, hop_length=self.hop_length, win_length=self.win_length, window=window, center=False
         # )
-        transformed_x = torch.stft(
-            input=x.detach().cpu(),
+        transformed_wav = torch.stft(
+            input=wav.detach().cpu(),
             n_fft=self.n_fft,
             hop_length=self.hop_length,
             win_length=self.win_length,
@@ -605,9 +596,9 @@ class ImperceptibleASRAttack(Attacker):
             center=False,
             return_complex=True,
         ).numpy()
-        transformed_x *= np.sqrt(8.0 / 3.0)
+        transformed_wav *= np.sqrt(8.0 / 3.0)
 
-        psd = abs(transformed_x / self.win_length)
+        psd = abs(transformed_wav / self.win_length)
         original_max_psd = np.max(psd * psd)
         with np.errstate(divide="ignore"):
             psd = (20 * np.log10(psd)).clip(min=-200)
@@ -686,15 +677,15 @@ class ImperceptibleASRAttack(Attacker):
 
             t_s = []
 
-            for m in range(barks_psd.shape[0]):
-                d_z = barks - barks_psd[m, 0]
+            for psd_id in range(barks_psd.shape[0]):
+                d_z = barks - barks_psd[psd_id, 0]
                 zero_idx = np.argmax(d_z > 0)
                 s_f = np.zeros(len(d_z), dtype=np.float32)
                 s_f[:zero_idx] = 27 * d_z[:zero_idx]
-                s_f[zero_idx:] = (-27 + 0.37 * max(barks_psd[m, 1] - 40, 0)) * d_z[
+                s_f[zero_idx:] = (-27 + 0.37 * max(barks_psd[psd_id, 1] - 40, 0)) * d_z[
                     zero_idx:
                 ]
-                t_s.append(barks_psd[m, 1] + delta[m] + s_f)
+                t_s.append(barks_psd[psd_id, 1] + delta[psd_id] + s_f)
 
             t_s_array = np.array(t_s)
 

@@ -61,15 +61,15 @@ class RNNTASR(AdvASRBrain):
                 feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1
             )
         if stage == rs.Stage.ATTACK:
-            x = self.modules.enc(feats)
+            encoded = self.modules.enc(feats)
         else:
-            x = self.modules.enc(feats.detach())
+            encoded = self.modules.enc(feats.detach())
         e_in = self.modules.emb(tokens_with_bos)
-        h, _ = self.modules.dec(e_in)
+        hidden, _ = self.modules.dec(e_in)
         # Joint network
         # add labelseq_dim to the encoder tensor: [B,T,H_enc] => [B,T,1,H_enc]
         # add timeseq_dim to the decoder tensor: [B,U,H_dec] => [B,1,U,H_dec]
-        joint = self.modules.Tjoint(x.unsqueeze(2), h.unsqueeze(1))
+        joint = self.modules.Tjoint(encoded.unsqueeze(2), hidden.unsqueeze(1))
 
         # Output layer for transducer log-probabilities
         logits = self.modules.transducer_lin(joint)
@@ -77,36 +77,36 @@ class RNNTASR(AdvASRBrain):
 
         # Compute outputs
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
-            return_CTC = False
-            return_CE = False
+            return_ctc = False
+            return_ce = False
             current_epoch = self.hparams.epoch_counter.current
             if (
                 hasattr(self.hparams, "ctc_cost")
                 and current_epoch <= self.hparams.number_of_ctc_epochs
             ):
-                return_CTC = True
+                return_ctc = True
                 # Output layer for ctc log-probabilities
-                out_ctc = self.modules.enc_lin(x)
+                out_ctc = self.modules.enc_lin(encoded)
                 p_ctc = self.hparams.log_softmax(out_ctc)
             if (
                 hasattr(self.hparams, "ce_cost")
                 and current_epoch <= self.hparams.number_of_ce_epochs
             ):
-                return_CE = True
+                return_ce = True
                 # Output layer for ctc log-probabilities
-                p_ce = self.modules.dec_lin(h)
+                p_ce = self.modules.dec_lin(hidden)
                 p_ce = self.hparams.log_softmax(p_ce)
-            if return_CE and return_CTC:
+            if return_ce and return_ctc:
                 return p_ctc, p_ce, p_transducer, wav_lens
-            elif return_CTC:
+            elif return_ctc:
                 return p_ctc, p_transducer, wav_lens
-            elif return_CE:
+            elif return_ce:
                 return p_ce, p_transducer, wav_lens
             else:
                 return p_transducer, wav_lens
 
         elif stage == sb.Stage.VALID:
-            best_hyps, scores, _, _ = self.hparams.valid_search(x)
+            best_hyps, scores, _, _ = self.hparams.valid_search(encoded)
             return p_transducer, wav_lens, best_hyps
         else:
             (
@@ -114,7 +114,7 @@ class RNNTASR(AdvASRBrain):
                 best_scores,
                 nbest_hyps,
                 nbest_scores,
-            ) = self.hparams.test_search(x)
+            ) = self.hparams.test_search(encoded)
             return p_transducer, wav_lens, best_hyps
 
     def compute_objectives(
@@ -135,18 +135,18 @@ class RNNTASR(AdvASRBrain):
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             if len(predictions) == 4:
                 p_ctc, p_ce, p_transducer, wav_lens = predictions
-                CTC_loss = self.hparams.ctc_cost(
+                ctc_loss = self.hparams.ctc_cost(
                     p_ctc, tokens, wav_lens, token_lens, reduction=reduction
                 )
-                CE_loss = self.hparams.ce_cost(
+                ce_loss = self.hparams.ce_cost(
                     p_ce, tokens_eos, length=token_eos_lens, reduction=reduction
                 )
                 loss_transducer = self.hparams.transducer_cost(
                     p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                 )
                 loss = (
-                    self.hparams.ctc_weight * CTC_loss
-                    + self.hparams.ce_weight * CE_loss
+                    self.hparams.ctc_weight * ctc_loss
+                    + self.hparams.ce_weight * ce_loss
                     + (1 - (self.hparams.ctc_weight + self.hparams.ce_weight))
                     * loss_transducer
                 )
@@ -155,27 +155,27 @@ class RNNTASR(AdvASRBrain):
                 # CTC alive
                 if current_epoch <= self.hparams.number_of_ctc_epochs:
                     p_ctc, p_transducer, wav_lens = predictions
-                    CTC_loss = self.hparams.ctc_cost(
+                    ctc_loss = self.hparams.ctc_cost(
                         p_ctc, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss_transducer = self.hparams.transducer_cost(
                         p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss = (
-                        self.hparams.ctc_weight * CTC_loss
+                        self.hparams.ctc_weight * ctc_loss
                         + (1 - self.hparams.ctc_weight) * loss_transducer
                     )
                 # CE for decoder alive
                 else:
                     p_ce, p_transducer, wav_lens = predictions
-                    CE_loss = self.hparams.ce_cost(
+                    ce_loss = self.hparams.ce_cost(
                         p_ce, tokens_eos, length=token_eos_lens, reduction=reduction
                     )
                     loss_transducer = self.hparams.transducer_cost(
                         p_transducer, tokens, wav_lens, token_lens, reduction=reduction
                     )
                     loss = (
-                        self.hparams.ce_weight * CE_loss
+                        self.hparams.ce_weight * ce_loss
                         + (1 - self.hparams.ctc_weight) * loss_transducer
                     )
             else:

@@ -48,13 +48,13 @@ class S2SASR(AdvASRBrain):
                 feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1
             )
         if stage == rs.Stage.ATTACK:
-            x = self.modules.enc(feats)
+            encoded = self.modules.enc(feats)
         else:
-            x = self.modules.enc(feats.detach())
+            encoded = self.modules.enc(feats.detach())
         e_in = self.modules.emb(tokens_bos)  # y_in bos + tokens
-        h, _ = self.modules.dec(e_in, x, wav_lens)
+        hidden, _ = self.modules.dec(e_in, encoded, wav_lens)
         # Output layer for seq2seq log-probabilities
-        logits = self.modules.seq_lin(h)
+        logits = self.modules.seq_lin(hidden)
         p_seq = self.hparams.log_softmax(logits)
 
         # Compute outputs
@@ -62,16 +62,16 @@ class S2SASR(AdvASRBrain):
             current_epoch = self.hparams.epoch_counter.current
             if current_epoch <= self.hparams.number_of_ctc_epochs:
                 # Output layer for ctc log-probabilities
-                logits = self.modules.ctc_lin(x)
+                logits = self.modules.ctc_lin(encoded)
                 p_ctc = self.hparams.log_softmax(logits)
                 return p_ctc, p_seq, wav_lens
             else:
                 return p_seq, wav_lens
         else:
             if stage == sb.Stage.VALID:
-                p_tokens, scores = self.hparams.valid_search(x, wav_lens)
+                p_tokens, scores = self.hparams.valid_search(encoded, wav_lens)
             else:
-                p_tokens, scores = self.hparams.test_search(x, wav_lens)
+                p_tokens, scores = self.hparams.test_search(encoded, wav_lens)
             return p_seq, wav_lens, p_tokens
 
     def compute_objectives(

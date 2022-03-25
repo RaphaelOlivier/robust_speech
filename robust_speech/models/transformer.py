@@ -282,17 +282,17 @@ class TrfASR(AdvASRBrain):
             # report different epoch stages according current stage
             current_epoch = self.hparams.epoch_counter.current
             if current_epoch <= self.hparams.stage_one_epochs:
-                lr = self.hparams.noam_annealing.current_lr
+                current_lr = self.hparams.noam_annealing.current_lr
                 steps = self.hparams.noam_annealing.n_steps
                 optimizer = self.optimizer.__class__.__name__
             else:
-                lr = self.hparams.lr_sgd
+                current_lr = self.hparams.lr_sgd
                 steps = -1
                 optimizer = self.optimizer.__class__.__name__
 
             epoch_stats = {
                 "epoch": epoch,
-                "lr": lr,
+                "lr": current_lr,
                 "steps": steps,
                 "optimizer": optimizer,
             }
@@ -314,8 +314,8 @@ class TrfASR(AdvASRBrain):
                     "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
-            with open(self.hparams.wer_file, "w") as w:
-                self.wer_metric.write_stats(w)
+            with open(self.hparams.wer_file, "w") as wer:
+                self.wer_metric.write_stats(wer)
 
             # save the averaged checkpoint at the end of the evaluation stage
             # delete the rest of the intermediate checkpoints

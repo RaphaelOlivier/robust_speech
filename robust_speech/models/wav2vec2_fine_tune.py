@@ -142,13 +142,13 @@ class W2VASR(AdvASRBrain):
         # Forward pass
         if stage == rs.Stage.ATTACK:
             feats = self.modules.wav2vec2.extract_features(wavs)
-            x = self.modules.enc(feats)
+            encoded = self.modules.enc(feats)
         else:
             feats = self.modules.wav2vec2(wavs)
-            x = self.modules.enc(feats.detach())
+            encoded = self.modules.enc(feats.detach())
         # Compute outputs
         p_tokens = None
-        logits = self.modules.ctc_lin(x)
+        logits = self.modules.ctc_lin(encoded)
         p_ctc = self.hparams.log_softmax(logits)
 
         if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:
@@ -297,8 +297,8 @@ class W2VASR(AdvASRBrain):
                     "Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
-            with open(self.hparams.wer_file, "w") as w:
-                self.wer_metric.write_stats(w)
+            with open(self.hparams.wer_file, "w") as wer:
+                self.wer_metric.write_stats(wer)
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"

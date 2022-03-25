@@ -48,16 +48,15 @@ def make_batch_from_waveform(wavform, wrd, tokens, hparams):
 
 def find_closest_length_string(string, str_list):
     """Find the sentence in str_list whose length is the closest to string"""
-    n = len(string)
-    lens = [len(s) for s in str_list]
+    len_ref = len(string)
     dist = np.inf
-    k = None
-    for i, s in enumerate(str_list):
-        d = abs(len(s) - n)
-        if d < dist:
-            dist = d
-            k = i
-    return str_list[k]
+    best = None
+    for idx, string in enumerate(str_list):
+        new_dist = abs(len(string) - len_ref)
+        if new_dist < dist:
+            dist = new_dist
+            best = idx
+    return str_list[best]
 
 
 def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
@@ -121,11 +120,11 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
 
 def load_audio(path, hparams, savedir="."):
     """Load a single audio file"""
-    source, fl = split_path(path)
-    path = fetch(fl, source=source, savedir=savedir)
-    signal, sr = torchaudio.load(str(path), channels_first=False)
+    source, filename = split_path(path)
+    path = fetch(filename, source=source, savedir=savedir)
+    signal, samplerate = torchaudio.load(str(path), channels_first=False)
     audio_normalizer = hparams.get("audio_normalizer", AudioNormalizer())
-    return audio_normalizer(signal, sr)
+    return audio_normalizer(signal, samplerate)
 
 
 def rand_assign(delta, ord, eps):
@@ -138,18 +137,18 @@ def rand_assign(delta, ord, eps):
     return delta.data
 
 
-def l2_clamp_or_normalize(x, eps=None):
-    """Clamp x to eps in L2 norm (or normalize if eps is None"""
-    xnorm = torch.norm(x, dim=list(range(1, x.dim())))
+def l2_clamp_or_normalize(tensor, eps=None):
+    """Clamp tensor to eps in L2 norm (or normalize if eps is None"""
+    xnorm = torch.norm(tensor, dim=list(range(1, tensor.dim())))
     if eps:
         coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
     else:
         coeff = 1.0 / xnorm
-    return coeff * x
+    return coeff * tensor
 
 
-def linf_clamp(x, eps):
-    """Clamp x to eps in Linf norm"""
+def linf_clamp(tensor, eps):
+    """Clamp tensor to eps in Linf norm"""
     if isinstance(eps, torch.Tensor) and eps.dim() == 1:
         eps = eps.unsqueeze(1)
-    return torch.clamp(x, min=-eps, max=eps)
+    return torch.clamp(tensor, min=-eps, max=eps)

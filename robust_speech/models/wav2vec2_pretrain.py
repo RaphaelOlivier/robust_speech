@@ -309,6 +309,9 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
 
 
 class W2VPretrain(AdvASRBrain):
+    """
+    Wav2Vec 2.0 base model for pretraining
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.checkpointer and not hasattr(self.hparams, "pretrainer"):

@@ -210,6 +210,9 @@ class ASRFeatureAdversary(ASRPGDAttack):
         batch.quantized_representation = q_repr
 
         class NestedClassForFeatureAdversary:
+            """Nested brain class that can be passed to pgd_loop.
+            Its objective is the Square Error
+            """
             def __init__(self, wav2vec2, batch):
                 self.wav2vec2 = wav2vec2
                 self.init_features = self.wav2vec2(batch.sig[0])[0].detach()

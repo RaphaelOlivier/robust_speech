@@ -13,6 +13,7 @@ from robust_speech.adversarial.utils import (l2_clamp_or_normalize, linf_clamp,
 
 
 def reverse_bound_from_rel_bound(batch, rel, ord=2):
+    """From a relative eps bound, reconstruct the absolute bound for the given batch"""
     wavs, wav_lens = batch.sig
     wav_lens = [int(wavs.size(1) * r) for r in wav_lens]
     epss = []
@@ -390,6 +391,18 @@ class SNRPGDAttack(ASRL2PGDAttack):
         self.rel_eps = torch.pow(torch.tensor(10.0), float(snr) / 20)
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+           The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, ord=2)
@@ -452,6 +465,18 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
         self.rel_eps = torch.pow(torch.tensor(10.0), float(snr) / 20)
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+           The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
         self.eps = reverse_bound_from_rel_bound(

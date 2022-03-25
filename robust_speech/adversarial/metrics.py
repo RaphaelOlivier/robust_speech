@@ -69,6 +69,7 @@ class AudioSaver:
             os.makedirs(save_audio_path)
 
     def save(self, audio_ids, batch, adv_sig):
+        """Save a batch of audio files, both natural and adversarial"""
         bs = len(audio_ids)
         lengths = (batch.sig[0].size(1) * batch.sig[1]).long()
         for i in range(bs):
@@ -78,6 +79,7 @@ class AudioSaver:
             self.save_wav(id, wav, adv_wav)
 
     def save_wav(self, id, wav, adv_wav):
+        """Save the original and the adversarial versions of a single audio file"""
         print(wav.size())
         nat_path = id + "_nat.wav"
         adv_path = id + "_adv.wav"

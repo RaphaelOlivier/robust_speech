@@ -186,6 +186,18 @@ class ImperceptibleASRAttack(Attacker):
         return adv_x
 
     def _generate_batch(self, batch):
+        """
+        Run all attack stages
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+           The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         # First stage of attack
         original_input = torch.clone(batch.sig[0])
         successful_adv_input_1st_stage = self._attack_1st_stage(batch)

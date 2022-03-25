@@ -18,6 +18,7 @@ class S2SASR(AdvASRBrain):
     """
     Encoder-decoder models using RNNs
     """
+
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
         self.modules.normalize.to(self.device)

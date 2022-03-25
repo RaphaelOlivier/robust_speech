@@ -91,6 +91,7 @@ def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
 
 
 def transcribe_batch(asr_brain, batch):
+    """Outputs transcriptions from an input batch"""
     out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST)
     p_seq, wav_lens, predicted_tokens = out
     try:
@@ -107,6 +108,7 @@ def transcribe_batch(asr_brain, batch):
 
 
 def predict_words_from_wavs(hparams, wavs, rel_length):
+    """Outputs transcriptions from input wavs tensor"""
     asr_model = EncoderDecoderASR.from_hparams(
         source=hparams["pretrained_model_path"],
         hparams_file=hparams["pretrained_model_hparams_file"],
@@ -118,6 +120,7 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
 
 
 def load_audio(path, hparams, savedir="."):
+    """Load a single audio file"""
     source, fl = split_path(path)
     path = fetch(fl, source=source, savedir=savedir)
     signal, sr = torchaudio.load(str(path), channels_first=False)
@@ -126,6 +129,7 @@ def load_audio(path, hparams, savedir="."):
 
 
 def rand_assign(delta, ord, eps):
+    """Randomly set the data of parameter delta with uniform sampling"""
     delta.data.uniform_(-1, 1)
     if ord == np.inf:
         delta.data = eps * delta.data
@@ -135,6 +139,7 @@ def rand_assign(delta, ord, eps):
 
 
 def l2_clamp_or_normalize(x, eps=None):
+    """Clamp x to eps in L2 norm (or normalize if eps is None"""
     xnorm = torch.norm(x, dim=list(range(1, x.dim())))
     if eps:
         coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
@@ -144,6 +149,7 @@ def l2_clamp_or_normalize(x, eps=None):
 
 
 def linf_clamp(x, eps):
+    """Clamp x to eps in Linf norm"""
     if isinstance(eps, torch.Tensor) and eps.dim() == 1:
         eps = eps.unsqueeze(1)
     return torch.clamp(x, min=-eps, max=eps)

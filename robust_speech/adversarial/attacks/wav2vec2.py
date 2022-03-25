@@ -159,6 +159,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
             )
 
     def _check_for_contrastive_loss(self):
+        """Check that the asr brain is a wav2vec2-type model"""
         if not hasattr(self.asr_brain.modules, "wav2vec2"):
             return False
         if not isinstance(
@@ -168,6 +169,18 @@ class ASRFeatureAdversary(ASRPGDAttack):
         return True
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+           The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         else:
@@ -213,16 +226,19 @@ class ASRFeatureAdversary(ASRPGDAttack):
             """Nested brain class that can be passed to pgd_loop.
             Its objective is the Square Error
             """
+
             def __init__(self, wav2vec2, batch):
                 self.wav2vec2 = wav2vec2
                 self.init_features = self.wav2vec2(batch.sig[0])[0].detach()
 
             def compute_forward(self, batch, stage):
+                """Forward computations from the waveform batches to the contextual features."""
                 assert stage == rs.Stage.ATTACK
                 features = self.wav2vec2(batch.sig[0])[0]
                 return features, None
 
             def compute_objectives(self, predictions, batch, stage):
+                """Computes the loss L2 squared given predictions and targets."""
                 assert stage == rs.Stage.ATTACK
                 loss = torch.square(predictions[0] - self.init_features).sum()
                 return loss

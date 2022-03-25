@@ -23,6 +23,7 @@ class TrfASR(AdvASRBrain):
     """
     Encoder-decoder models using Transformers
     """
+
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
         if not stage == rs.Stage.ATTACK:

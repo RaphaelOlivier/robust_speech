@@ -109,7 +109,9 @@ def pgd_loop(
             if eps is not None:
                 delta.data = l2_clamp_or_normalize(delta.data, eps)
         else:
-            raise NotImplementedError("PGD attack only supports order=2 or order=np.inf")
+            raise NotImplementedError(
+                "PGD attack only supports order=2 or order=np.inf"
+            )
         delta.grad.data.zero_()
         # print(loss)
     if isinstance(eps_iter, torch.Tensor):

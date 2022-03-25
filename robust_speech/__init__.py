@@ -1,1 +1,4 @@
-from robust_speech.adverersarial.utils import Stage
+"""Importing some core classes"""
+
+from robust_speech.adversarial.utils import Stage
+from robust_speech.adversarial.brain import ASRBrain, AdvASRBrain

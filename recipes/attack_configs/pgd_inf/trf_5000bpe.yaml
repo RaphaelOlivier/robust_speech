@@ -14,6 +14,7 @@ attack_class: !name:robust_speech.adversarial.attacks.pgd.ASRLinfPGDAttack
   targeted: False
   eps: !ref <eps>
   nb_iter: !ref <nb_iter>
+  train_mode_for_backward: False
 save_audio: False
 
 # Model information

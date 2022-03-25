@@ -3,11 +3,11 @@
 Evaluation script supporting adversarial attacks.
 Similar to the training script without the brain.fit() call, with one key difference:
 To support transferred attacks or attacks conducted on multiple models like MGAA,
-the model hparams files was decoupled from the main hparams file. 
+the model hparams files was decoupled from the main hparams file.
 
 hparams contains target_brain_class and target_brain_hparams_file arguments,
 which are used to load corresponding brains, modules and pretrained parameters.
-Optional source_brain_class and source_brain_hparams_file can be specified to transfer 
+Optional source_brain_class and source_brain_hparams_file can be specified to transfer
 the adversarial perturbations. Each of them can be specified as a (nested) list, in which case
 the brain will be an EnsembleASRBrain object.
 
@@ -81,7 +81,8 @@ if __name__ == "__main__":
     )
 
     if "pretrainer" in hparams:  # load parameters
-        # the tokenizer currently is loaded from the main hparams file and set in all brain classes
+        # the tokenizer currently is loaded from the main hparams file and set
+        # in all brain classes
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(device=run_opts["device"])
 
@@ -117,7 +118,8 @@ if __name__ == "__main__":
     attacker = hparams["attack_class"]
     if source_brain:
         # instanciating with the source model if there is one.
-        # Otherwise, AdvASRBrain will handle instanciating the attacker with the target model.
+        # Otherwise, AdvASRBrain will handle instanciating the attacker with
+        # the target model.
         attacker = attacker(source_brain)
 
     # Target model initialization

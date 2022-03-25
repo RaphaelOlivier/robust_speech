@@ -76,7 +76,8 @@ class TrfASR(AdvASRBrain):
 
         return p_ctc, p_seq, wav_lens, hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         (p_ctc, p_seq, wav_lens, hyps,) = predictions
@@ -226,7 +227,8 @@ class TrfASR(AdvASRBrain):
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(self, stage, stage_loss, epoch,
+                     stage_adv_loss=None, stage_adv_loss_target=None):
         # Gets called at the end of a epoch.
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
@@ -305,7 +307,8 @@ class TrfASR(AdvASRBrain):
 
             # save the averaged checkpoint at the end of the evaluation stage
             # delete the rest of the intermediate checkpoints
-            # ACC is set to 1.1 so checkpointer only keeps the averaged checkpoint
+            # ACC is set to 1.1 so checkpointer only keeps the averaged
+            # checkpoint
             if self.checkpointer is not None:
                 self.checkpointer.save_and_keep_only(
                     meta={"ACC": 1.1, "epoch": epoch},

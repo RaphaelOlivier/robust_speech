@@ -189,7 +189,7 @@ class ImperceptibleASRAttack(Attacker):
         theta_batch = []
         original_max_psd_batch = []
         x = batch.sig[0]
-        lengths = (x.size(1)*batch.sig[1]).long()
+        lengths = (x.size(1) * batch.sig[1]).long()
         x = [x[i, :lengths[i]] for i in range(batch.batchsize)]
         for _, x_i in enumerate(x):
             theta, original_max_psd = None, None
@@ -228,7 +228,7 @@ class ImperceptibleASRAttack(Attacker):
         """
         # Compute local shape
         local_batch_size = batch.batchsize
-        real_lengths = (batch.sig[1]*batch.sig[0].size(1)
+        real_lengths = (batch.sig[1] * batch.sig[0].size(1)
                         ).long().detach().cpu().numpy()
         local_max_length = np.max(real_lengths)
 
@@ -272,7 +272,8 @@ class ImperceptibleASRAttack(Attacker):
             # Do optimization
             self.optimizer_1.step()
 
-            # Save the best adversarial example and adjust the rescale coefficient if successful
+            # Save the best adversarial example and adjust the rescale
+            # coefficient if successful
             if iter_1st_stage_idx % self.num_iter_decrease_eps == 0:
                 for local_batch_size_idx in range(local_batch_size):
                     tokens = batch.tokens[local_batch_size_idx].detach(
@@ -285,7 +286,8 @@ class ImperceptibleASRAttack(Attacker):
                         max_local_delta = np.max(
                             np.abs(local_delta[local_batch_size_idx].detach().cpu().numpy()))
 
-                        if rescale[local_batch_size_idx][0] * self.eps > max_local_delta:
+                        if rescale[local_batch_size_idx][0] * \
+                                self.eps > max_local_delta:
                             rescale[local_batch_size_idx] = max_local_delta / self.eps
                         rescale[local_batch_size_idx] *= self.decrease_factor_eps
 
@@ -345,7 +347,7 @@ class ImperceptibleASRAttack(Attacker):
 
         # Compute local shape
         local_batch_size = batch.batchsize
-        real_lengths = (batch.sig[1]*batch.sig[0].size(1)
+        real_lengths = (batch.sig[1] * batch.sig[0].size(1)
                         ).long().detach().cpu().numpy()
         local_max_length = np.max(real_lengths)
 
@@ -418,7 +420,8 @@ class ImperceptibleASRAttack(Attacker):
             # Do optimization
             self.optimizer_2.step()
 
-            # Save the best adversarial example and adjust the alpha coefficient
+            # Save the best adversarial example and adjust the alpha
+            # coefficient
             for local_batch_size_idx in range(local_batch_size):
                 tokens = batch.tokens[local_batch_size_idx].detach(
                 ).cpu().numpy().reshape(-1)
@@ -480,7 +483,8 @@ class ImperceptibleASRAttack(Attacker):
 
         return losses_stack
 
-    def _compute_masking_threshold(self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _compute_masking_threshold(
+            self, x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the masking threshold and the maximum psd of the original audio.
         :param x: Samples of shape (seq_length,).
@@ -510,7 +514,7 @@ class ImperceptibleASRAttack(Attacker):
 
         # Compute freqs and barks
         #freqs = librosa.core.fft_frequencies(sr=self.asr_brain.hparams.sample_rate, n_fft=self.n_fft)
-        freqs = torch.fft.rfftfreq(n=self.n_fft, d=1./16000)
+        freqs = torch.fft.rfftfreq(n=self.n_fft, d=1. / 16000)
         barks = 13 * np.arctan(0.00076 * freqs) + 3.5 * \
             np.arctan(pow(freqs / 7500.0, 2))
 
@@ -595,7 +599,8 @@ class ImperceptibleASRAttack(Attacker):
 
         return torch.tensor(theta).to(self.asr_brain.device), original_max_psd
 
-    def _psd_transform(self, delta: "torch.Tensor", original_max_psd: "torch.Tensor") -> "torch.Tensor":
+    def _psd_transform(self, delta: "torch.Tensor",
+                       original_max_psd: "torch.Tensor") -> "torch.Tensor":
         """
         Compute the psd matrix of the perturbation.
         :param delta: The perturbation.

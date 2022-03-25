@@ -6,7 +6,7 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 
 
 def is_successful(y1, y2, targeted):
-    equal = type(y1) == type(y2)
+    equal = isinstance(y1, type(y2))
     if equal:
         if isinstance(y1, torch.Tensor):
             equal = y1.size() == y2.size() and (y1 == y2).all()
@@ -34,7 +34,8 @@ class KenansvilleAttack(Attacker):
 
     """
 
-    def __init__(self, asr_brain, targeted=False, snr=100, train_mode_for_backward=False):
+    def __init__(self, asr_brain, targeted=False, snr=100,
+                 train_mode_for_backward=False):
         """Carlini Wagner L2 Attack implementation in pytorch."""
         self.asr_brain = asr_brain
         # The last iteration (if we run many steps) repeat the search once.
@@ -60,7 +61,7 @@ class KenansvilleAttack(Attacker):
         wavs, rel_lengths = batch.sig
         wavs = wavs.detach().clone()
         batch_size = wavs.size(0)
-        wav_lengths = (rel_lengths.float()*wavs.size(1)).long()
+        wav_lengths = (rel_lengths.float() * wavs.size(1)).long()
 
         for i in range(batch_size):
             x, n = wavs[i], wav_lengths[i]

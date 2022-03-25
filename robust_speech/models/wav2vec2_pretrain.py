@@ -48,8 +48,8 @@ logger = logging.getLogger(__name__)
 
 
 class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
-    """ 
-    Slight modification of the HF feature extractor. 
+    """
+    Slight modification of the HF feature extractor.
     The original class assumes that input is a leaf tensor, which when running attacks isn't always the case.
     """
 
@@ -80,7 +80,7 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2FeatureExtractor):
 
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
     """
-    This class modifies the transformers Wav2Vec2ForPreTraining module in order to 
+    This class modifies the transformers Wav2Vec2ForPreTraining module in order to
         -replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
         -handle contrastive attacks in forward
     """
@@ -90,7 +90,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
         self.wav2vec2.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
     @add_start_docstrings_to_model_forward(WAV_2_VEC_2_INPUTS_DOCSTRING)
-    @replace_return_docstrings(output_type=Wav2Vec2ForPreTrainingOutput, config_class=_CONFIG_FOR_DOC)
+    @replace_return_docstrings(output_type=Wav2Vec2ForPreTrainingOutput,
+                               config_class=_CONFIG_FOR_DOC)
     def forward(
         self,
         input_values,
@@ -123,10 +124,12 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             return_dict=return_dict,
         )
 
-        # 1. project all transformed features (including masked) to final vq dim
+        # 1. project all transformed features (including masked) to final vq
+        # dim
         transformer_features = self.project_hid(outputs[0])
 
-        # 2. quantize all (unmasked) extracted features and project to final vq dim
+        # 2. quantize all (unmasked) extracted features and project to final vq
+        # dim
         extract_features = self.dropout_features(outputs[1])
 
         if attention_mask is not None:
@@ -192,8 +195,10 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             loss = contrastive_loss + self.config.diversity_loss_weight * diversity_loss
         if not return_dict:
             if loss is not None:
-                return (loss, transformer_features, quantized_features, codevector_perplexity) + outputs[2:]
-            return (transformer_features, quantized_features, codevector_perplexity) + outputs[2:]
+                return (loss, transformer_features, quantized_features,
+                        codevector_perplexity) + outputs[2:]
+            return (transformer_features, quantized_features,
+                    codevector_perplexity) + outputs[2:]
 
         return Wav2Vec2ForPreTrainingOutput(
             loss=loss,
@@ -301,7 +306,8 @@ class W2VPretrain(AdvASRBrain):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.checkpointer and not hasattr(self.hparams, "pretrainer"):
-            # model was loaded from HuggingFace but not preloaded with SpeechBrain: saving it at initialization
+            # model was loaded from HuggingFace but not preloaded with
+            # SpeechBrain: saving it at initialization
             self.checkpointer.save_checkpoint()
 
     def compute_forward(self, batch, stage):
@@ -334,7 +340,8 @@ class W2VPretrain(AdvASRBrain):
             return loss, out, mask
         return loss
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             # We don't have to compute anything as the HF model directly returns
@@ -458,7 +465,8 @@ class W2VPretrain(AdvASRBrain):
             self.adv_acc_metric = []
             self.adv_acc_metric_target = []
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(self, stage, stage_loss, epoch,
+                     stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}

@@ -1,9 +1,9 @@
 
 """
-Training script for robust-speech models. 
-It handles adversarial training using the hparams.attacker object, 
+Training script for robust-speech models.
+It handles adversarial training using the hparams.attacker object,
 and externalizes data loading and brain classes with hparams.
-This aside, the script is very similar to SpeechBrain training scripts. 
+This aside, the script is very similar to SpeechBrain training scripts.
 It is compatible with any robust-speech model.
 
 Example:
@@ -47,7 +47,8 @@ if __name__ == "__main__":
     )
 
     # Dataset prep (parsing Librispeech)
-    # data preparation function. Have skip_prep=True if csv files have already been processed.
+    # data preparation function. Have skip_prep=True if csv files have already
+    # been processed.
     prepare_dataset = hparams["dataset_prepare_fct"]
 
     # multi-gpu (ddp) save data preparation

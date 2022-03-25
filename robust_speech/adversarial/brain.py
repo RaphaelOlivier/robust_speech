@@ -44,7 +44,8 @@ class ASRBrain(sb.Brain):
         """
         raise NotImplementedError
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Compute loss, to be overridden by sub-classes.
 
         Arguments
@@ -139,15 +140,20 @@ class EnsembleASRBrain(ASRBrain):
         if isinstance(predictions, PredictionEnsemble):
             assert len(predictions) == self.nmodels
             if all:
-                return [self.asr_brains[i].get_tokens(pred) for i, pred in enumerate(predictions)]
+                return [self.asr_brains[i].get_tokens(
+                    pred) for i, pred in enumerate(predictions)]
             if model_idx is not None:
-                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
-            return self.asr_brains[self.ref_tokens].get_tokens(predictions[self.ref_tokens])
+                return self.asr_brains[model_idx].get_tokens(
+                    predictions[model_idx])
+            return self.asr_brains[self.ref_tokens].get_tokens(
+                predictions[self.ref_tokens])
         return self.asr_brains[self.ref_tokens].get_tokens(predictions)
 
-    def compute_objectives(self, predictions, batch, stage, average=True, model_idx=None, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage, average=True,
+                           model_idx=None, adv=False, targeted=False, reduction="mean"):
         # concatenate of average objectives
-        if isinstance(predictions, PredictionEnsemble) or model_idx is None:  # many predictions
+        if isinstance(
+                predictions, PredictionEnsemble) or model_idx is None:  # many predictions
             assert len(predictions) == self.nmodels
             losses = []
             for i in range(self.nmodels):
@@ -162,7 +168,8 @@ class EnsembleASRBrain(ASRBrain):
             if average:
                 return torch.mean(loss, dim=0)
             return losses
-        return self.asr_brains[model_idx].compute_objectives(predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction)
+        return self.asr_brains[model_idx].compute_objectives(
+            predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction)
 
     def __setattr__(self, name, value):  # useful to set tokenizer
         if name != "asr_brains" and name != "ref_tokens":
@@ -232,7 +239,7 @@ class AdvASRBrain(ASRBrain):
         By default, this will be used to load checkpoints, and will have the
         optimizer added to continue training if interrupted.
     attacker : Optional[robust_speech.adversarial.attacker.Attacker]
-        If not None, this will run attacks on the nested source brain model 
+        If not None, this will run attacks on the nested source brain model
         (which may share its modules with this brain model)
 """
 
@@ -265,8 +272,13 @@ class AdvASRBrain(ASRBrain):
     def __setattr__(self, name, value, attacker_brain=True):
         """Maintain similar attributes for the main and nested brain
         """
-        if hasattr(self, "attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
-            super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
+        if hasattr(
+                self, "attacker") and self.attacker is not None and name != "attacker" and attacker_brain:
+            super(
+                AdvASRBrain,
+                self.attacker.asr_brain).__setattr__(
+                name,
+                value)
         super(AdvASRBrain, self).__setattr__(name, value)
 
     def init_attacker(
@@ -278,11 +290,11 @@ class AdvASRBrain(ASRBrain):
         attacker=None
     ):
         """
-        Initialize attacker class. 
+        Initialize attacker class.
         Attackers take a brain as argument. If the attacker is not already instantiated,
          then it will receive a copy of the current object (without an attacker!), sharing modules.
          If the attacker is already instanciated it may contain a different brain. This is useful for
-         transferring adversarial attacks between models: the noise is computed on the nested (source) 
+         transferring adversarial attacks between models: the noise is computed on the nested (source)
          brain and evaluated on the main (target) brain.
         """
         if isinstance(attacker, Attacker):  # attacker object already initiated
@@ -786,7 +798,8 @@ class AdvASRBrain(ASRBrain):
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(self, stage, stage_loss, epoch,
+                     stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of a stage.
 
         Useful for computing stage statistics, saving checkpoints, etc.

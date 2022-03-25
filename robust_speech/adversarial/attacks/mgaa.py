@@ -23,7 +23,7 @@ class ASRMGAA(Attacker):
      asr_brain: robust_speech.adversarial.brain.EnsembleAsrBrain
         the brain objects. It should be an EnsembleAsrBrain object where the first brain is the meta model and the second is the train model.
         That second brain is typically also an EnsembleAsrBrain to improve transferability.
-     nested_attack_class: robust_speech.adversarial.attacks.attacker.Attacker 
+     nested_attack_class: robust_speech.adversarial.attacks.attacker.Attacker
         the nested adversarial attack class.
      nb_iter: int
         number of test (meta) iterations
@@ -94,12 +94,12 @@ class ASRMGAA(Attacker):
         delta = torch.zeros_like(x)
 
         for i in range(self.nb_iter):
-            batch.sig = x+delta, batch.sig[1]
+            batch.sig = x + delta, batch.sig[1]
             train_adv = self.nested_attack.perturb(batch)
             batch.sig = x, batch.sig[1]
             test_adv = pgd_loop(
                 batch, self.asr_brain, nb_iter=1,
-                eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
+                eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
                 minimize=self.targeted, ord=self.ord,
                 clip_min=self.clip_min, clip_max=self.clip_max,
                 delta_init=nn.Parameter(train_adv - x), l1_sparsity=False
@@ -109,4 +109,4 @@ class ASRMGAA(Attacker):
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)
         self.asr_brain.module_eval()
-        return (x+delta).data.to(save_device)
+        return (x + delta).data.to(save_device)

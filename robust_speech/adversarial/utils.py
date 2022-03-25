@@ -37,7 +37,7 @@ def find_closest_length_string(string, str_list):
     dist = np.inf
     k = None
     for i, s in enumerate(str_list):
-        d = abs(len(s)-n)
+        d = abs(len(s) - n)
         if d < dist:
             dist = d
             k = i
@@ -115,7 +115,7 @@ def load_audio(path, hparams, savedir="."):
 def rand_assign(delta, ord, eps):
     delta.data.uniform_(-1, 1)
     if ord == np.inf:
-        delta.data = eps*delta.data
+        delta.data = eps * delta.data
     elif ord == 2:
         delta.data = l2_clamp_or_normalize(delta.data, eps)
     return delta.data
@@ -124,10 +124,10 @@ def rand_assign(delta, ord, eps):
 def l2_clamp_or_normalize(x, eps=None):
     xnorm = torch.norm(x, dim=list(range(1, x.dim())))
     if eps:
-        coeff = torch.minimum(eps/xnorm, torch.ones_like(xnorm)).unsqueeze(1)
+        coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
     else:
-        coeff = 1./xnorm
-    return coeff*x
+        coeff = 1. / xnorm
+    return coeff * x
 
 
 def linf_clamp(x, eps):

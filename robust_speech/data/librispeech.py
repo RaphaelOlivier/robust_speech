@@ -447,16 +447,19 @@ def dataio_prepare(hparams):
         )
 
         if hparams["sorting"] == "ascending":
-            # we sort training data to speed up training and get better results.
+            # we sort training data to speed up training and get better
+            # results.
             train_data = train_data.filtered_sorted(sort_key="duration")
-            # when sorting do not shuffle in dataloader ! otherwise is pointless
+            # when sorting do not shuffle in dataloader ! otherwise is
+            # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "descending":
             train_data = train_data.filtered_sorted(
                 sort_key="duration", reverse=True
             )
-            # when sorting do not shuffle in dataloader ! otherwise is pointless
+            # when sorting do not shuffle in dataloader ! otherwise is
+            # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "random":

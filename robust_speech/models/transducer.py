@@ -55,7 +55,7 @@ class RNNTASR(AdvASRBrain):
         else:
             # don't update normalization outside of training!
             feats = self.modules.normalize(
-                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch+1)
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -113,7 +113,8 @@ class RNNTASR(AdvASRBrain):
             ) = self.hparams.test_search(x)
             return p_transducer, wav_lens, best_hyps
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Computes the loss (Transducer+(CTC+NLL)) given predictions and targets."""
 
         ids = batch.id

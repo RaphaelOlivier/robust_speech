@@ -15,9 +15,9 @@ EPS_NUM_STRIDES = 4
 
 
 class GeneticAttack(Attacker):
-    """ 
+    """
     Implementation of the Black-Box genetic adversarial attack for ASR models (https://arxiv.org/abs/1801.00554)
-    The original implementation (https://github.com/nesl/adversarial_audio) was slightly changed: 
+    The original implementation (https://github.com/nesl/adversarial_audio) was slightly changed:
         -untargeted attacks are supported
         -mutations occur in float space rather than byte space (for smoother integration to pytorch)
 
@@ -33,7 +33,8 @@ class GeneticAttack(Attacker):
         maximum Linf distortion.
     """
 
-    def __init__(self, asr_brain, nb_iter=100, population_size=10, eps=0.01, targeted=False):
+    def __init__(self, asr_brain, nb_iter=100,
+                 population_size=10, eps=0.01, targeted=False):
         self.asr_brain = asr_brain
         self.nb_iter = nb_iter
         self.population_size = population_size
@@ -97,7 +98,7 @@ class GeneticAttack(Attacker):
         mutation_mask = (torch.rand(*wav_size, device=wavs.device)
                          < MUTATION_PROB).reshape(-1)
         n_mutations = int(mutation_mask.sum())
-        rg = np.arange(-self.eps, self.eps, self.eps/EPS_NUM_STRIDES)
+        rg = np.arange(-self.eps, self.eps, self.eps / EPS_NUM_STRIDES)
         mutations = torch.tensor(
             np.random.choice(rg, size=n_mutations),
             device=wavs.device,
@@ -114,7 +115,7 @@ class GeneticAttack(Attacker):
         new_wavs = batch.sig[0].unsqueeze(
             0).expand(self.population_size, *size)
         max_wavs = torch.clone(new_wavs).transpose(0, 1) + self.eps
-        min_wavs = max_wavs - 2*self.eps
+        min_wavs = max_wavs - 2 * self.eps
         new_wavs = self._mutation(new_wavs)
 
         # new batch
@@ -144,7 +145,7 @@ class GeneticAttack(Attacker):
         new_wavs_2 = []
         for i in range(batch_size):
             rg = np.random.choice(
-                self.population_size, p=pop_probs[i].detach().cpu().numpy(), size=2*n)
+                self.population_size, p=pop_probs[i].detach().cpu().numpy(), size=2 * n)
             new_wavs_1_i = [batches[k].sig[0][i] for k in rg[:n]]
             new_wavs_1.append(torch.stack(new_wavs_1_i, 0))
             new_wavs_2_i = [batches[k].sig[0][i] for k in rg[n:]]

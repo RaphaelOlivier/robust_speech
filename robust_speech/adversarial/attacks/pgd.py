@@ -11,10 +11,10 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 
 def reverse_bound_from_rel_bound(batch, rel, ord=2):
     wavs, wav_lens = batch.sig
-    wav_lens = [int(wavs.size(1)*r) for r in wav_lens]
+    wav_lens = [int(wavs.size(1) * r) for r in wav_lens]
     epss = []
     for i in range(len(wavs)):
-        eps = torch.norm(wavs[i, :wav_lens[i]], p=ord)/rel
+        eps = torch.norm(wavs[i, :wav_lens[i]], p=ord) / rel
         epss.append(eps)
     return torch.tensor(epss).to(wavs.device)
 
@@ -36,7 +36,7 @@ def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -67,7 +67,7 @@ def pgd_loop(batch, asr_brain, nb_iter, eps, eps_iter,
         eps_iter = eps_iter.unsqueeze(1)
     delta.requires_grad_()
     for ii in range(nb_iter):
-        batch.sig = wav_init+delta, wav_lens
+        batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
         loss = asr_brain.compute_objectives(
             predictions, batch, rs.Stage.ATTACK)
@@ -116,7 +116,7 @@ class ASRPGDAttack(Attacker):
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -187,7 +187,7 @@ class ASRPGDAttack(Attacker):
 
         wav_adv = pgd_loop(
             batch, self.asr_brain, nb_iter=self.nb_iter,
-            eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
+            eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted, ord=self.ord,
             clip_min=self.clip_min, clip_max=self.clip_max,
             delta_init=delta, l1_sparsity=self.l1_sparsity
@@ -212,7 +212,7 @@ class ASRL2PGDAttack(ASRPGDAttack):
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -249,7 +249,7 @@ class ASRLinfPGDAttack(ASRPGDAttack):
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -287,7 +287,7 @@ class SNRPGDAttack(ASRL2PGDAttack):
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -308,7 +308,7 @@ class SNRPGDAttack(ASRL2PGDAttack):
             rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
             clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward)
         assert isinstance(snr, int)
-        self.rel_eps = torch.pow(torch.tensor(10.), float(snr)/20)
+        self.rel_eps = torch.pow(torch.tensor(10.), float(snr) / 20)
 
     def perturb(self, batch):
         save_device = batch.sig[0].device
@@ -334,7 +334,7 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
        number of iterations.
     eps_iter: float
        attack step size.
-    rand_init: (optional bool) 
+    rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
        mininum value per input dimension.
@@ -355,7 +355,7 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
             rel_eps_iter=rel_eps_iter, rand_init=rand_init, clip_min=clip_min,
             clip_max=clip_max, targeted=targeted, train_mode_for_backward=train_mode_for_backward)
         assert isinstance(snr, int)
-        self.rel_eps = torch.pow(torch.tensor(10.), float(snr)/20)
+        self.rel_eps = torch.pow(torch.tensor(10.), float(snr) / 20)
 
     def perturb(self, batch):
         save_device = batch.sig[0].device

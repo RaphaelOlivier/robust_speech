@@ -6,7 +6,7 @@ from speechbrain.utils.edit_distance import accumulatable_wer_stats
 
 
 def snr(audio, perturbation, rel_length=torch.tensor([1.])):
-    """ 
+    """
     Signal to Noise Ratio computation
 
     Arguments
@@ -19,12 +19,12 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.])):
         the relative length of the wavs in the batch
     """
 
-    length = (audio.size(1)*rel_length).long()
+    length = (audio.size(1) * rel_length).long()
     num = torch.tensor([torch.square(audio[i, :length[i]]).sum()
                         for i in range(audio.size(0))])
     den = torch.tensor([torch.square(perturbation[i, :length[i]]).sum()
                         for i in range(audio.size(0))])
-    ratio = 10*torch.log10(num/den)
+    ratio = 10 * torch.log10(num / den)
     return torch.round(ratio).long()
 
 
@@ -35,7 +35,7 @@ class SNRComputer(MetricStats):
     def __init__(self, **kwargs):
 
         def metric(batch, adv_wav):
-            return snr(batch.sig[0], adv_wav-batch.sig[0], batch.sig[1])
+            return snr(batch.sig[0], adv_wav - batch.sig[0], batch.sig[1])
         super().__init__(metric, **kwargs)
 
 
@@ -62,7 +62,7 @@ class AudioSaver:
 
     def save(self, audio_ids, batch, adv_sig):
         bs = len(audio_ids)
-        lengths = (batch.sig[0].size(1)*batch.sig[1]).long()
+        lengths = (batch.sig[0].size(1) * batch.sig[1]).long()
         for i in range(bs):
             id = audio_ids[i]
             wav = batch.sig[0][i, :lengths[i]].detach().cpu().unsqueeze(0)

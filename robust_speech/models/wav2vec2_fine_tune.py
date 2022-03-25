@@ -38,7 +38,7 @@ HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
 
 
 class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
-    """This class inherits the SpeechBrain Wav2Vec2 lobe and replaces the model with an AdvWav2Vec2 model, 
+    """This class inherits the SpeechBrain Wav2Vec2 lobe and replaces the model with an AdvWav2Vec2 model,
     which supports backpropagating through the inputs
 
     Arguments
@@ -152,7 +152,8 @@ class W2VASR(AdvASRBrain):
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions
@@ -229,7 +230,8 @@ class W2VASR(AdvASRBrain):
 
         return loss.detach().cpu()
 
-    def on_stage_end(self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
+    def on_stage_end(self, stage, stage_loss, epoch,
+                     stage_adv_loss=None, stage_adv_loss_target=None):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}

@@ -28,7 +28,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
         number of iterations.
      eps_iter: float
         attack step size.
-     rand_init: (optional bool) 
+     rand_init: (optional bool)
         random initialization.
      clip_min: (optional) float
         mininum value per input dimension.
@@ -52,7 +52,8 @@ class ContrastiveASRAttack(ASRPGDAttack):
     def _check_for_contrastive_loss(self):
         if not hasattr(self.asr_brain.modules, "wav2vec2"):
             return False
-        if not isinstance(self.asr_brain.modules.wav2vec2, AdvHuggingFaceWav2Vec2Pretrain):
+        if not isinstance(self.asr_brain.modules.wav2vec2,
+                          AdvHuggingFaceWav2Vec2Pretrain):
             return False
         return True
 
@@ -64,7 +65,7 @@ class ContrastiveASRAttack(ASRPGDAttack):
         """
         Given an audio batch, returns its adversarial counterpart with
         an attack radius of eps.
-        
+
         Arguments
         ---------
         batch: PaddedBatch
@@ -88,13 +89,14 @@ class ContrastiveASRAttack(ASRPGDAttack):
             delta.data = torch.clamp(
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
-        # fixing the quantized representation of the batch for contrastive adversarial learning
+        # fixing the quantized representation of the batch for contrastive
+        # adversarial learning
         _, out, _ = self.asr_brain.compute_forward(batch, stage=sb.Stage.VALID)
         q_repr = out.projected_quantized_states.detach(), out.codevector_perplexity.detach()
         batch.quantized_representation = q_repr
         wav_adv = pgd_loop(
             batch, self.asr_brain, nb_iter=self.nb_iter,
-            eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
+            eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted, ord=self.ord,
             clip_min=self.clip_min, clip_max=self.clip_max,
             delta_init=delta, l1_sparsity=self.l1_sparsity
@@ -122,7 +124,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
         number of iterations.
      eps_iter: float
         attack step size.
-     rand_init: (optional bool) 
+     rand_init: (optional bool)
         random initialization.
      clip_min: (optional) float
         mininum value per input dimension.
@@ -146,7 +148,8 @@ class ASRFeatureAdversary(ASRPGDAttack):
     def _check_for_contrastive_loss(self):
         if not hasattr(self.asr_brain.modules, "wav2vec2"):
             return False
-        if not isinstance(self.asr_brain.modules.wav2vec2, AdvHuggingFaceWav2Vec2Pretrain):
+        if not isinstance(self.asr_brain.modules.wav2vec2,
+                          AdvHuggingFaceWav2Vec2Pretrain):
             return False
         return True
 
@@ -158,7 +161,7 @@ class ASRFeatureAdversary(ASRPGDAttack):
         """
         Given an audio batch, returns its adversarial counterpart with
         an attack radius of eps.
-        
+
         Arguments
         ---------
         batch: PaddedBatch
@@ -182,7 +185,8 @@ class ASRFeatureAdversary(ASRPGDAttack):
             delta.data = torch.clamp(
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
-        # fixing the quantized representation of the batch for contrastive adversarial learning
+        # fixing the quantized representation of the batch for contrastive
+        # adversarial learning
         _, out, _ = self.asr_brain.compute_forward(batch, stage=sb.Stage.VALID)
         q_repr = out.projected_quantized_states.detach(), out.codevector_perplexity.detach()
         batch.quantized_representation = q_repr
@@ -199,12 +203,12 @@ class ASRFeatureAdversary(ASRPGDAttack):
 
             def compute_objectives(self, predictions, batch, stage):
                 assert stage == rs.Stage.ATTACK
-                loss = torch.square(predictions[0]-self.init_features).sum()
+                loss = torch.square(predictions[0] - self.init_features).sum()
                 return loss
 
         wav_adv = pgd_loop(
             batch, NestedClassForFeatureAdversary(self.asr_brain.modules.wav2vec2.model.wav2vec2, batch), nb_iter=self.nb_iter,
-            eps=self.eps, eps_iter=self.rel_eps_iter*self.eps,
+            eps=self.eps, eps_iter=self.rel_eps_iter * self.eps,
             minimize=self.targeted, ord=self.ord,
             clip_min=self.clip_min, clip_max=self.clip_max,
             delta_init=delta, l1_sparsity=self.l1_sparsity

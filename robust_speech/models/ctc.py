@@ -6,7 +6,7 @@ The neural network is trained on CTC likelihood target and character units
 are used as basic recognition tokens. Training is performed on the full
 LibriSpeech dataset (960 h).
 
-Inspired from both SpeechBrain Wav2Vec2 
+Inspired from both SpeechBrain Wav2Vec2
 (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/CTC/train_with_wav2vec.py)
 and Seq2Seq (https://github.com/speechbrain/speechbrain/blob/develop/recipes/LibriSpeech/ASR/seq2seq/train.py)
 
@@ -47,7 +47,7 @@ class CTCASR(AdvASRBrain):
         else:
             # don't update normalization outside of training!
             feats = self.modules.normalize(
-                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch+1)
+                feats, wav_lens, epoch=self.modules.normalize.update_until_epoch + 1)
         if stage == rs.Stage.ATTACK:
             x = self.modules.enc(feats)
         else:
@@ -63,7 +63,8 @@ class CTCASR(AdvASRBrain):
             )
         return p_ctc, wav_lens, p_tokens
 
-    def compute_objectives(self, predictions, batch, stage, adv=False, targeted=False, reduction="mean"):
+    def compute_objectives(self, predictions, batch, stage,
+                           adv=False, targeted=False, reduction="mean"):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
         p_ctc, wav_lens, predicted_tokens = predictions

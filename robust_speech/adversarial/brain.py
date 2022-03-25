@@ -310,7 +310,6 @@ class AdvASRBrain(ASRBrain):
             attacker=attacker,
         )
         self.tokenizer = None
-        self.init_metrics()
 
     def __setattr__(self, name, value, attacker_brain=True):
         """Maintain similar attributes for the main and nested brain"""
@@ -350,17 +349,6 @@ class AdvASRBrain(ASRBrain):
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
-
-    def init_metrics(self):
-        self.cer_metric = None
-        self.wer_metric = None
-        self.acc_metric = None
-        self.adv_cer_metric = None
-        self.adv_wer_metric = None
-        self.adv_acc_metric = None
-        self.adv_cer_metric_target = None
-        self.adv_wer_metric_target = None
-        self.adv_acc_metric_target = None
 
     def compute_forward_adversarial(self, batch, stage):
         """Forward pass applied to an adversarial example.

@@ -58,12 +58,12 @@ Example
 # in ./recipes/
 
 # This will download the speechbrain/asr-crdnn-rnnlm-librispeech model from huggingface
-python evaluate.py attack_configs/pgd/s2s_1000bpe.yaml --root=/path/to/results/folder 
+python evaluate.py attack_configs/pgd/s2s_1000bpe.yaml --root=/path/to/results/folder --skip_prep=False
 
 # This will train a model first
-python train.py train_configs/ctc_train.yaml --root=/path/to/results/folder
+python train.py train_configs/ctc_train.yaml --root=/path/to/results/folder --skip_prep=False
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-ctcrnn-librispeech/
-python evaluate.py attack_configs/pgd/ctc_char.yaml --root=/path/to/results/folder --snr=25
+python evaluate.py attack_configs/pgd/ctc_char.yaml --root=/path/to/results/folder --snr=25 --skip_prep=False
 ```
 
 Our provided configs assume a results folder structure such as

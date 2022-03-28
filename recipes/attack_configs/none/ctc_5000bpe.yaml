@@ -50,7 +50,7 @@ data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
 test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
-data_csv_name: test-clean-short
+data_csv_name: test-clean
 test_csv:
    - !ref <data_folder>/csv/<data_csv_name>.csv
 batch_size: 1 # This works for 2x GPUs with 32GB

@@ -35,7 +35,8 @@ dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2-base-960h
 
 # Data files
-data_folder: !ref <root>/data/LibriSpeech
+data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
+csv_folder: !ref <data_folder>/csv
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 

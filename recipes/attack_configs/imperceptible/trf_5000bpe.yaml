@@ -58,6 +58,7 @@ dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
+csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
 # If RIRS_NOISES dir exists in /localscratch/xxx_corpus/RIRS_NOISES
 # then data_folder_rirs should be /localscratch/xxx_corpus
 # otherwise the dataset will automatically be downloaded

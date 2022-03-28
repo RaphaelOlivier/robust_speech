@@ -34,7 +34,8 @@ dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 pretrained_lm_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
 
 # Data files
-data_folder: !ref <root>/data/LibriSpeech
+data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
+csv_folder: !ref <data_folder>/csv
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 

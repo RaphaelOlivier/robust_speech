@@ -19,7 +19,8 @@ attack_class: null
 wav2vec2_hub: facebook/wav2vec2-large-960h
 
 # Data files
-data_folder: !ref <root>/data/LibriSpeech
+data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
+csv_folder: !ref <data_folder>/csv
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 train_splits: ["train-clean-100"]

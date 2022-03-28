@@ -98,7 +98,7 @@ if __name__ == "__main__":
         kwargs={
             "data_folder": hparams["data_folder"],
             "te_splits": hparams["test_splits"],
-            "save_folder": hparams["output_folder"],
+            "save_folder": hparams["csv_folder"],
             "skip_prep": hparams["skip_prep"],
         },
     )

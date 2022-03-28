@@ -14,7 +14,7 @@ attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
   targeted: False
   snr: !ref <snr>
   nb_iter: !ref <nb_iter>
-  train_mode_for_backward: False
+  #train_mode_for_backward: False
 save_audio: False
 attack_name: transfer/pgd
 

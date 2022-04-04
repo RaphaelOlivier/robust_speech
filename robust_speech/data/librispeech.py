@@ -83,8 +83,6 @@ def prepare_librispeech(
     >>> prepare_librispeech(data_folder, save_folder, tr_splits, dev_splits, te_splits)
     """
 
-    if skip_prep:
-        return
     data_folder = data_folder
     splits = tr_splits + dev_splits + te_splits
     save_folder = save_folder
@@ -101,7 +99,7 @@ def prepare_librispeech(
     save_opt = os.path.join(save_folder, OPT_FILE)
 
     # Check if this phase is already done (if so, skip it)
-    if skip(splits, save_folder, conf):
+    if skip(splits, save_folder, conf) and skip_prep:
         logger.info("Skipping preparation, completed in previous run.")
         return
     else:

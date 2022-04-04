@@ -115,4 +115,18 @@ Snippets of code have been copy-pasted from packages [SpeechBrain](https://githu
 **robust_speech** is released under the Apache License, version 2.0.
 
 ## Cite
-Results of adversarial attacks on these models and this dataset will be shorly published in a preprint paper. Incoming...
+If you are using robust_speeech for your experiments please cite [this paper](https://arxiv.org/abs/2203.16536)
+
+```bibtex
+@misc{https://doi.org/10.48550/arxiv.2203.16536,
+  doi = {10.48550/ARXIV.2203.16536},
+  url = {https://arxiv.org/abs/2203.16536},
+  author = {Olivier, Raphael and Raj, Bhiksha},
+  keywords = {Cryptography and Security (cs.CR), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), Sound (cs.SD), Audio and Speech Processing (eess.AS), FOS: Computer and information sciences, FOS: Computer and information sciences, FOS: Electrical engineering, electronic engineering, information engineering, FOS: Electrical engineering, electronic engineering, information engineering},
+  title = {Recent improvements of ASR models in the face of adversarial attacks},
+  publisher = {arXiv},
+  year = {2022},  
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+
+```

@@ -29,14 +29,7 @@ from robust_speech.adversarial.brain import AdvASRBrain
 logger = logging.getLogger("speechbrain.dataio.sampler")
 logger.setLevel(logging.WARNING)  # avoid annoying logs
 
-if __name__ == "__main__":
-
-    # CLI:
-    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-
-    # If distributed_launch=True then
-    # create ddp_group with the right communication protocol
-    sb.utils.distributed.ddp_init_group(run_opts)
+def train(hparams_file, run_opts, overrides):
 
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
@@ -125,3 +118,15 @@ if __name__ == "__main__":
         asr_brain.evaluate(
             test_datasets[k], test_loader_kwargs=hparams["test_dataloader_opts"]
         )
+
+if __name__ == "__main__":
+
+    # CLI:
+    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
+
+    # If distributed_launch=True then
+    # create ddp_group with the right communication protocol
+    sb.utils.distributed.ddp_init_group(run_opts)
+
+    train(hparams_file, run_opts, overrides)
+

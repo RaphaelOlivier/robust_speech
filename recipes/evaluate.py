@@ -65,14 +65,7 @@ def read_brains(
     return brain
 
 
-if __name__ == "__main__":
-
-    # CLI:
-    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
-    # If distributed_launch=True then
-    # create ddp_group with the right communication protocol
-    sb.utils.distributed.ddp_init_group(run_opts)
-
+def evaluate(hparams_file, run_opts, overrides):
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
@@ -155,3 +148,15 @@ if __name__ == "__main__":
             sample_rate=hparams["sample_rate"],
             target=hparams["target_sentence"] if "target_sentence" in hparams else None,
         )
+
+
+if __name__ == "__main__":
+
+    # CLI:
+    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
+    # If distributed_launch=True then
+    # create ddp_group with the right communication protocol
+    sb.utils.distributed.ddp_init_group(run_opts)
+
+    evaluate(hparams_file, run_opts, overrides)
+

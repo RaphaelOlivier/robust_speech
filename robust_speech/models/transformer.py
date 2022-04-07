@@ -304,7 +304,7 @@ class TrfASR(AdvASRBrain):
 
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                stats_meta={"Epoch loaded": self.hparams.epoch_counter.current},
+                stats_meta={"Evaluation stage": "TEST"},
                 test_stats=stage_stats,
             )
             with open(self.hparams.wer_file, "w") as wer:

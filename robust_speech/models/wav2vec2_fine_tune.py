@@ -81,6 +81,7 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         freeze=True,
         freeze_feature_extractor=False,
         apply_spec_augment=False,
+        load_pretrained_weights=True,
     ):
         nn.Module.__init__(self)
 
@@ -99,7 +100,7 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
             model = HF_models.get("wav2vec2")
 
         # Download and load the model
-        self._from_pretrained(source, config=config, model=model, save_path=save_path)
+        self._from_pretrained(source, config=config, model=model, save_path=save_path, load_weights=load_pretrained_weights)
 
         # set apply_spec_augment
         self.model.config.apply_spec_augment = apply_spec_augment

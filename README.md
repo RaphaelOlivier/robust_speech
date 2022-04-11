@@ -132,6 +132,7 @@ You may change this at will in your custom `.yaml` files or with command line ar
     * [Universal](https://arxiv.org/abs/1905.03828)
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
     * [Targeted Black Box](https://arxiv.org/abs/1805.07820)
+    * [Yeehaw Junction](https://arxiv.org/abs/2203.05408)
 * Defenses:
     * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
 * Data poisoning

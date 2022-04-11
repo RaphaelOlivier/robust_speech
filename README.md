@@ -65,9 +65,9 @@ python evaluate.py attack_configs/pgd/s2s_1000bpe.yaml --root=/path/to/results/f
 # in ./recipes/
 
 # This will train a model first
-python train.py train_configs/ctc_train.yaml --root=/path/to/results/folder
-mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-ctcrnn-librispeech/
-python evaluate.py attack_configs/pgd/ctc_char.yaml --root=/path/to/results/folder --snr=25
+python train.py train_configs/transformer_train.yaml --root=/path/to/results/folder
+mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transformer-transformerlm-librispeech/
+python evaluate.py attack_configs/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
 ```
 
 ### Computation time

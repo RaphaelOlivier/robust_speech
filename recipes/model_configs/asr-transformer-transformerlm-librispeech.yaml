@@ -37,19 +37,19 @@ n_mels: 80
 
 ####################### Model parameters ###########################
 # Transformer
-d_model: 768
-nhead: 8
+d_model: 512
+nhead: 4
 num_encoder_layers: 12
 num_decoder_layers: 6
-d_ffn: 3072
-transformer_dropout: 0.0
+d_ffn: 2048
+transformer_dropout: 0.1
 activation: !name:torch.nn.GELU
 output_neurons: 5000
 vocab_size: 5000
 
 # Outputs
 blank_index: 0
-label_smoothing: 0.1
+label_smoothing: 0.0
 pad_index: 0
 bos_index: 1
 eos_index: 2
@@ -61,25 +61,22 @@ max_decode_ratio: 1.0
 valid_search_interval: 1
 valid_beam_size: 1
 test_beam_size: 1
-lm_weight: 0.
+lm_weight: 2
 ctc_weight_decode: 0.
 
 ############################## models ################################
 
-bn2: !name:speechbrain.nnet.normalization.BatchNorm2d
-    momentum: 0.0 # important to not track running stats during evaluation. 
 CNN: !new:speechbrain.lobes.models.convolution.ConvolutionFrontEnd
     input_shape: (8, 10, 80)
     num_blocks: 3
     num_layers_per_block: 1
-    out_channels: (128, 256, 512)
-    kernel_sizes: (3, 3, 1)
+    out_channels: (64, 64, 64)
+    kernel_sizes: (5, 5, 1)
     strides: (2, 2, 1)
-    residuals: (False, False, False)
-    norm: !ref <bn2>
+    residuals: (False, False, True)
 
-Transformer: !new:speechbrain.lobes.models.transformer.TransformerASR.TransformerASR
-    input_size: 10240
+Transformer: !new:speechbrain.lobes.models.transformer.TransformerASR.TransformerASR # yamllint disable-line rule:line-length
+    input_size: 1280
     tgt_vocab: !ref <output_neurons>
     d_model: !ref <d_model>
     nhead: !ref <nhead>
@@ -88,7 +85,10 @@ Transformer: !new:speechbrain.lobes.models.transformer.TransformerASR.Transforme
     d_ffn: !ref <d_ffn>
     dropout: !ref <transformer_dropout>
     activation: !ref <activation>
-    normalize_before: False
+    encoder_module: transformer
+    attention_type: regularMHA
+    normalize_before: True
+    causal: False
 
 ctc_lin: !new:speechbrain.nnet.linear.Linear
     input_size: !ref <d_model>

@@ -300,7 +300,7 @@ def create_csv(
     # Processing all the wav files in wav_lst
     for wav_file in wav_lst:
 
-        snt_id = wav_file.split("/")[-1].replace(".flac", "")
+        snt_id = os.path.basename(wav_file).replace(".flac", "")
         spk_id = "-".join(snt_id.split("-")[0:2])
         wrds = text_dict[snt_id]
 

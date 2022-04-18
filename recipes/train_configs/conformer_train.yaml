@@ -1,14 +1,14 @@
 # ############################################################################
 # Model: E2E ASR with Transformer
 # Encoder: Conformer Encoder
-# Decoder: Transformer Decoder + (CTC/ATT joint) beamsearch + TransformerLM
+# Decoder: Transformer Decoder + (CTC/ATT joint) beamsearch + RNNLM
 # Tokens: unigram
 # losses: CTC + KLdiv (Label Smoothing loss)
 # Training: Librispeech 960h
 # Authors:  Jianyuan Zhong, Titouan Parcollet, Samuele Cornell
 # ############################################################################
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 1006
+seed: 1008
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
 output_folder: !ref <root>/trainings/conformer/<seed>
@@ -40,14 +40,13 @@ csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
 data_folder_rirs: !ref <data_folder>
 train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
 dev_splits: ["dev-clean"]
-test_splits: ["test-clean", "test-other"]
+test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
 train_csv: !ref <data_folder>/csv/train.csv
 valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
    - !ref <data_folder>/csv/test-clean.csv
-   - !ref <data_folder>/csv/test-other.csv
 avoid_if_longer_than: 17.0
 avoid_if_shorter_than: 0.0
 # Training parameters
@@ -55,24 +54,24 @@ avoid_if_shorter_than: 0.0
 # The global batch size is computed as batch_size * n_gpus * gradient_accumulation.
 # Empirically, we found that this value should be >= 128.
 # Please, set your parameters accordingly.
-number_of_epochs: 220
-batch_size: 16 # This works for 2x GPUs with 32GB
+number_of_epochs: 30
+batch_size: 128 # This works for 2x GPUs with 32GB
 ctc_weight: 0.3
-gradient_accumulation: 8
+gradient_accumulation: 1
 gradient_clipping: 5.0
 loss_reduction: 'batchmean'
 sorting: random
 
 dynamic_batching: True
 dynamic_batch_sampler:
-   max_batch_len: 4096000 # 128 seconds
+   max_batch_len: 32768000 # 1024 seconds
    shuffle_ex: True
    batch_ordering: random
    num_buckets: 40
 
 
 # stages related parameters
-stage_one_epochs: 180
+stage_one_epochs: 30
 lr_adam: 0.0005
 lr_sgd: 0.0000125
 
@@ -95,9 +94,9 @@ test_dataloader_opts:
 ####################### Model parameters ###########################
 # Transformer
 d_model: 144
-nhead: 4
-num_encoder_layers: 12
-num_decoder_layers: 4
+nhead: 3
+num_encoder_layers: 6
+num_decoder_layers: 2
 d_ffn: 1024
 transformer_dropout: 0.0
 activation: !name:torch.nn.GELU

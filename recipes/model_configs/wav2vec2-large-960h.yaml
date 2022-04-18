@@ -50,7 +50,7 @@ enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
 
-wav2vec2: !new:robust_speech.models.wav2vec2_fine_tune.AdvHuggingFaceWav2Vec2
+wav2vec2: !new:robust_speech.models.modules.hf_wav2vec2.AdvHuggingFaceWav2Vec2
    source: !ref <wav2vec2_hub>
    output_norm: True
    freeze: !ref <freeze_wav2vec>

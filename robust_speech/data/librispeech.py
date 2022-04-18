@@ -362,20 +362,7 @@ def skip(splits, save_folder, conf):
 
     for split in splits:
         if not os.path.isfile(os.path.join(save_folder, split + ".csv")):
-            skip = False
-
-    #  Checking saved options
-    save_opt = os.path.join(save_folder, OPT_FILE)
-    if skip is True:
-        if os.path.isfile(save_opt):
-            opts_old = load_pkl(save_opt)
-            if opts_old == conf:
-                skip = True
-            else:
-                skip = False
-        else:
-            skip = False
-
+            skip = False 
     return skip
 
 

@@ -9,7 +9,7 @@ import torch.nn as nn
 import robust_speech as rs
 from robust_speech.adversarial.attacks.pgd import ASRPGDAttack, pgd_loop
 from robust_speech.adversarial.utils import rand_assign
-from robust_speech.models.wav2vec2_pretrain import AdvHuggingFaceWav2Vec2Pretrain
+from robust_speech.models.modules.hf_wav2vec2 import AdvHuggingFaceWav2Vec2Pretrain
 
 
 class ContrastiveASRAttack(ASRPGDAttack):

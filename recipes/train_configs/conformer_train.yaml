@@ -8,7 +8,7 @@
 # Authors:  Jianyuan Zhong, Titouan Parcollet, Samuele Cornell
 # ############################################################################
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 1008
+seed: 1009
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 root: !PLACEHOLDER
 output_folder: !ref <root>/trainings/conformer/<seed>
@@ -56,15 +56,15 @@ avoid_if_shorter_than: 0.0
 # Please, set your parameters accordingly.
 number_of_epochs: 30
 batch_size: 128 # This works for 2x GPUs with 32GB
-ctc_weight: 0.3
-gradient_accumulation: 1
+ctc_weight: 1.0
+gradient_accumulation: 3
 gradient_clipping: 5.0
 loss_reduction: 'batchmean'
 sorting: random
 
 dynamic_batching: True
 dynamic_batch_sampler:
-   max_batch_len: 32768000 # 1024 seconds
+   max_batch_len: 8192000 # 1024 seconds
    shuffle_ex: True
    batch_ordering: random
    num_buckets: 40
@@ -118,7 +118,7 @@ valid_search_interval: 10
 valid_beam_size: 1
 test_beam_size: 1
 lm_weight: 0.0
-ctc_weight_decode: 0.0
+ctc_weight_decode: 1.0
 
 ############################## models ################################
 
@@ -238,7 +238,7 @@ seq_cost: !name:speechbrain.nnet.losses.kldiv_loss
 
 noam_annealing: !new:speechbrain.nnet.schedulers.NoamScheduler
     lr_initial: !ref <lr_adam>
-    n_warmup_steps: 25000
+    n_warmup_steps: 5000
 #    model_size: !ref <d_model>
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer

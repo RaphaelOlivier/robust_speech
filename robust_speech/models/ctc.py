@@ -117,20 +117,3 @@ class CTCASR(AdvASRBrain):
 
         return loss
 
-
-class CTCGreedyDecode(sb.decoders.seq2seq.S2SBaseSearcher):
-    """Binding between Seq2Seq models and CTC decoders"""
-
-    def __init__(self, blank_index, ctc_lin, log_softmax):
-        super(CTCGreedyDecode, self).__init__(None, None, None, None)
-        self.blank_index = blank_index
-        self.ctc_lin = ctc_lin
-        self.log_softmax = log_softmax
-
-    def forward(self, enc_states, wav_len):
-        logits = self.ctc_lin(enc_states)
-        p_ctc = self.log_softmax(logits)
-        p_tokens = sb.decoders.ctc_greedy_decode(
-            p_ctc, wav_len, blank_id=self.blank_index
-        )
-        return p_tokens, None

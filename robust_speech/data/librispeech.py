@@ -597,16 +597,6 @@ def dataio_prepare(hparams):
                 batch_ordering=dynamic_hparams["batch_ordering"],
             )
 
-        if valid_data:
-            valid_batch_sampler = DynamicBatchSampler(
-                valid_data,
-                max_batch_len,
-                num_buckets=num_buckets,
-                length_func=lambda x: x["duration"] * hparams["sample_rate"],
-                shuffle=dynamic_hparams["shuffle_ex"],
-                batch_ordering=dynamic_hparams["batch_ordering"],
-            )
-
     return (
         train_data,
         valid_data,

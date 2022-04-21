@@ -16,6 +16,7 @@ from tqdm import tqdm
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
+from robust_speech.adversarial.smoothing import SpeechNoiseAugmentation
 
 warnings.simplefilter("once", RuntimeWarning)
 
@@ -309,6 +310,7 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker,
         )
+        self.init_smoothing(hparams=hparams)
         self.tokenizer = None
 
     def __setattr__(self, name, value, attacker_brain=True):
@@ -321,6 +323,26 @@ class AdvASRBrain(ASRBrain):
         ):
             super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
         super(AdvASRBrain, self).__setattr__(name, value)
+
+    def init_smoothing(self, hparams):
+        if 'enable_eval_smoothing' in hparams.keys():
+            if hparams['enable_eval_smoothing']:
+                self.enable_eval_smoothing = hparams['enable_eval_smoothing']
+                if 'eval_smoothing_sigma' not in hparams.keys():
+                    self.eval_smoothing_sigma = 0.01
+                else:
+                    self.eval_smoothing_sigma = hparams['eval_smoothing_sigma']
+                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma)
+
+        if 'enable_train_smoothing' in hparams.keys():
+            if hparams['enable_train_smoothing']:
+                self.enable_train_smoothing = hparams['enable_train_smoothing']
+                if 'train_smoothing_sigma' not in hparams.keys():
+                    self.train_smoothing_sigma = 0.01
+                else:
+                    self.train_smoothing_sigma = hparams['train_smoothing_sigma']
+                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma)
+
 
     def init_attacker(
         self, modules=None, opt_class=None, hparams=None, run_opts=None, attacker=None
@@ -646,6 +668,8 @@ class AdvASRBrain(ASRBrain):
             ) as pbar:
                 for batch in pbar:
                     self.step += 1
+                    if (self.enable_train_smoothing and self.train_speech_noise_augmentation is not None):
+                        batch = self.train_speech_noise_augmentation(batch)
                     if self.attacker is not None:
                         loss = self.fit_batch_adversarial(batch)
                     else:
@@ -774,6 +798,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_loss = 0.0
         avg_test_adv_loss = None
         avg_test_adv_loss_target = None
+
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
@@ -782,6 +807,9 @@ class AdvASRBrain(ASRBrain):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)
+
+            if (self.enable_eval_smoothing and self.eval_speech_noise_augmentation is not None):
+                batch = self.eval_speech_noise_augmentation(batch)
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(

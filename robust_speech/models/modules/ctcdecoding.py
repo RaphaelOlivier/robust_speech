@@ -25,7 +25,7 @@ class CTCGreedyDecode(sb.decoders.seq2seq.S2SBaseSearcher):
         return p_tokens, None
 
 
-def prefix_beam_search(ctc, blank_id, lm=None, k=25, alpha=0.30, beta=5, prune=0.001):
+def prefix_beam_search(ctc, blank_id, lm=None, k=25, alpha=0.30, beta=5, prune=0.001, temperature_lm=1.0):
     W = lambda l: re.findall(r'\w+[\s|>]', l)
     lm = (lambda l: 1) if lm is None else lm # if no LM is provided, just set to function returning 1
     F = ctc.shape[1]
@@ -48,6 +48,11 @@ def prefix_beam_search(ctc, blank_id, lm=None, k=25, alpha=0.30, beta=5, prune=0
             if alpha>0:
                 lm_prob = lm(l_t.to(ctc.device))[-1]
                 probs = alpha * torch.exp(lm_prob) + (1.-alpha)*ctc[t]
+            if alpha>0 and len(filt_l)>0:
+                filt_l = ctc.new(filter_ctc_output(l_t.tolist(),blank_id)).long()
+                lm_log_prob = lm(filt_l)[-1]
+                lm_prob = F.softmax(lm_log_prob / temperature_lm,dim=-1)
+                probs = alpha * lm_prob + (1.-alpha)*ctc[t]
             else:
                 probs=ctc[t]
             pruned_alphabet = [alphabet[i] for i in torch.where(probs > prune)[0]]

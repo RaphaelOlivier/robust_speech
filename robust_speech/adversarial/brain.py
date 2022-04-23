@@ -778,6 +778,10 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
+        ######
+        if type(self.attacker).__name__ == 'UniversalAttack':
+            self.attacker.compute_universal_perturbation()
+        ######
         for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)

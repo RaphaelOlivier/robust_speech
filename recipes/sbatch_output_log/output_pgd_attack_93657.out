@@ -1,0 +1,25 @@
+0: n11
+2: n11
+3: n11
+1: n11
+0: /home/deokhk/coursework/robust_speech/recipes
+1: /home/deokhk/coursework/robust_speech/recipes
+3: /home/deokhk/coursework/robust_speech/recipes
+2: /home/deokhk/coursework/robust_speech/recipes
+0: Thu Apr  7 05:21:46 KST 2022
+2: Thu Apr  7 05:21:46 KST 2022
+1: Thu Apr  7 05:21:46 KST 2022
+3: Thu Apr  7 05:21:46 KST 2022
+Thu Apr  7 05:21:46 KST 2022
+speechbrain.core - Beginning experiment!
+speechbrain.core - Experiment folder: /home/deokhk/coursework/robust_speech/root/trainings/conformer/40
+speechbrain.pretrained.fetching - Fetch lm.ckpt: Delegating to Huggingface hub, source speechbrain/asr-crdnn-rnnlm-librispeech.
+speechbrain.pretrained.fetching - Fetch tokenizer.ckpt: Delegating to Huggingface hub, source speechbrain/asr-crdnn-rnnlm-librispeech.
+speechbrain.utils.parameter_transfer - Loading pretrained files for: lm, tokenizer
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
+speechbrain.utils.epoch_loop - Going into epoch 1
+  0%|          | 0/1556 [00:00<?, ?it/s]  0%|          | 0/1556 [00:01<?, ?it/s, adv_train_loss=13.2]  0%|          | 1/1556 [00:01<34:44,  1.34s/it, adv_train_loss=13.2]  0%|          | 1/1556 [00:01<34:44,  1.34s/it, adv_train_loss=14.1]  0%|          | 2/1556 [00:01<21:18,  1.22it/s, adv_train_loss=14.1]  0%|          | 2/1556 [00:02<21:18,  1.22it/s, adv_train_loss=14.3]  0%|          | 3/1556 [00:02<16:41,  1.55it/s, adv_train_loss=14.3]  0%|          | 3/1556 [00:02<16:41,  1.55it/s, adv_train_loss=14.5]  0%|          | 4/1556 [00:02<14:16,  1.81it/s, adv_train_loss=14.5]  0%|          | 4/1556 [00:03<14:16,  1.81it/s, adv_train_loss=14.5]  0%|          | 5/1556 [00:03<13:47,  1.87it/s, adv_train_loss=14.5]  0%|          | 5/1556 [00:03<13:47,  1.87it/s, adv_train_loss=14.3]  0%|          | 6/1556 [00:03<13:27,  1.92it/s, adv_train_loss=14.3]  0%|          | 6/1556 [00:04<13:27,  1.92it/s, adv_train_loss=14.3]  0%|          | 7/1556 [00:04<13:09,  1.96it/s, adv_train_loss=14.3]  0%|          | 7/1556 [00:04<13:09,  1.96it/s, adv_train_loss=14.3]  1%|          | 8/1556 [00:04<12:58,  1.99it/s, adv_train_loss=14.3]  1%|          | 8/1556 [00:05<12:58,  1.99it/s, adv_train_loss=13.9]  1%|          | 9/1556 [00:05<12:31,  2.06it/s, adv_train_loss=13.9]  1%|          | 9/1556 [00:05<12:31,  2.06it/s, adv_train_loss=13.6]  1%|          | 10/1556 [00:05<12:08,  2.12it/s, adv_train_loss=13.6]  1%|          | 10/1556 [00:05<12:08,  2.12it/s, adv_train_loss=13.3]  1%|          | 11/1556 [00:05<11:45,  2.19it/s, adv_train_loss=13.3]  1%|          | 11/1556 [00:06<11:45,  2.19it/s, adv_train_loss=13.1]  1%|          | 12/1556 [00:06<11:32,  2.23it/s, adv_train_loss=13.1]  1%|          | 12/1556 [00:06<11:32,  2.23it/s, adv_train_loss=12.9]  1%|          | 13/1556 [00:06<11:49,  2.17it/s, adv_train_loss=12.9]  1%|          | 13/1556 [00:07<11:49,  2.17it/s, adv_train_loss=12.7]  1%|          | 14/1556 [00:07<11:18,  2.27it/s, adv_train_loss=12.7]  1%|          | 14/1556 [00:07<11:18,  2.27it/s, adv_train_loss=12.6]  1%|          | 15/1556 [00:07<11:18,  2.27it/s, adv_train_loss=12.6]  1%|          | 15/1556 [00:08<11:18,  2.27it/s, adv_train_loss=12.5]  1%|          | 16/1556 [00:08<11:40,  2.20it/s, adv_train_loss=12.5]  1%|          | 16/1556 [00:08<11:40,  2.20it/s, adv_train_loss=12.4]  1%|          | 17/1556 [00:08<11:35,  2.21it/s, adv_train_loss=12.4]  1%|          | 17/1556 [00:09<11:35,  2.21it/s, adv_train_loss=12.3]  1%|          | 18/1556 [00:09<11:29,  2.23it/s, adv_train_loss=12.3]  1%|          | 18/1556 [00:09<11:29,  2.23it/s, adv_train_loss=12.2]  1%|          | 19/1556 [00:09<11:25,  2.24it/s, adv_train_loss=12.2]  1%|          | 19/1556 [00:09<11:25,  2.24it/s, adv_train_loss=12.1]  1%|▏         | 20/1556 [00:09<11:21,  2.25it/s, adv_train_loss=12.1]  1%|▏         | 20/1556 [00:10<11:21,  2.25it/s, adv_train_loss=12]    1%|▏         | 21/1556 [00:10<11:18,  2.26it/s, adv_train_loss=12]slurmstepd: error: *** JOB 93657 ON n11 CANCELLED AT 2022-04-07T05:22:04 ***

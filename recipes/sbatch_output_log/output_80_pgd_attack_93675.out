@@ -1,0 +1,25 @@
+1: n11
+2: n11
+3: n11
+0: n11
+1: /home/deokhk/coursework/robust_speech/recipes
+2: /home/deokhk/coursework/robust_speech/recipes
+3: /home/deokhk/coursework/robust_speech/recipes
+0: /home/deokhk/coursework/robust_speech/recipes
+0: Thu Apr  7 12:21:40 KST 2022
+1: Thu Apr  7 12:21:40 KST 2022
+2: Thu Apr  7 12:21:40 KST 2022
+3: Thu Apr  7 12:21:40 KST 2022
+Thu Apr  7 12:21:40 KST 2022
+speechbrain.core - Beginning experiment!
+speechbrain.core - Experiment folder: /home/deokhk/coursework/robust_speech/root/trainings/conformer/1006
+speechbrain.pretrained.fetching - Fetch lm.ckpt: Using existing file/symlink in /home/deokhk/coursework/robust_speech/root/trainings/conformer/1006/save/lm.ckpt.
+speechbrain.pretrained.fetching - Fetch tokenizer.ckpt: Using existing file/symlink in /home/deokhk/coursework/robust_speech/root/trainings/conformer/1006/save/tokenizer.ckpt.
+speechbrain.utils.parameter_transfer - Loading pretrained files for: lm, tokenizer
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.utils.checkpoints - Loading a checkpoint from /home/deokhk/coursework/robust_speech/root/trainings/conformer/1006/save/CKPT+2022-04-07+11-54-36+00
+speechbrain.utils.epoch_loop - Going into epoch 12
+  0%|          | 0/1556 [00:00<?, ?it/s]  0%|          | 0/1556 [00:05<?, ?it/s, adv_train_loss=5.02]  0%|          | 1/1556 [00:05<2:29:58,  5.79s/it, adv_train_loss=5.02]  0%|          | 1/1556 [00:10<2:29:58,  5.79s/it, adv_train_loss=5.08]  0%|          | 2/1556 [00:10<2:11:03,  5.06s/it, adv_train_loss=5.08]  0%|          | 2/1556 [00:14<2:11:03,  5.06s/it, adv_train_loss=5.1]   0%|          | 3/1556 [00:14<2:04:17,  4.80s/it, adv_train_loss=5.1]  0%|          | 3/1556 [00:18<2:04:17,  4.80s/it, adv_train_loss=5.09]  0%|          | 4/1556 [00:18<1:57:33,  4.54s/it, adv_train_loss=5.09]  0%|          | 4/1556 [00:23<1:57:33,  4.54s/it, adv_train_loss=5.09]  0%|          | 5/1556 [00:23<1:58:02,  4.57s/it, adv_train_loss=5.09]  0%|          | 5/1556 [00:28<1:58:02,  4.57s/it, adv_train_loss=5.09]  0%|          | 6/1556 [00:28<1:58:20,  4.58s/it, adv_train_loss=5.09]  0%|          | 6/1556 [00:32<1:58:20,  4.58s/it, adv_train_loss=5.07]  0%|          | 7/1556 [00:32<1:57:46,  4.56s/it, adv_train_loss=5.07]  0%|          | 7/1556 [00:37<1:57:46,  4.56s/it, adv_train_loss=5.07]  1%|          | 8/1556 [00:37<1:57:28,  4.55s/it, adv_train_loss=5.07]  1%|          | 8/1556 [00:41<1:57:28,  4.55s/it, adv_train_loss=5.07]  1%|          | 9/1556 [00:41<1:58:08,  4.58s/it, adv_train_loss=5.07]  1%|          | 9/1556 [00:46<1:58:08,  4.58s/it, adv_train_loss=5.06]  1%|          | 10/1556 [00:46<1:57:06,  4.54s/it, adv_train_loss=5.06]  1%|          | 10/1556 [00:50<1:57:06,  4.54s/it, adv_train_loss=5.06]  1%|          | 11/1556 [00:50<1:54:38,  4.45s/it, adv_train_loss=5.06]  1%|          | 11/1556 [00:55<1:54:38,  4.45s/it, adv_train_loss=5.05]  1%|          | 12/1556 [00:55<1:54:58,  4.47s/it, adv_train_loss=5.05]  1%|          | 12/1556 [00:59<1:54:58,  4.47s/it, adv_train_loss=5.05]  1%|          | 13/1556 [00:59<1:55:40,  4.50s/it, adv_train_loss=5.05]  1%|          | 13/1556 [01:03<1:55:40,  4.50s/it, adv_train_loss=5.05]  1%|          | 14/1556 [01:03<1:53:29,  4.42s/it, adv_train_loss=5.05]  1%|          | 14/1556 [01:08<1:53:29,  4.42s/it, adv_train_loss=5.05]  1%|          | 15/1556 [01:08<1:54:11,  4.45s/it, adv_train_loss=5.05]  1%|          | 15/1556 [01:13<1:54:11,  4.45s/it, adv_train_loss=5.05]  1%|          | 16/1556 [01:13<1:55:27,  4.50s/it, adv_train_loss=5.05]  1%|          | 16/1556 [01:17<1:55:27,  4.50s/it, adv_train_loss=5.05]  1%|          | 17/1556 [01:17<1:55:02,  4.49s/it, adv_train_loss=5.05]  1%|          | 17/1556 [01:22<1:55:02,  4.49s/it, adv_train_loss=5.05]  1%|          | 18/1556 [01:22<1:55:36,  4.51s/it, adv_train_loss=5.05]  1%|          | 18/1556 [01:26<1:55:36,  4.51s/it, adv_train_loss=5.05]  1%|          | 19/1556 [01:26<1:55:32,  4.51s/it, adv_train_loss=5.05]  1%|          | 19/1556 [01:31<1:55:32,  4.51s/it, adv_train_loss=5.05]  1%|▏         | 20/1556 [01:31<1:55:27,  4.51s/it, adv_train_loss=5.05]slurmstepd: error: *** JOB 93675 ON n11 CANCELLED AT 2022-04-07T12:23:36 ***

@@ -349,7 +349,9 @@ class AdvASRBrain(ASRBrain):
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
-
+    def test_feature(self):
+        print("Hey its me!")
+        
     def compute_forward_adversarial(self, batch, stage):
         """Forward pass applied to an adversarial example.
 

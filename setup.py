@@ -29,7 +29,7 @@ setup(
     install_requires=[
         "torch>=1.7,<=1.11",
         "speechbrain @ git+https://github.com/RaphaelOlivier/speechbrain.git",
-        "transformers>=4.15.0",
+        "transformers>=4.18.0",
         "torchvision",
     ],
     python_requires=">=3.7",

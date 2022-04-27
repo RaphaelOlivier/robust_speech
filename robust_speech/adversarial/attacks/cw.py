@@ -62,6 +62,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         initial_rescale: float = 1.0,
         decrease_factor_eps: float = 0.8,
         num_iter_decrease_eps: int = 1,
+        max_num_decrease_eps: Optional[int] = None,
         targeted: bool = True,
         train_mode_for_backward: bool = True,
         clip_min: Optional[float] = None,
@@ -77,6 +78,9 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
             optimizer_1=optimizer,
             global_max_length=global_max_length,
             initial_rescale=initial_rescale,
+            decrease_factor_eps=decrease_factor_eps,
+            num_iter_decrease_eps=num_iter_decrease_eps,
+            max_num_decrease_eps=max_num_decrease_eps,
             targeted=targeted,
             train_mode_for_backward=train_mode_for_backward,
             clip_min=clip_min,
@@ -96,7 +100,8 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
     ):
 
         # Compute perturbed inputs
-        local_delta = self.global_optimal_delta[:local_batch_size, :local_max_length]
+        local_delta = self.global_optimal_delta[:
+                                                local_batch_size, :local_max_length]
         local_delta_rescale = torch.clamp(local_delta, -self.eps, self.eps).to(
             self.asr_brain.device
         )
@@ -111,7 +116,8 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         # Compute loss and decoded output
         batch.sig = masked_adv_input, batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
+        loss = self.asr_brain.compute_objectives(
+            predictions, batch, rs.Stage.ATTACK)
         loss = self.const * loss + torch.norm(local_delta_rescale)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)

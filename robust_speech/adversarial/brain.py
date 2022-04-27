@@ -725,6 +725,7 @@ class AdvASRBrain(ASRBrain):
         progressbar=None,
         test_loader_kwargs={},
         save_audio_path=None,
+        load_audio=False,
         sample_rate=16000,
         target=None,
     ):
@@ -751,6 +752,8 @@ class AdvASRBrain(ASRBrain):
             is not added to the checkpointer).
         save_audio_path : str
             optional path where to store adversarial audio files
+        load_audio : bool
+            whether to load audio files from save_audio_path instead of running the attack
         sample_rate = 16000
             the audio sample rate
         target : str
@@ -776,7 +779,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_adv_loss_target = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
-            self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
+            self.attacker.on_evaluation_start(load_audio=load_audio,save_audio_path=save_audio_path)
 
         for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
             self.step += 1

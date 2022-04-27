@@ -22,7 +22,7 @@ class Attacker:
         if the attack is targeted.
     """
 
-    def on_evaluation_start(self, save_audio_path=None, sample_rate=16000):
+    def on_evaluation_start(self, load_audio=False, save_audio_path=None, sample_rate=16000):
         """
         Method to run at the beginning of an evaluation phase with adverersarial attacks.
 
@@ -33,6 +33,10 @@ class Attacker:
         sample_rate: int
             audio sample rate for wav encoding
         """
+
+        self.load_audio=load_audio
+        if self.load_audio and (save_audio_path is None):
+            raise ValueError("save_audio_path must be provided in order to load audio files")
         self.snr_metric = SNRComputer()
         self.save_audio_path = save_audio_path
         if self.save_audio_path:
@@ -71,10 +75,14 @@ class Attacker:
         -------
         the tensor of the perturbed batch
         """
-        adv_wav = self.perturb(batch)
+        adv_wav = None
+        if self.load_audio:
+            adv_wav = self.audio_saver.load(batch.id, batch)
+        if adv_wav is None:
+            adv_wav = self.perturb(batch)
+            if self.save_audio_path:
+                self.audio_saver.save(batch.id, batch, adv_wav)
         self.snr_metric.append(batch.id, batch, adv_wav)
-        if self.save_audio_path:
-            self.audio_saver.save(batch.id, batch, adv_wav)
         return adv_wav
 
     def perturb(self, batch):

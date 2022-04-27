@@ -110,7 +110,7 @@ def evaluate(hparams_file, run_opts, overrides):
             tokenizer=tokenizer,
         )
     attacker = hparams["attack_class"]
-    if source_brain:
+    if source_brain and attacker:
         # instanciating with the source model if there is one.
         # Otherwise, AdvASRBrain will handle instanciating the attacker with
         # the target model.
@@ -134,6 +134,9 @@ def evaluate(hparams_file, run_opts, overrides):
     target_brain.logger = hparams["logger"]
     target_brain.hparams.train_logger = hparams["logger"]
 
+    target = hparams["target_sentence"] if "target_sentence" in hparams else None
+    load_audio = hparams["load_audio"] if "load_audio" in hparams else None
+    save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None
     # Evaluation
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(
@@ -142,11 +145,10 @@ def evaluate(hparams_file, run_opts, overrides):
         target_brain.evaluate(
             test_datasets[k],
             test_loader_kwargs=hparams["test_dataloader_opts"],
-            save_audio_path=hparams["save_audio_path"]
-            if hparams["save_audio"]
-            else None,
+            load_audio = load_audio,
+            save_audio_path=save_audio_path,
             sample_rate=hparams["sample_rate"],
-            target=hparams["target_sentence"] if "target_sentence" in hparams else None,
+            target=target,
         )
 
 

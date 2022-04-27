@@ -74,7 +74,7 @@ def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
     tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index])
     tokens = torch.LongTensor(tokens_list)
     dic = {
-        "id": "0",
+        "id": batch.id[0],
         "sig": batch.sig[0][0],
         "tokens_list": tokens_list,
         "tokens_bos": tokens_bos,

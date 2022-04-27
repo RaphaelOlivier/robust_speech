@@ -3,12 +3,14 @@ Metrics and loggers for adversarial attacks.
 """
 
 import os
+import warnings
 
 import torch
 import torchaudio
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
 from speechbrain.utils.metric_stats import MetricStats
 
+warnings.simplefilter("once", RuntimeWarning)
 
 def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     """
@@ -75,9 +77,19 @@ class AudioSaver:
             adv_wav = adv_sig[i, : lengths[i]].detach().cpu().unsqueeze(0)
             self.save_wav(audio_id, wav, adv_wav)
 
+    def load_wav(self, audio_id):
+        adv_path = audio_id + "_adv.wav"
+        adv_path=os.path.join(self.save_audio_path, adv_path)
+        if os.path.exists(adv_path):
+            adv_wav, sr = torchaudio.load(adv_path)
+            assert sr == self.sample_rate
+            return adv_wav
+        else:
+            warnings.warn("Audio file not found: computing the attack", RuntimeWarning)
+            return None
+
     def save_wav(self, audio_id, wav, adv_wav):
         """Save the original and the adversarial versions of a single audio file"""
-        print(wav.size())
         nat_path = audio_id + "_nat.wav"
         adv_path = audio_id + "_adv.wav"
         torchaudio.save(
@@ -86,3 +98,15 @@ class AudioSaver:
         torchaudio.save(
             os.path.join(self.save_audio_path, adv_path), adv_wav, self.sample_rate
         )
+
+    def load(self, audio_ids, batch):
+        """Load a batch of audio files, both natural and adversarial"""
+        lengths = (batch.sig[0].size(1) * batch.sig[1]).long()
+        adv_sig = torch.zeros_like(batch.sig[0])
+        for i in range(len(audio_ids)):
+            audio_id = audio_ids[i]
+            adv_wav = self.load_wav(audio_id)
+            if adv_wav is None:
+                return None
+            adv_sig[i,:lengths[i]] = adv_wav
+        return adv_sig

@@ -12,10 +12,13 @@ from transformers import (
     Wav2Vec2Config,
     Wav2Vec2FeatureExtractor,
     Wav2Vec2Model,
+    Data2VecAudioConfig,
+    Data2VecAudioModel,
 )
+from transformers.models.data2vec.modeling_data2vec_audio import Data2VecAudioFeatureEncoder
 
 import transformers
-from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain
+from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain, HF_models, HF_config
 from transformers import Wav2Vec2ForPreTraining
 from transformers.file_utils import (
     add_start_docstrings_to_model_forward,
@@ -30,6 +33,8 @@ from transformers.models.wav2vec2.modeling_wav2vec2 import (
 )
 from transformers.models.wav2vec2.modeling_wav2vec2 import Wav2Vec2FeatureExtractor as Wav2Vec2PretrainFeatureExtractor
 import robust_speech as rs
+
+logger = logging.getLogger(__name__)
 
 
 class AdvWav2Vec2FeatureEncoder(Wav2Vec2PretrainFeatureExtractor):
@@ -65,6 +70,31 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2PretrainFeatureExtractor):
 
         return hidden_states
 
+class AdvData2VecAudioFeatureEncoder(Data2VecAudioFeatureEncoder):
+    def forward(self, input_values):
+        hidden_states = input_values[:, None]
+
+        # make sure hidden_states require grad for gradient_checkpointing
+        if self._requires_grad and self.training and hidden_states.is_leaf:
+            hidden_states.requires_grad = True
+
+        for conv_layer in self.conv_layers:
+            if self._requires_grad and self.gradient_checkpointing and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return module(*inputs)
+
+                    return custom_forward
+
+                hidden_states = torch.utils.checkpoint.checkpoint(
+                    create_custom_forward(conv_layer),
+                    hidden_states,
+                )
+            else:
+                hidden_states = conv_layer(hidden_states)
+
+        return hidden_states
 
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
     """
@@ -314,10 +344,32 @@ class AdvWav2Vec2Model(Wav2Vec2Model):
         super().__init__(config)
         self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
+class AdvHubertModel(HubertModel):
+    """
+    This class modifies the transformers Wav2Vec2 module
+     in order to replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
+    """
 
-HF_models = {"wav2vec2": AdvWav2Vec2Model, "hubert": HubertModel}
-HF_config = {"wav2vec2": Wav2Vec2Config, "hubert": HubertConfig}
+    def __init__(self, config: HubertConfig):
+        super().__init__(config)
+        self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
+class AdvData2VecAudioModel(Data2VecAudioModel):
+    """
+    This class modifies the transformers Data2VecAudio module
+     in order to replace the Feature Extractor with AdvData2VecAudioFeatureEncoder
+    """
+
+    def __init__(self, config: Data2VecAudioConfig):
+        super().__init__(config)
+        self.feature_extractor = AdvData2VecAudioFeatureEncoder(config)
+
+
+Adv_HF_models = {
+    "wav2vec2": AdvWav2Vec2Model,
+    "hubert": AdvHubertModel,
+    "data2vec": AdvData2VecAudioModel
+}
 
 class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
     """This class inherits the SpeechBrain Wav2Vec2 lobe and
@@ -368,10 +420,13 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         # Select specific self-supervised loader (eg. Wav2Vec2, Hubert)
         if "hubert" in source:
             config = HF_config.get("hubert")
-            model = HF_models.get("hubert")
+            model = Adv_HF_models.get("hubert")
+        elif "data2vec" in source:
+            config = HF_config.get("data2vec")
+            model = Adv_HF_models.get("data2vec")
         else:
             config = HF_config.get("wav2vec2")
-            model = HF_models.get("wav2vec2")
+            model = Adv_HF_models.get("wav2vec2")
 
         # Download and load the model
         self._from_pretrained(source, config=config, model=model, save_path=save_path, load_weights=load_pretrained_weights)

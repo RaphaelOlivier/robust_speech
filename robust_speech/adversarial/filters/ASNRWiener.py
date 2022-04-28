@@ -23,7 +23,6 @@ class ASNRWiener:
             self.high_freq=filter_config['high_freq']
 
     def __call__(self, x):
-        print("ASNR filter launched ", x.shape)
         x_np=x.cpu().detach().numpy()
         for i in range(len(x_np)):
             if self.high_freq:
@@ -38,6 +37,4 @@ class ASNRWiener:
             elif len(filtered_output)>len(x_np[i]):
                 filtered_output=filtered_output[:len(x_np[i])]
             x[i]=torch.from_numpy(filtered_output)
-        print("ASNR filter finished ", x.shape)
-        # x_filtered = torch.from_numpy(x_filtered).to(device)
         return x

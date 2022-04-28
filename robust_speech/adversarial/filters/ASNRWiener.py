@@ -10,9 +10,9 @@ class ASNRWiener:
         assert('nfft' in filter_config, "nfft not in filter_config")
         assert('hop' in filter_config, "hop not in filter_config")
 
-        self.sr=float(filter_config['sr'])
-        self.nfft=float(filter_config['nfft'])
-        self.hop=float(filter_config['hop'])
+        self.sr=int(filter_config['sr'])
+        self.nfft=int(filter_config['nfft'])
+        self.hop=int(filter_config['hop'])
         self.window=hamming(self.nfft, hop=self.hop)
         self.gaussian_sigma = 0.0
         if 'gaussian_sigma' in filter_config:

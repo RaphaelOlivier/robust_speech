@@ -311,6 +311,9 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker,
         )
+        self.filter = None
+        if 'filter_config' in hparams:
+            self.init_filter(hparams)
         self.init_smoothing(hparams=hparams)
         self.tokenizer = None
 

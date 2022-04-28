@@ -24,6 +24,7 @@ class ASNRWiener:
 
     def __call__(self, x: np.ndarray):
         print("ASNR filter launched ", x.shape)
+        device=x.get_device()
         x=x.cpu().detach().numpy()
         x_filtered=np.copy(x)
         for i in range(len(x)):
@@ -40,5 +41,5 @@ class ASNRWiener:
                 filtered_output=filtered_output[:len(x[i])]
             x_filtered[i]=filtered_output
         print("ASNR filter finished ", x_filtered.shape)
-        x_filtered = torch.Tensor(x_filtered).to(x.get_device())
+        x_filtered = torch.Tensor(x_filtered).to(device)
         return x_filtered

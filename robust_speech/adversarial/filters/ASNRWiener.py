@@ -1,6 +1,7 @@
 from audlib.enhance import wiener_iter, asnr, SSFEnhancer
 from audlib.sig.window import hamming
 import numpy as np
+import torch
 
 class ASNRWiener:
     def __init__(self, filter_config):
@@ -23,7 +24,7 @@ class ASNRWiener:
 
     def __call__(self, x: np.ndarray):
         print("ASNR filter launched ", x.shape)
-        x_filtered=np.copy(x)
+        x_filtered=np.copy(x.cpu().detach().numpy())
         for i in range(len(x)):
             if self.high_freq:
                 noise = np.random.normal(0, scale=self.gaussian_sigma, size=(x[i].shape[0]+1,))
@@ -38,4 +39,5 @@ class ASNRWiener:
                 filtered_output=filtered_output[:len(x[i])]
             x_filtered[i]=filtered_output
         print("ASNR filter finished ", x_filtered.shape)
+        x_filtered = torch.Tensor(x_filtered).to(x.get_device())
         return x_filtered

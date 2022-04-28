@@ -24,7 +24,8 @@ class ASNRWiener:
 
     def __call__(self, x: np.ndarray):
         print("ASNR filter launched ", x.shape)
-        x_filtered=np.copy(x.cpu().detach().numpy().astype(float))
+        x=x.cpu().detach().numpy()
+        x_filtered=np.copy(x.cpu().detach().numpy())
         for i in range(len(x)):
             if self.high_freq:
                 noise = np.random.normal(0, scale=self.gaussian_sigma, size=(x[i].shape[0]+1,))

@@ -14,7 +14,6 @@ attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
   snr: !ref <snr>
   nb_iter: !ref <nb_iter>
-  data_csv_path: <data_folder>/csv/<data_csv_name>.csv
 save_audio: False
 
 # Model information

@@ -27,6 +27,7 @@ setup(
     packages=setuptools.find_packages(),
     package_data={"robust_speech": ["version.txt", "log-config.yaml"]},
     install_requires=[
+        "audlib==0.0.3.5"
         "art==1.10.0",
         "tensorflow==2.8.0",
         "torch>=1.7,<=1.11",

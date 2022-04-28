@@ -17,12 +17,14 @@ python universal_evaluate.py attack_configs/pgd/attack.yaml\
 """
 import os
 import sys
+import torch
 from pathlib import Path
 
 import speechbrain as sb
 from hyperpyyaml import load_hyperpyyaml
 from speechbrain.utils.distributed import run_on_main
 
+from torch.utils.data import DataLoader, Dataset, random_split
 
 import robust_speech as rs
 from robust_speech.adversarial.brain import AdvASRBrain
@@ -136,19 +138,32 @@ def universal_evaluate(hparams_file, run_opts, overrides):
 
     target_brain.test_feature()
     # Evaluation
+
+    test_data_list = []
+    for k in test_datasets.keys():
+        test_data_list.append(k)
+    
+    # Sort the test_data_list key to match the order
+    test_data_list.sort(reverse=True)
+
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
-        target_brain.hparams.wer_file = os.path.join(
-            hparams["output_folder"], "wer_{}.txt".format(k)
-        )
-        target_brain.evaluate(
-            test_datasets[k],
-            test_loader_kwargs=hparams["test_dataloader_opts"],
-            save_audio_path=hparams["save_audio_path"]
-            if hparams["save_audio"]
-            else None,
-            sample_rate=hparams["sample_rate"],
-            target=hparams["target_sentence"] if "target_sentence" in hparams else None,
-        )
+        if k.endswith("train"):
+            target_brain.hparams.wer_file = os.path.join(
+                hparams["output_folder"], "wer_{}.txt".format(k)
+            )
+            target_brain.evaluate(
+                test_datasets[k],
+                test_loader_kwargs=hparams["test_dataloader_opts"],
+                save_audio_path=hparams["save_audio_path"]
+                if hparams["save_audio"]
+                else None,
+                sample_rate=hparams["sample_rate"],
+                target=hparams["target_sentence"] if "target_sentence" in hparams else None,
+            )
+        elif k.endswith("dev"):
+            pass
+        else:
+            raise ValueError("Invalid file name!")
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@ class ASNRWiener:
             self.gaussian_sigma=filter_config['gaussian_sigma']
         self.lpc_order=12
         self.high_freq=False
-        if 'high_freq' in filter_config['high_freq']:
+        if 'high_freq' in filter_config:
             self.high_freq=filter_config['high_freq']
 
     def __call__(self, x: np.ndarray):

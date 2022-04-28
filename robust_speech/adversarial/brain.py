@@ -343,6 +343,8 @@ class AdvASRBrain(ASRBrain):
                 else:
                     self.eval_smoothing_sigma = hparams['eval_smoothing_sigma']
                 self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma, apply_fit=True, apply_predict=False)
+            else:
+                self.enable_eval_smoothing = False
 
         if 'enable_train_smoothing' in hparams.keys():
             if hparams['enable_train_smoothing']:
@@ -352,6 +354,8 @@ class AdvASRBrain(ASRBrain):
                 else:
                     self.train_smoothing_sigma = hparams['train_smoothing_sigma']
                 self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=False, apply_predict=True)
+            else:
+                self.enable_train_smoothing = False
 
 
     def init_attacker(

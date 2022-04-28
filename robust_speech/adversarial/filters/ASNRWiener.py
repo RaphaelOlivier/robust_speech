@@ -41,5 +41,5 @@ class ASNRWiener:
                 filtered_output=filtered_output[:len(x[i])]
             x_filtered[i]=filtered_output
         print("ASNR filter finished ", x_filtered.shape)
-        x_filtered = torch.Tensor(x_filtered).to(device)
+        x_filtered = torch.from_numpy(x_filtered).to(device)
         return x_filtered

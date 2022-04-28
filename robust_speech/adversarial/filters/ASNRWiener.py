@@ -1,5 +1,6 @@
 from audlib.enhance import wiener_iter, asnr, SSFEnhancer
 from audlib.sig.window import hamming
+import numpy as np
 
 class ASNRWiener:
     def __init__(self, filter_config):

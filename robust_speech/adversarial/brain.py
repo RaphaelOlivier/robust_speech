@@ -5,6 +5,7 @@ Multiple Brain classes that extend sb.Brain to enable attacks.
 import logging
 import time
 import warnings
+import importlib
 
 import speechbrain as sb
 import torch
@@ -324,6 +325,12 @@ class AdvASRBrain(ASRBrain):
             super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
         super(AdvASRBrain, self).__setattr__(name, value)
 
+    def init_filter(self, hparams):
+        filter_config = hparams['filter_config']
+        module = importlib.import_module(filter_config['filter_package'])
+        filter_class = getattr(module, filter_config['filter_class'])
+        self.filter = filter_class(filter_config)
+
     def init_smoothing(self, hparams):
         if 'enable_eval_smoothing' in hparams.keys():
             if hparams['enable_eval_smoothing']:
@@ -332,7 +339,7 @@ class AdvASRBrain(ASRBrain):
                     self.eval_smoothing_sigma = 0.01
                 else:
                     self.eval_smoothing_sigma = hparams['eval_smoothing_sigma']
-                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma)
+                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma, apply_fit=True, apply_predict=False)
 
         if 'enable_train_smoothing' in hparams.keys():
             if hparams['enable_train_smoothing']:
@@ -341,7 +348,7 @@ class AdvASRBrain(ASRBrain):
                     self.train_smoothing_sigma = 0.01
                 else:
                     self.train_smoothing_sigma = hparams['train_smoothing_sigma']
-                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma)
+                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=False, apply_predict=True)
 
 
     def init_attacker(

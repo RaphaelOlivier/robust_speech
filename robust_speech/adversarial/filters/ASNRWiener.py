@@ -21,6 +21,7 @@ class ASNRWiener:
             self.high_freq=filter_config['high_freq']
 
     def __call__(self, x: np.ndarray):
+        print("ASNR filter launched ", x.shape)
         x_filtered=np.copy(x)
         for i in range(len(x)):
             if self.high_freq:
@@ -35,4 +36,5 @@ class ASNRWiener:
             elif len(filtered_output)>len(x[i]):
                 filtered_output=filtered_output[:len(x[i])]
             x_filtered[i]=filtered_output
+        print("ASNR filter finished ", x_filtered.shape)
         return x_filtered

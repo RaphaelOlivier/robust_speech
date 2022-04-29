@@ -77,7 +77,7 @@ class Rover:
     def run(self,asr_outputs_tensor, alignments=None, confidence=None, char_alignment=True, **kwargs):
         #print(asr_outputs)
         #print(alignments)
-        asr_outputs = asr_outputs_tensor.cpu().detach()
+        asr_outputs = asr_outputs_tensor#.cpu().detach()
         if len(asr_outputs)>ROVER_MAX_HYPS:
             raise ValueError("ROVER can only handle %d hypothesis at a time but batch contains %d transcriptions. Evaluation will be interrupted."
             %(ROVER_MAX_HYPS,len(asr_outputs)))
@@ -110,7 +110,7 @@ class Rover:
             final_scores.append(scores)
         
         final_outputs=np.array(final_outputs)
-        final_outputs = torch.from_numpy(final_outputs).to(asr_outputs_tensor.get_device())
+        # final_outputs = torch.from_numpy(final_outputs).to(asr_outputs_tensor.get_device())
         if self.faults>0:
             print("ROVER failed on %d instances, fall back on majority vote"%self.faults)
         if self.return_all:

@@ -597,7 +597,12 @@ class AdvASRBrain(ASRBrain):
 
         if self.voting_module is not None:
             print(predictions[0])
-            predictions = self.voting_module.run(predictions[0])
+            preds = []
+            for i in range(3):
+                predictions, adv_wav = self.compute_forward_adversarial(batch_to_attack, stage=stage)
+                preds.append(predictions[-1])
+            outs = self.voting_module.run(preds)
+            print(outs)
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted

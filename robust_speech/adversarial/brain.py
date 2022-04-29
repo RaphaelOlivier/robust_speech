@@ -18,6 +18,7 @@ import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 from robust_speech.adversarial.smoothing import SpeechNoiseAugmentation
+from robust_speech.adversarial.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
 
 warnings.simplefilter("once", RuntimeWarning)
 
@@ -312,8 +313,11 @@ class AdvASRBrain(ASRBrain):
             attacker=attacker,
         )
         self.filter = None
+        self.voting_module = None
         if 'filter_config' in hparams:
             self.init_filter(hparams)
+        if 'voting_config' in hparams:
+            self.init_rover(hparams)
         self.init_smoothing(hparams=hparams)
         self.tokenizer = None
 
@@ -334,6 +338,34 @@ class AdvASRBrain(ASRBrain):
         filter_class = getattr(module, filter_config['filter_class'])
         self.filter = filter_class(filter_config)
 
+    def init_voting(self, hparams):
+        voting_config = hparams['voting_config']
+
+        
+        voting=voting_config["voting"]
+        rover_bin_path=voting_config["rover_path"]
+        vote_on_nbest=False
+        decoder_type="greedy"
+        use_alignments=False
+        use_confidence=False
+
+        assert (not vote_on_nbest) or (decoder_type=="beam"), "option vote_on_nbest is incompatible with greedy decoding"
+        assert (not use_confidence) or decoder_type=="beam" or voting=="majority", "use_confidence is currently not compatible with greedy search. You can use beam search with width 1"
+        if voting in ["rover","rover_freq"]: # Rover by Word frequency
+            if self.niters_forward>ROVER_MAX_HYPS:
+                self.voting_module = VoteEnsemble(Rover(scheme='freq', exec_path=rover_bin_path, return_all=True),Rover(scheme='freq', exec_path=rover_bin_path))
+            else:
+                self.voting_module=Rover(scheme='freq', exec_path=rover_bin_path)
+        elif voting=="rover_conf": # Rover by Average Confidence Scores 
+            self.voting_module=Rover(scheme='conf', exec_path=rover_bin_path)
+        elif voting=="rover_max": # Rover by Word Maximum Confidence Scores 
+            self.voting_module=Rover(scheme='max', exec_path=rover_bin_path)
+        else:
+            assert voting=="majority"
+            self.voting_module=MajorityVote()
+
+        self.transcription_output = not voting.startswith("probs")
+
     def init_smoothing(self, hparams):
         if 'enable_eval_smoothing' in hparams.keys():
             if hparams['enable_eval_smoothing']:
@@ -342,7 +374,7 @@ class AdvASRBrain(ASRBrain):
                     self.eval_smoothing_sigma = 0.01
                 else:
                     self.eval_smoothing_sigma = hparams['eval_smoothing_sigma']
-                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma, apply_fit=True, apply_predict=False)
+                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma, apply_fit=True, apply_predict=False, filter=self.filter)
         else:
             self.enable_eval_smoothing = False
 
@@ -353,7 +385,7 @@ class AdvASRBrain(ASRBrain):
                     self.train_smoothing_sigma = 0.01
                 else:
                     self.train_smoothing_sigma = hparams['train_smoothing_sigma']
-                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=False, apply_predict=True)
+                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=False, apply_predict=True, filter=self.filter)
         else:
             self.enable_train_smoothing = False
 

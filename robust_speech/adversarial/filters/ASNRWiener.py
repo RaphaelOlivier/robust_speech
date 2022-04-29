@@ -23,7 +23,7 @@ class ASNRWiener:
             self.high_freq=filter_config['high_freq']
 
     def __call__(self, x):
-        x_np=np.copy(x)
+        x_np=x.cpu().detach().numpy()
         for i in range(len(x_np)):
             if self.high_freq:
                 noise = np.random.normal(0, scale=self.gaussian_sigma, size=(x_np[i].shape[0]+1,))
@@ -36,5 +36,5 @@ class ASNRWiener:
                 filtered_output = np.pad(filtered_output,mode="mean",pad_width=((0,len(x_np[i])-len(filtered_output))))
             elif len(filtered_output)>len(x_np[i]):
                 filtered_output=filtered_output[:len(x_np[i])]
-            x_np[i]=filtered_output
-        return x_np
+            x[i]=torch.from_numpy(filtered_output)
+        return x

@@ -601,11 +601,8 @@ class AdvASRBrain(ASRBrain):
             for i in range(3):
                 predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1]
-                predicted_words = [self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens]
-                # predicted_words = [" ".join(str(s)) for s in predicted_tokens]
                 preds.append(predicted_words)
             outs = self.voting_module.run(preds)
-            print(outs)
             predictions[-1] = [int(token) for token in outs]
             print("voted", predictions[-1])
         advloss, targetloss = None, None

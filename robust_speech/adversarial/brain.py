@@ -606,9 +606,9 @@ class AdvASRBrain(ASRBrain):
                 preds.append(predicted_words)
             outs = self.voting_module.run(preds)
             tokens = [self.tokenizer.encode_sequence(list(stc)) for stc in outs]
-            print(tokens)
-            predictions[-1] = [int(token) for token in outs]
-            print("voted", predictions[-1])
+            # print(tokens)
+            predictions[-1] = tokens
+            # print("voted", predictions[-1])
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted

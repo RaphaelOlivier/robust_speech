@@ -600,7 +600,7 @@ class AdvASRBrain(ASRBrain):
             for i in range(3):
                 predictions, adv_wav = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1]
-                predicted_words = [self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens]
+                predicted_words = self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
                 predicted_words = "".join(predicted_words)
                 print(predicted_words)
                 preds.append(predicted_words)

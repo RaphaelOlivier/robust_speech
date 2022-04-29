@@ -595,17 +595,19 @@ class AdvASRBrain(ASRBrain):
             batch_to_attack, stage=stage
         )
 
+        print("raw", predictions[-1])
         if self.voting_module is not None:
             preds = []
             for i in range(3):
-                predictions, adv_wav = self.compute_forward_adversarial(batch_to_attack, stage=stage)
+                predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1]
                 predicted_words = [self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens]
                 predicted_words = ["".join(s) for s in predicted_words]
-                print(predicted_words)
+                # print(predicted_words)
                 preds.append(predicted_words)
             outs = self.voting_module.run(preds)
-            print(outs)
+            predictions[-1] = self.tokenizer.encode_sequence(outs)
+            print("voted", predictions[-1])
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted

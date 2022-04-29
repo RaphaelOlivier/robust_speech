@@ -145,7 +145,6 @@ class Rover:
         hypfile = os.path.join(self.rover_directory,str(idx)+'.txt')
         with open(hypfile,'w') as f:
             for line in lines:
-                print("ctm line", line)
                 f.write(line)
         return hypfile
 

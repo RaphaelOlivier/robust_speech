@@ -143,7 +143,7 @@ encoder: !new:speechbrain.nnet.containers.LengthsCapableSequential
     normalize: !ref <normalizer>
     model: !ref <enc>
 
-decoder: !new:robust_speech.models.ctc.CTCGreedyDecode
+decoder: !new:robust_speech.models.modules.ctcdecoding.CTCGreedyDecode
     blank_index: !ref <blank_index>
     ctc_lin: !ref <ctc_lin>
     log_softmax: !ref <log_softmax>

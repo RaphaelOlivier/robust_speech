@@ -596,11 +596,13 @@ class AdvASRBrain(ASRBrain):
         )
 
         if self.voting_module is not None:
-            print(predictions[0])
             preds = []
             for i in range(3):
                 predictions, adv_wav = self.compute_forward_adversarial(batch_to_attack, stage=stage)
-                preds.append(predictions[-1])
+                predicted_tokens = predictions[-1]
+                predicted_words = [self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens]
+                print(predicted_words)
+                preds.append(predicted_words)
             outs = self.voting_module.run(preds)
             print(outs)
         advloss, targetloss = None, None

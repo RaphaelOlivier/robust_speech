@@ -317,7 +317,7 @@ class AdvASRBrain(ASRBrain):
         if 'filter_config' in hparams:
             self.init_filter(hparams)
         if 'voting_config' in hparams:
-            self.init_rover(hparams)
+            self.init_voting(hparams)
         self.init_smoothing(hparams=hparams)
         self.tokenizer = None
 
@@ -340,8 +340,6 @@ class AdvASRBrain(ASRBrain):
 
     def init_voting(self, hparams):
         voting_config = hparams['voting_config']
-
-        
         voting=voting_config["voting"]
         rover_bin_path=voting_config["rover_path"]
         vote_on_nbest=False
@@ -596,6 +594,10 @@ class AdvASRBrain(ASRBrain):
         predictions, adv_wav = self.compute_forward_adversarial(
             batch_to_attack, stage=stage
         )
+
+        if self.voting_module is not None:
+            print(predictions)
+            predictions = self.voting_module(predictions)
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted

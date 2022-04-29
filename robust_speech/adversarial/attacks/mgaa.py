@@ -24,7 +24,7 @@ class ASRMGAA(Attacker):
 
     Arguments
     ---------
-     asr_brain: robust_speech.adversarial.brain.EnsembleAsrBrain
+     asr_brain:
         the brain objects. It should be an EnsembleAsrBrain object
          where the first brain is the meta model
          and the second is the train model.
@@ -72,8 +72,10 @@ class ASRMGAA(Attacker):
 
         assert (
             isinstance(asr_brain, rs.adversarial.brain.EnsembleASRBrain)
-            and asr_brain.nmodels == 2
         )
+
+        assert (asr_brain.nmodels == 2)
+
         self.nested_attack = nested_attack_class(asr_brain.asr_brains[1])
         self.asr_brain = asr_brain.asr_brains[0]
 
@@ -89,7 +91,8 @@ class ASRMGAA(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(
+            self.eps, float)
 
     def perturb(self, batch):
         """
@@ -119,6 +122,7 @@ class ASRMGAA(Attacker):
             batch.sig = wav_init + delta, batch.sig[1]
             train_adv = self.nested_attack.perturb(batch)
             batch.sig = wav_init, batch.sig[1]
+
             test_adv = pgd_loop(
                 batch,
                 self.asr_brain,
@@ -129,10 +133,11 @@ class ASRMGAA(Attacker):
                 order=self.order,
                 clip_min=self.clip_min,
                 clip_max=self.clip_max,
-                delta_init=nn.Parameter(train_adv - x),
+                delta_init=nn.Parameter(
+                    train_adv - batch.sig[0]),  # rem to put x
                 l1_sparsity=False,
             )
-            delta = test_adv - train_adv
+            delta = (test_adv - train_adv).detach()
 
         batch.sig = save_input, batch.sig[1]
         batch = batch.to(save_device)

@@ -85,7 +85,8 @@ def pgd_loop(
     for _ in range(nb_iter):
         batch.sig = wav_init + delta, wav_lens
         predictions = asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
+        loss = asr_brain.compute_objectives(
+            predictions, batch, rs.Stage.ATTACK)
         if minimize:
             loss = -loss
         loss.backward()
@@ -180,7 +181,8 @@ class ASRPGDAttack(Attacker):
         assert isinstance(self.rel_eps_iter, torch.Tensor) or isinstance(
             self.rel_eps_iter, float
         )
-        assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
+        assert isinstance(self.eps, torch.Tensor) or isinstance(
+            self.eps, float)
 
     def perturb(self, batch):
         """
@@ -481,7 +483,8 @@ class MaxSNRPGDAttack(ASRLinfPGDAttack):
         """
         save_device = batch.sig[0].device
         batch = batch.to(self.asr_brain.device)
-        self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, order=np.inf)
+        self.eps = reverse_bound_from_rel_bound(
+            batch, self.rel_eps, order=np.inf)
         res = super(MaxSNRPGDAttack, self).perturb(batch)
         self.eps = 1.0
         batch.to(save_device)

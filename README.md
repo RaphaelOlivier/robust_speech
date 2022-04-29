@@ -27,8 +27,8 @@ Supported attacks:
 * [Kenansville](https://arxiv.org/abs/1910.05262) 
 * [Imperceptible](https://arxiv.org/abs/1903.10346) 
 * [Genetic](https://arxiv.org/abs/1801.00554)
-* [ACL](https://arxiv.org/abs/2006.07589) for Wav2Vec2
-* (In development) [MGAA](https://arxiv.org/abs/2108.04204)
+* [Self-supervised attacks](https://arxiv.org/abs/2111.04330) for Wav2Vec2
+* [MGAA](https://arxiv.org/abs/2108.04204)
 
 The package provised model classes in the form of Speechbrain Brain classes, that are compatible with the attacks above. Currently implemented:
 * Sequence-to-Sequence models with RNNs and Transformers, also supporting the CTC loss and CTC decoding. Compatible with [pretrained](https://huggingface.co/speechbrain/asr-crdnn-rnnlm-librispeech) [speechbrain](https://huggingface.co/speechbrain/asr-crdnn-transformerlm-librispeech) [models](https://huggingface.co/speechbrain/asr-transformer-transformerlm-librispeech).

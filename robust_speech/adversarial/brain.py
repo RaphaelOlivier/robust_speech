@@ -605,7 +605,8 @@ class AdvASRBrain(ASRBrain):
                 predicted_words = ["".join(s) for s in predicted_words]
                 preds.append(predicted_words)
             outs = self.voting_module.run(preds)
-            print(outs)
+            tokens = [self.tokenizer.encode_sequence(list(stc)) for stc in outs]
+            print(tokens)
             predictions[-1] = [int(token) for token in outs]
             print("voted", predictions[-1])
         advloss, targetloss = None, None

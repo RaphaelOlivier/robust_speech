@@ -350,10 +350,10 @@ class AdvASRBrain(ASRBrain):
         assert (not vote_on_nbest) or (decoder_type=="beam"), "option vote_on_nbest is incompatible with greedy decoding"
         assert (not use_confidence) or decoder_type=="beam" or voting=="majority", "use_confidence is currently not compatible with greedy search. You can use beam search with width 1"
         if voting in ["rover","rover_freq"]: # Rover by Word frequency
-            if self.niters_forward>ROVER_MAX_HYPS:
-                self.voting_module = VoteEnsemble(Rover(scheme='freq', exec_path=rover_bin_path, return_all=True),Rover(scheme='freq', exec_path=rover_bin_path))
-            else:
-                self.voting_module=Rover(scheme='freq', exec_path=rover_bin_path)
+            # if self.niters_forward>ROVER_MAX_HYPS:
+            #     self.voting_module = VoteEnsemble(Rover(scheme='freq', exec_path=rover_bin_path, return_all=True),Rover(scheme='freq', exec_path=rover_bin_path))
+            # else:
+            self.voting_module=Rover(scheme='freq', exec_path=rover_bin_path)
         elif voting=="rover_conf": # Rover by Average Confidence Scores 
             self.voting_module=Rover(scheme='conf', exec_path=rover_bin_path)
         elif voting=="rover_max": # Rover by Word Maximum Confidence Scores 

@@ -898,6 +898,7 @@ class AdvASRBrain(ASRBrain):
             if self.enhancer is not None:
                 sigs, sig_lens = batch.sig
                 enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
+                enh_sigs = enh_sigs.to(sigs.get_device())
                 batch.sig = enh_sigs, sig_lens
 
             if self.attacker is not None:

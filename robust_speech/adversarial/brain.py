@@ -19,6 +19,8 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 from robust_speech.adversarial.smoothing import SpeechNoiseAugmentation
 from robust_speech.adversarial.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
+from speechbrain.pretrained import SpectralMaskEnhancement
+
 
 warnings.simplefilter("once", RuntimeWarning)
 
@@ -319,6 +321,7 @@ class AdvASRBrain(ASRBrain):
         if 'voting_config' in hparams:
             self.init_voting(hparams)
         self.init_smoothing(hparams=hparams)
+        self.init_enhancer(hparams=hparams)
         self.tokenizer = None
 
     def __setattr__(self, name, value, attacker_brain=True):
@@ -392,6 +395,17 @@ class AdvASRBrain(ASRBrain):
         else:
             self.enable_train_smoothing = False
 
+    def init_enhancer(hparams):
+        if 'enhancer_config' in hparams:
+            enhancer_config = hparams['enhancer_config']
+            # speechbrain/metricgan-plus-voicebank
+            enhancer_source = enhancer_config['source']
+            # pretrained_models/metricgan-plus-voicebank
+            enhancer_dir = enhancer_config['savedir']
+            self.enhancer = SpectralMaskEnhancement.from_hparams(
+                source=enhancer_source,
+                savedir=enhancer_dir)
+
 
     def init_attacker(
         self, modules=None, opt_class=None, hparams=None, run_opts=None, attacker=None
@@ -451,6 +465,10 @@ class AdvASRBrain(ASRBrain):
                 adv_wavs = self.attacker.perturb(batch)
             adv_wavs = adv_wavs.detach()
             batch.sig = adv_wavs, batch.sig[1]
+        if self.enhancer is not None:
+            sigs, sig_lens = batch.sig
+            enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
+            batch.sig = enh_sigs, sig_lens
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
         return res, adv_wavs

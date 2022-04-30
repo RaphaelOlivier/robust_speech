@@ -395,7 +395,7 @@ class AdvASRBrain(ASRBrain):
         else:
             self.enable_train_smoothing = False
 
-    def init_enhancer(hparams):
+    def init_enhancer(self, hparams):
         if 'enhancer_config' in hparams:
             enhancer_config = hparams['enhancer_config']
             # speechbrain/metricgan-plus-voicebank

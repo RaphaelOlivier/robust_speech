@@ -600,8 +600,8 @@ class AdvASRBrain(ASRBrain):
             preds = []
             for i in range(16):
                 predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
-                predicted_tokens = predictions[-1]
-                predicted_words = [[" ".join(str(s)) for s in utt_seq] for utt_seq in predicted_tokens]
+                predicted_tokens = predictions[-1][0]
+                predicted_words = " ".join(str(predicted_tokens))
                 # predicted_words = ["".join(s) for s in predicted_words]
                 preds.append(predicted_words)
             outs = self.voting_module.run(preds)

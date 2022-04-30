@@ -18,7 +18,7 @@ class ASNRWiener:
         if 'gaussian_sigma' in filter_config:
             self.gaussian_sigma=float(filter_config['gaussian_sigma'])
         self.lpc_order=12
-        self.high_freq=False
+        self.high_freq=True
         if 'high_freq' in filter_config:
             self.high_freq=filter_config['high_freq']
 
@@ -36,5 +36,6 @@ class ASNRWiener:
                 filtered_output = np.pad(filtered_output,mode="mean",pad_width=((0,len(x_np[i])-len(filtered_output))))
             elif len(filtered_output)>len(x_np[i]):
                 filtered_output=filtered_output[:len(x_np[i])]
-            x[i]=torch.from_numpy(filtered_output)
+            if not np.isnan(filtered_output).any():
+                x[i]=torch.from_numpy(filtered_output)
         return x

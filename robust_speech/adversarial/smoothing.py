@@ -10,9 +10,8 @@ import speechbrain as sb
 
 logger = logging.getLogger(__name__)
 
-class SpeechNoiseAugmentation(GaussianAugmentation,nn.Module):
+class SpeechNoiseAugmentation(GaussianAugmentation):
     def __init__(self, *args, filter=None, high_freq=False, **kwargs):
-        nn.Module.__init__(self)
         GaussianAugmentation.__init__(self, *args, **kwargs)
         self.filter = filter
         self.high_freq=high_freq

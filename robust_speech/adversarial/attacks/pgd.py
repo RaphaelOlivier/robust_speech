@@ -235,7 +235,6 @@ class ASRPGDAttack(Attacker):
         self.asr_brain.module_eval()
         return wav_adv.data.to(save_device)
 
-
 class ASRL2PGDAttack(ASRPGDAttack):
     """
     PGD Attack with order=L2

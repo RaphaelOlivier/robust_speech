@@ -120,6 +120,7 @@ class Rover:
     def generate_ctm(self,sentence, idx, duration, alignments=None, char_alignment=True):
         sentence=sentence.rstrip().lstrip() # remove left and right whitespaces
         sentence=" ".join(filter(lambda w:w!='',sentence.split(' '))) # remove duplicate whitespaces
+        print(sentence)
         lines=[]
         if len(sentence)>0: 
             char_time = duration/len(sentence)

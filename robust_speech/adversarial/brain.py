@@ -604,10 +604,12 @@ class AdvASRBrain(ASRBrain):
                 predicted_tokens = [str(s) for s in predicted_tokens]
                 predicted_words = " ".join(predicted_tokens)
                 preds.append(predicted_words)
+            print(preds)
             outs = self.voting_module.run(preds)
             outs = outs[0].split(" ")
             tokens = [int(token) for token in outs]
-            # print(tokens)
+
+            print(tokens)
             predictions = list(predictions)
             predictions[-1] = tokens
             predictions = tuple(predictions)

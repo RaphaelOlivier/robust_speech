@@ -369,6 +369,7 @@ class AdvASRBrain(ASRBrain):
         self.transcription_output = not voting.startswith("probs")
 
     def init_smoothing(self, hparams):
+        print(hparams)
         if 'enable_eval_smoothing' in hparams.keys():
             if hparams['enable_eval_smoothing']:
                 self.enable_eval_smoothing = hparams['enable_eval_smoothing']
@@ -387,7 +388,7 @@ class AdvASRBrain(ASRBrain):
                     self.train_smoothing_sigma = 0.01
                 else:
                     self.train_smoothing_sigma = hparams['train_smoothing_sigma']
-                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=False, apply_predict=True, filter=self.filter)
+                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=True, apply_predict=True, filter=self.filter)
         else:
             self.enable_train_smoothing = False
 

@@ -5,7 +5,7 @@ from collections import Counter
 import numpy as np
 import torch
 import tempfile
-
+import shutil
 ROVER_MAX_HYPS=50
 ROVER_RECOMMENDED_HYPS=50
 TMP_PATH = "/tmp/rover"
@@ -63,6 +63,9 @@ class Rover:
         self.rover_path=exec_path
         self.rover_directory = TMP_PATH
         if not os.path.exists(self.rover_directory):
+            os.makedirs(self.rover_directory)
+        else:
+            shutil.rmtree(self.rover_directory)
             os.makedirs(self.rover_directory)
         self.outfile = os.path.join(self.rover_directory,'out.txt')
         if scheme=='freq':

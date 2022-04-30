@@ -13,7 +13,7 @@ from speechbrain.dataio.dataloader import LoopedLoader
 from speechbrain.utils.distributed import run_on_main
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+import numpy as np
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
@@ -613,7 +613,12 @@ class AdvASRBrain(ASRBrain):
             tokens = [int(token) for token in outs]
 
             predictions = list(predictions)
-            predictions[-1] = tokens
+            #print(np.allclose(predictions[-1], [tokens]))
+            #print(predictions[-1])
+            #print()
+            #print()
+            #print(tokens)
+            predictions[-1] = [tokens]
             predictions = tuple(predictions)
         advloss, targetloss = None, None
         with torch.no_grad():

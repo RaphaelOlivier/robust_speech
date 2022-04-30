@@ -369,7 +369,6 @@ class AdvASRBrain(ASRBrain):
         self.transcription_output = not voting.startswith("probs")
 
     def init_smoothing(self, hparams):
-        print(hparams)
         if 'enable_eval_smoothing' in hparams.keys():
             if hparams['enable_eval_smoothing']:
                 self.enable_eval_smoothing = hparams['enable_eval_smoothing']

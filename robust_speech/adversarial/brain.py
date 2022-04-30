@@ -595,10 +595,9 @@ class AdvASRBrain(ASRBrain):
             batch_to_attack, stage=stage
         )
 
-        print("raw", predictions[-1])
         if self.voting_module is not None:
             preds = []
-            for i in range(16):
+            for i in range(3):
                 predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1][0]
                 predicted_tokens = [str(s) for s in predicted_tokens]
@@ -608,11 +607,9 @@ class AdvASRBrain(ASRBrain):
             outs = outs[0].split(" ")
             tokens = [int(token) for token in outs]
 
-            print(tokens)
             predictions = list(predictions)
             predictions[-1] = tokens
             predictions = tuple(predictions)
-            print("voted", predictions[-1])
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted

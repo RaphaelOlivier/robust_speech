@@ -465,10 +465,6 @@ class AdvASRBrain(ASRBrain):
                 adv_wavs = self.attacker.perturb(batch)
             adv_wavs = adv_wavs.detach()
             batch.sig = adv_wavs, batch.sig[1]
-        if self.enhancer is not None:
-            sigs, sig_lens = batch.sig
-            enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
-            batch.sig = enh_sigs, sig_lens
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
         return res, adv_wavs
@@ -898,6 +894,11 @@ class AdvASRBrain(ASRBrain):
 
             if (self.enable_eval_smoothing and self.eval_speech_noise_augmentation is not None):
                 batch = self.eval_speech_noise_augmentation(batch)
+            
+            if self.enhancer is not None:
+                sigs, sig_lens = batch.sig
+                enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
+                batch.sig = enh_sigs, sig_lens
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(

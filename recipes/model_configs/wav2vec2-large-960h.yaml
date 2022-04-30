@@ -38,6 +38,7 @@ filter_config:
   nfft: 320
 voting_config:
   voting: rover_freq
+  rover_iters: 16 
   rover_path: /home/ec2-user/SCTK/bin/rover
 
 

@@ -342,6 +342,10 @@ class AdvASRBrain(ASRBrain):
         voting_config = hparams['voting_config']
         voting=voting_config["voting"]
         rover_bin_path=voting_config["rover_path"]
+        if "rover_iters" in voting_config:
+            self.rover_iters = voting_config["rover_iters"]
+        else:
+            self.rover_iters = 1
         vote_on_nbest=False
         decoder_type="greedy"
         use_alignments=False
@@ -597,7 +601,7 @@ class AdvASRBrain(ASRBrain):
 
         if self.voting_module is not None:
             preds = []
-            for i in range(3):
+            for i in range(self.rover_iters):
                 predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1][0]
                 predicted_tokens = [str(s) for s in predicted_tokens]

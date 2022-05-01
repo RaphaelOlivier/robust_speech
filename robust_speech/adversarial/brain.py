@@ -854,10 +854,13 @@ class AdvASRBrain(ASRBrain):
             progressbar = not self.noprogressbar
 
         if not (isinstance(test_set, DataLoader) or isinstance(test_set, LoopedLoader)):
+            all_data = test_set
             test_loader_kwargs["ckpt_prefix"] = None
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
             )
+        else:
+            all_data = None
         self.on_evaluate_start(max_key=max_key, min_key=min_key)
         self.on_stage_start(sb.Stage.TEST, epoch=None)
         self.modules.eval()
@@ -868,6 +871,16 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
+        ######
+        if type(self.attacker).__name__ == 'UniversalAttack':
+            if all_data is None:
+                raise NotImplementedError
+
+            univ_test_set = self.make_dataloader(
+                all_data, sb.Stage.TEST, {"batch_size":1,"ckpt_prefix":None}
+            )
+            self.attacker.compute_universal_perturbation(univ_test_set)
+        ######
         for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)

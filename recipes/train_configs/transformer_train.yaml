@@ -29,6 +29,9 @@ brain_class: !name:robust_speech.models.transformer.TrfASR
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
+enable_train_smoothing: True
+train_smoothing_sigma: 0.01
+
 pretrained_lm_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
 
 # Data files
@@ -38,16 +41,18 @@ csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
 # then data_folder_rirs should be /localscratch/xxx_corpus
 # otherwise the dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
-train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
+# train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
+train_splits: ["train-clean-100"]
 dev_splits: ["dev-clean"]
-test_splits: ["test-clean", "test-other"]
+# test_splits: ["test-clean", "test-other"]
+test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
 train_csv: !ref <data_folder>/csv/train.csv
 valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
    - !ref <data_folder>/csv/test-clean.csv
-   - !ref <data_folder>/csv/test-other.csv
+#    - !ref <data_folder>/csv/test-other.csv
 avoid_if_longer_than: 17.0
 avoid_if_shorter_than: 0.0
 # Training parameters
@@ -55,7 +60,7 @@ avoid_if_shorter_than: 0.0
 # The global batch size is computed as batch_size * n_gpus * gradient_accumulation.
 # Empirically, we found that this value should be >= 128.
 # Please, set your parameters accordingly.
-number_of_epochs: 220
+number_of_epochs: 3
 batch_size: 16 # This works for 2x GPUs with 32GB
 ctc_weight: 0.3
 gradient_accumulation: 8
@@ -73,7 +78,7 @@ dynamic_batch_sampler:
 
 # stages related parameters
 stage_one_epochs: 180
-lr_adam: 1.0
+lr_adam: 0.0005
 lr_sgd: 0.0000125
 
 # Feature parameters
@@ -101,7 +106,7 @@ num_decoder_layers: 6
 d_ffn: 3072
 transformer_dropout: 0.0
 activation: !name:torch.nn.GELU
-output_neurons: 5000
+output_neurons: 1000
 vocab_size: 5000
 
 # Outputs

@@ -900,6 +900,8 @@ class AdvASRBrain(ASRBrain):
                 enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
                 enh_sigs = enh_sigs.to(sigs.get_device())
                 batch.sig = enh_sigs, sig_lens
+            else:
+                self.enhancer = None
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(

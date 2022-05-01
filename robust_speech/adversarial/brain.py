@@ -349,7 +349,7 @@ class AdvASRBrain(ASRBrain):
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
-
+        
     def compute_forward_adversarial(self, batch, stage):
         """Forward pass applied to an adversarial example.
 
@@ -383,6 +383,41 @@ class AdvASRBrain(ASRBrain):
         res = self.compute_forward(batch, stage)
         batch.sig = wavs, batch.sig[1]
         return res, adv_wavs
+
+    def compute_forward_adversarial_universal(self, batch, stage, mode):
+        """Forward pass applied to an adversarial example.
+
+        The default implementation depends on a few methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+
+        Arguments
+        ---------
+        batch : torch.Tensor or tensors
+            An element from the dataloader, including inputs for processing.
+        stage : Stage
+            The stage of the experiment: Stage.TRAIN, Stage.VALID, Stage.TEST
+
+        Returns
+        -------
+        torch.Tensor or Tensors
+            The outputs after all processing is complete.
+            Directly passed to ``compute_objectives()``.
+        """
+        assert stage != rs.Stage.ATTACK
+        wavs = batch.sig[0]
+        if self.attacker is not None:
+            if stage == sb.Stage.TEST:
+                adv_wavs, perturbation = self.attacker.perturb_and_log_return_perturbation(batch, mode)    
+            else:
+                adv_wavs = self.attacker.perturb(batch)
+            adv_wavs = adv_wavs.detach()
+            batch.sig = adv_wavs, batch.sig[1]
+        res = self.compute_forward(batch, stage)
+        batch.sig = wavs, batch.sig[1]
+        return res, adv_wavs
+
 
     def fit_batch(self, batch):
         """Fit one batch, override to do multiple updates.
@@ -545,6 +580,61 @@ class AdvASRBrain(ASRBrain):
             else:
                 advloss = loss
         return advloss, targetloss
+    
+    def universal_evaluate_batch_adversarial(self, batch, stage, target=None, mode='train'):
+        """Evaluate one batch on adversarial examples.
+
+        The default implementation depends on two methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+        * ``compute_objectives()``
+
+        Arguments
+        ---------
+        batch : list of torch.Tensors
+            Batch of data to use for evaluation. Default implementation assumes
+            this batch has two elements: inputs and targets.
+        stage : Stage
+            The stage of the experiment: Stage.VALID, Stage.TEST
+        target : str
+            The optional attack target
+
+        Returns
+        -------
+        detached loss
+        """
+        tokenizer = (
+            self.tokenizer if hasattr(self, "tokenizer") else self.hparams.tokenizer
+        )
+        if target is not None and self.attacker.targeted:
+            batch_to_attack = replace_tokens_in_batch(
+                batch, target, tokenizer, self.hparams
+            )
+        else:
+            batch_to_attack = batch
+
+        predictions, adv_wav = self.compute_forward_adversarial_universal(
+            batch_to_attack, stage=stage, mode=mode
+        )
+        advloss, targetloss = None, None
+        with torch.no_grad():
+            targeted = target is not None and self.attacker.targeted
+            loss = self.compute_objectives(
+                predictions, batch_to_attack, stage=stage, adv=True, targeted=targeted
+            ).detach()
+            if targeted:
+                targetloss = loss
+                batch.sig = adv_wav, batch.sig[1]
+                predictions = self.compute_forward(batch, stage=stage)
+                advloss = self.compute_objectives(
+                    predictions, batch, stage=stage, adv=True, targeted=False
+                ).detach()
+                batch.sig = batch_to_attack.sig
+            else:
+                advloss = loss
+        return advloss, targetloss
+
 
     def fit(
         self,
@@ -811,6 +901,115 @@ class AdvASRBrain(ASRBrain):
         self.step = 0
         self.on_evaluate_end()
         return avg_test_loss
+
+    def universal_evaluate(
+        self,
+        test_set,
+        max_key=None,
+        min_key=None,
+        progressbar=None,
+        test_loader_kwargs={},
+        save_audio_path=None,
+        sample_rate=16000,
+        target=None,
+        mode='train'
+    ):
+        """Iterate test_set and evaluate brain performance. By default, loads
+        the best-performing checkpoint (as recorded using the checkpointer).
+
+        Arguments
+        ---------
+        test_set : Dataset, DataLoader
+            If a DataLoader is given, it is iterated directly. Otherwise passed
+            to ``self.make_dataloader()``.
+        max_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        min_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        progressbar : bool
+            Whether to display the progress in a progressbar.
+        test_loader_kwargs : dict
+            Kwargs passed to ``make_dataloader()`` if ``test_set`` is not a
+            DataLoader. NOTE: ``loader_kwargs["ckpt_prefix"]`` gets
+            automatically overwritten to ``None`` (so that the test DataLoader
+            is not added to the checkpointer).
+        save_audio_path : str
+            optional path where to store adversarial audio files
+        sample_rate = 16000
+            the audio sample rate
+        target : str
+            The optional attack target
+
+        Returns
+        -------
+        average test loss
+        """
+        if progressbar is None:
+            progressbar = not self.noprogressbar
+
+        if not (isinstance(test_set, DataLoader) or isinstance(test_set, LoopedLoader)):
+            test_loader_kwargs["ckpt_prefix"] = None
+            test_set = self.make_dataloader(
+                test_set, sb.Stage.TEST, **test_loader_kwargs
+            )
+        self.on_evaluate_start(max_key=max_key, min_key=min_key)
+        self.on_stage_start(sb.Stage.TEST, epoch=None)
+        self.modules.eval()
+        avg_test_loss = 0.0
+        avg_test_adv_loss = None
+        avg_test_adv_loss_target = None
+        if self.attacker is not None:
+            avg_test_adv_loss = 0.0
+            self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
+        if mode == 'train':
+            for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                self.step += 1
+                loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                if self.attacker is not None:
+                    adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
+                        batch, stage=sb.Stage.TEST, target=target, mode='train'
+                    )
+                    avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                    if adv_loss_target:
+                        if avg_test_adv_loss_target is None:
+                            avg_test_adv_loss_target = 0.0
+                        avg_test_adv_loss_target = self.update_average(
+                            adv_loss_target, avg_test_adv_loss_target
+                        )
+
+                # Debug mode only runs a few batches
+                if self.debug and self.step == self.debug_batches:
+                    break
+        elif mode == 'eval':
+            for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                self.step += 1
+                loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                if self.attacker is not None:
+                    adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
+                        batch, stage=sb.Stage.TEST, target=target, mode='eval'
+                    )
+        else:
+            raise ValueError("Invalid mode!")
+
+            # Only run evaluation "on_stage_end" on main process
+        run_on_main(
+            self.on_stage_end,
+            args=[sb.Stage.TEST, avg_test_loss, None],
+            kwargs={
+                "stage_adv_loss": avg_test_adv_loss,
+                "stage_adv_loss_target": avg_test_adv_loss_target,
+            },
+        )
+        self.step = 0
+        self.on_evaluate_end()
+        return avg_test_loss
+
 
     def on_stage_start(self, stage, epoch):
         """Gets called when a stage starts.

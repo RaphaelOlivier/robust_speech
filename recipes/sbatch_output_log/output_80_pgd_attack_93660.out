@@ -1,0 +1,25 @@
+0: n8
+1: n8
+2: n8
+3: n8
+1: /home/deokhk/coursework/robust_speech/recipes
+0: /home/deokhk/coursework/robust_speech/recipes
+2: /home/deokhk/coursework/robust_speech/recipes
+3: /home/deokhk/coursework/robust_speech/recipes
+1: Thu Apr  7 05:24:59 KST 2022
+0: Thu Apr  7 05:24:59 KST 2022
+2: Thu Apr  7 05:24:59 KST 2022
+3: Thu Apr  7 05:24:59 KST 2022
+Thu Apr  7 05:24:59 KST 2022
+speechbrain.core - Beginning experiment!
+speechbrain.core - Experiment folder: /home/deokhk/coursework/robust_speech/root/trainings/conformer/80
+speechbrain.pretrained.fetching - Fetch lm.ckpt: Using existing file/symlink in /home/deokhk/coursework/robust_speech/root/trainings/conformer/80/save/lm.ckpt.
+speechbrain.pretrained.fetching - Fetch tokenizer.ckpt: Using existing file/symlink in /home/deokhk/coursework/robust_speech/root/trainings/conformer/80/save/tokenizer.ckpt.
+speechbrain.utils.parameter_transfer - Loading pretrained files for: lm, tokenizer
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.core - Info: ckpt_interval_minutes arg from hparam file is used
+speechbrain.core - 11.6M trainable parameters in TrfASR
+speechbrain.utils.checkpoints - Would load a checkpoint here, but none found yet.
+speechbrain.utils.epoch_loop - Going into epoch 1
+  0%|          | 0/1556 [00:00<?, ?it/s]  0%|          | 0/1556 [00:06<?, ?it/s, adv_train_loss=13.4]  0%|          | 1/1556 [00:06<2:55:57,  6.79s/it, adv_train_loss=13.4]  0%|          | 1/1556 [00:11<2:55:57,  6.79s/it, adv_train_loss=14.4]  0%|          | 2/1556 [00:11<2:25:15,  5.61s/it, adv_train_loss=14.4]slurmstepd: error: *** JOB 93660 ON n8 CANCELLED AT 2022-04-07T05:25:33 ***

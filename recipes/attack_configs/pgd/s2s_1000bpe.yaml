@@ -8,7 +8,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-snr: 20
+snr: 30
 nb_iter: 1
 attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
   targeted: False

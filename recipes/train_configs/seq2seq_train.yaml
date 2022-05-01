@@ -39,21 +39,21 @@ csv_folder: !ref <data_folder>/csv
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder>
 
-train_splits: ["train-clean-100", "train-clean-360", "train-other-500"]
+train_splits: ["train-clean-100"]
 dev_splits: ["dev-clean"]
-test_splits: ["test-clean", "test-other"]
+test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
 train_csv: !ref <data_folder>/csv/train.csv
 valid_csv: !ref <data_folder>/csv/dev-clean.csv
 test_csv:
    - !ref <data_folder>/csv/test-clean.csv
-   - !ref <data_folder>/csv/test-other.csv
+   # - !ref <data_folder>/csv/test-other.csv
 avoid_if_longer_than: 17
 avoid_if_shorter_than: 0.0
 # Training parameters
-number_of_epochs: 15
-number_of_ctc_epochs: 5
+number_of_epochs: 1
+number_of_ctc_epochs: 1
 batch_size: 1
 lr: 1.0
 ctc_weight: 0.5
@@ -305,3 +305,5 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
       lm: !ref <pretrained_lm_tokenizer_path>/lm.ckpt
       tokenizer: !ref <pretrained_lm_tokenizer_path>/tokenizer.ckpt
       
+enable_train_smoothing: True
+train_smoothing_sigma: 0.02

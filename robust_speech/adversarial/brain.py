@@ -396,6 +396,7 @@ class AdvASRBrain(ASRBrain):
             self.enable_train_smoothing = False
 
     def init_enhancer(self, hparams):
+        self.enhancer = None
         if 'enhancer_config' in hparams:
             enhancer_config = hparams['enhancer_config']
             # speechbrain/metricgan-plus-voicebank
@@ -900,8 +901,6 @@ class AdvASRBrain(ASRBrain):
                 enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
                 enh_sigs = enh_sigs.to(sigs.get_device())
                 batch.sig = enh_sigs, sig_lens
-            else:
-                self.enhancer = None
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(

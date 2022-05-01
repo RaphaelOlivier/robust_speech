@@ -136,7 +136,6 @@ def universal_evaluate(hparams_file, run_opts, overrides):
     target_brain.logger = hparams["logger"]
     target_brain.hparams.train_logger = hparams["logger"]
 
-    target_brain.test_feature()
     # Evaluation
 
     test_data_list = []
@@ -149,9 +148,10 @@ def universal_evaluate(hparams_file, run_opts, overrides):
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         if k.endswith("train"):
             target_brain.hparams.wer_file = os.path.join(
-                hparams["output_folder"], "wer_{}.txt".format(k)
+                hparams["output_folder"], "wer_{}_train.txt".format(k)
             )
-            target_brain.evaluate(
+            print(f"Now experiment with {k}")
+            target_brain.universal_evaluate(
                 test_datasets[k],
                 test_loader_kwargs=hparams["test_dataloader_opts"],
                 save_audio_path=hparams["save_audio_path"]
@@ -159,9 +159,22 @@ def universal_evaluate(hparams_file, run_opts, overrides):
                 else None,
                 sample_rate=hparams["sample_rate"],
                 target=hparams["target_sentence"] if "target_sentence" in hparams else None,
+                mode='train'
             )
         elif k.endswith("dev"):
-            pass
+            target_brain.hparams.wer_file = os.path.join(
+                hparams["output_folder"], "wer_{}_train.txt".format(k)
+            )
+            target_brain.universal_evaluate(
+                test_datasets[k],
+                test_loader_kwargs=hparams["test_dataloader_opts"],
+                save_audio_path=hparams["save_audio_path"]
+                if hparams["save_audio"]
+                else None,
+                sample_rate=hparams["sample_rate"],
+                target=hparams["target_sentence"] if "target_sentence" in hparams else None,
+                mode='eval'
+            )
         else:
             raise ValueError("Invalid file name!")
 

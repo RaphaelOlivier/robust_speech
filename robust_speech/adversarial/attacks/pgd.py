@@ -219,6 +219,9 @@ def pgd_loop_with_return_delta(
          delta = F.pad(existing_perturbation, (0, wav_length - perturb_length), mode='constant')
     if isinstance(eps_iter, torch.Tensor):
         eps_iter = eps_iter.squeeze(1)
+    if eps is not None:
+      delta.data = l2_clamp_or_normalize(delta.data, eps)
+
     wav_adv = torch.clamp(wav_init + delta, clip_min, clip_max)
     return wav_adv, delta
 
@@ -595,6 +598,89 @@ class SNRPGDAttack(ASRL2PGDAttack):
         self.eps = 1.0
         batch.to(save_device)
         return res.to(save_device)
+
+    def perturb_and_log_return_perturbation(self, batch, mode):
+         """
+         Compute an adversarial perturbation 
+         and return the perturbated vectors
+
+         Arguments
+         ---------
+         batch : sb.PaddedBatch
+            The input batch to perturb
+
+         Returns
+         -------
+         the tensor of the perturbed batch
+         Also, the perturbation vector is returned.
+         """
+         if self.train_mode_for_backward:
+            self.asr_brain.module_train()
+         else:
+            self.asr_brain.module_eval()
+
+         save_device = batch.sig[0].device
+         batch = batch.to(self.asr_brain.device)
+         save_input = batch.sig[0]
+         self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, order=2)
+
+         wav_init = torch.clone(save_input)
+         delta = torch.zeros_like(wav_init)
+         delta = nn.Parameter(delta)
+         if self.rand_init:
+            clip_min = self.clip_min if self.clip_min is not None else -0.1
+            clip_max = self.clip_max if self.clip_max is not None else 0.1
+
+            rand_assign(delta, self.order, self.eps)
+            delta.data = (
+                  torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max)
+                  - wav_init
+            )
+         if mode == 'train':
+            wav_adv, perturbation = pgd_loop_with_return_delta(
+                  batch,
+                  self.asr_brain,
+                  nb_iter=self.nb_iter,
+                  eps=self.eps,
+                  eps_iter=self.rel_eps_iter * self.eps,
+                  minimize=self.targeted,
+                  order=self.order,
+                  clip_min=self.clip_min,
+                  clip_max=self.clip_max,
+                  delta_init=delta,
+                  l1_sparsity=self.l1_sparsity,
+               )
+            cur_perturbation_len = perturbation.shape[1]
+            if self.max_perturbation_len < cur_perturbation_len:
+               # We save the longest perturbation vector
+               self.max_perturbation_len = cur_perturbation_len
+               self.perturbation = perturbation
+         else:
+            wav_adv, perturbation = pgd_loop_with_return_delta(
+                  batch,
+                  self.asr_brain,
+                  nb_iter=self.nb_iter,
+                  eps=self.eps,
+                  eps_iter=self.rel_eps_iter * self.eps,
+                  minimize=self.targeted,
+                  order=self.order,
+                  clip_min=self.clip_min,
+                  clip_max=self.clip_max,
+                  delta_init=delta,
+                  l1_sparsity=self.l1_sparsity,
+                  existing_perturbation=self.perturbation
+               )
+
+         batch.sig = save_input, batch.sig[1]
+         self.eps = 1.0
+         batch = batch.to(save_device)
+         self.asr_brain.module_eval()
+         adv_wav, perturbation= wav_adv.data.to(save_device), perturbation.to(save_device)
+         self.snr_metric.append(batch.id, batch, adv_wav)
+         if self.save_audio_path:
+            self.audio_saver.save(batch.id, batch, adv_wav)
+         return adv_wav, perturbation
+
 
 
 class MaxSNRPGDAttack(ASRLinfPGDAttack):

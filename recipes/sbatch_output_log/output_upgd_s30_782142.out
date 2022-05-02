@@ -1,0 +1,32 @@
+0: n2
+1: n2
+3: n2
+2: n2
+2: /home/deokhk/coursework/robust_speech/recipes
+0: /home/deokhk/coursework/robust_speech/recipes
+1: /home/deokhk/coursework/robust_speech/recipes
+3: /home/deokhk/coursework/robust_speech/recipes
+2: Sun May  1 16:35:23 KST 2022
+0: Sun May  1 16:35:23 KST 2022
+3: Sun May  1 16:35:23 KST 2022
+1: Sun May  1 16:35:23 KST 2022
+Sun May  1 16:35:24 KST 2022
+speechbrain.core - Beginning experiment!
+speechbrain.core - Experiment folder: /home/deokhk/coursework/robust_speech/root/attacks/pgd/asr-crdnn-transformerlm-librispeech/102630
+speechbrain.pretrained.fetching - Fetch tokenizer.ckpt: Using existing file/symlink in /home/deokhk/coursework/robust_speech/root/tokenizers/asr-crdnn-transformerlm-librispeech/tokenizer.ckpt.
+speechbrain.utils.parameter_transfer - Loading pretrained files for: tokenizer
+robust_speech.data.librispeech - Skipping preparation, completed in previous run.
+speechbrain.core - Exception:
+Traceback (most recent call last):
+  File "universal_evaluate.py", line 190, in <module>
+    universal_evaluate(hparams_file, run_opts, overrides)
+  File "universal_evaluate.py", line 104, in universal_evaluate
+    _, _, test_datasets, _, _, tokenizer = dataio_prepare(hparams)
+  File "/home/deokhk/coursework/robust_speech/robust_speech/data/librispeech.py", line 488, in dataio_prepare
+    test_datasets[name] = sb.dataio.dataset.DynamicItemDataset.from_csv(
+  File "/home/deokhk/anaconda3/envs/IDL/lib/python3.8/site-packages/speechbrain/dataio/dataset.py", line 364, in from_csv
+    data = load_data_csv(csv_path, replacements)
+  File "/home/deokhk/anaconda3/envs/IDL/lib/python3.8/site-packages/speechbrain/dataio/dataio.py", line 127, in load_data_csv
+    with open(csv_path, newline="") as csvfile:
+FileNotFoundError: [Errno 2] No such file or directory: '/home/deokhk/coursework/robust_speech/root/data/LibriSpeech/csv/test-clean-adv.csv'
+Sun May  1 16:35:30 KST 2022

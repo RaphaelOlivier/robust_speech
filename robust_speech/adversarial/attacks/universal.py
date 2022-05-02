@@ -248,7 +248,6 @@ class UniversalAttack(Attacker):
                 if delta.shape[1] <= delta_x.shape[1]:
                     delta = delta_x[:,:delta.shape[1]].detach()
                 else:
-                    delta = torch.zeros_like(delta)
                     delta[:,:delta_x.shape[1]] = delta_x.detach()
 
             # print(f'MAX OF INPUT WAVE IS {torch.max(wav_init).data}')

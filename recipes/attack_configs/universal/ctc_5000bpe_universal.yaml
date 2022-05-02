@@ -18,6 +18,7 @@ attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   nb_iter: !ref <nb_iter>
   lr: !ref <lr>
   eps: !ref <eps>
+  time_universal: False
 save_audio: False
 
 # Model information

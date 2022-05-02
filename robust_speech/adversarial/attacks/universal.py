@@ -264,12 +264,21 @@ class UniversalAttack(Attacker):
             for idx, batch in enumerate(tqdm(loader, dynamic_ncols=True)):
                 batch = batch.to(self.asr_brain.device)
                 wav_init, wav_lens = batch.sig
-                if wav_init.shape[1] <= delta.shape[1]:
+                
+                if use_time_universal:
+                    delta = torch.concat((base_delta, base_delta), axis=1)
+                    #Concat delta to match length with data point x
+                    while wav_init.shape[1] > delta.shape[1]:
+                        delta = torch.concat((delta, base_delta), axis=1)
                     delta_x = torch.zeros_like(wav_init)
-                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]]
+                    delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]]
                 else:
-                    delta_x = torch.zeros_like(wav_init)
-                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]]
+                    if wav_init.shape[1] <= delta.shape[1]:
+                        delta_x = torch.zeros_like(wav_init)
+                        delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]]
+                    else:
+                        delta_x = torch.zeros_like(wav_init)
+                        delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]]
                 # if idx == 400:
                 #     break
                 #     raise NotImplementedError
@@ -301,7 +310,10 @@ class UniversalAttack(Attacker):
             print(f'SUCCESS RATE IS {success_rate}')
             if success_rate > best_success_rate:
                 best_success_rate = success_rate
-                self.univ_perturb = delta.detach()
+                if use_time_universal:
+                    self.univ_perturb = base_delta.detach()
+                else:
+                    self.univ_perturb = delta.detach()
                 print(f"Perturbation vector with best success rate saved. Success rate:{best_success_rate}")
         print(f"Training finisihed. Best success rate: {best_success_rate}")
     def perturb(self, batch):
@@ -326,11 +338,19 @@ class UniversalAttack(Attacker):
         save_input = batch.sig[0]
         wav_init = torch.clone(save_input)
 
-        if wav_init.shape[1] <= self.univ_perturb.shape[1]:
-            delta = self.univ_perturb[:,:wav_init.shape[1]]
-        else:
+        if self.time_universal:
             delta = torch.zeros_like(wav_init)
-            delta[:,:self.univ_perturb.shape[1]] = self.univ_perturb
+            temp_delta = torch.concat((self.univ_perturb, self.univ_perturb), axis=1)
+            #Concat delta to match length with data point x
+            while wav_init.shape[1] > temp_delta.shape[1]:
+                temp_delta = torch.concat((temp_delta, self.univ_perturb), axis=1)
+            delta[:,:wav_init.shape[1]] = temp_delta[:,:wav_init.shape[1]]
+        else:
+            if wav_init.shape[1] <= self.univ_perturb.shape[1]:
+                delta = self.univ_perturb[:,:wav_init.shape[1]]
+            else:
+                delta = torch.zeros_like(wav_init)
+                delta[:,:self.univ_perturb.shape[1]] = self.univ_perturb
 
         wav_adv = wav_init + delta
         # self.eps = 1.0

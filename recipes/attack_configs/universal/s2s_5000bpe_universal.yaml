@@ -18,7 +18,8 @@ attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   nb_iter: !ref <nb_iter>
   lr: !ref <lr>
   eps: !ref <eps>
-save_audio: False
+  time_universal: True
+save_audio: True
 
 # Model information
 model_name: asr-crdnn-transformerlm-librispeech

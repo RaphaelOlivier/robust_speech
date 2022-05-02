@@ -2,7 +2,7 @@
 Variations of the Unviersal attack (https://arxiv.org/pdf/1905.03828.pdf)
 """
 
-
+import pdb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -77,6 +77,7 @@ class UniversalAttack(Attacker):
         targeted=False,
         train_mode_for_backward=True,
         lr=0.001,
+        time_universal=False
     ):
         print(f"Experiment with eps: {eps}")
         self.clip_min = clip_min if clip_min is not None else -10
@@ -91,6 +92,7 @@ class UniversalAttack(Attacker):
         self.asr_brain = asr_brain
         self.l1_sparsity = l1_sparsity
         self.train_mode_for_backward = train_mode_for_backward
+        self.time_universal = time_universal
 
         assert isinstance(snr, int)
         self.rel_eps = torch.pow(torch.tensor(10.0), float(snr) / 20)
@@ -121,6 +123,12 @@ class UniversalAttack(Attacker):
         
         best_success_rate = -100
         epoch = 0
+        
+        #####HYPERPARAM for fixed delta#####
+        use_time_universal = self.time_universal
+        testing_delta_size = 20000
+        ####################################
+        
         while epoch < self.nb_iter:
             print(f'{epoch}s epoch')
             epoch+=1
@@ -131,20 +139,47 @@ class UniversalAttack(Attacker):
                 wav_init, wav_lens = batch.sig
 
                 if delta is None:
-                    delta = torch.zeros_like(wav_init)
+                    if use_time_universal:
+                        base_delta = torch.zeros((1, testing_delta_size))
+                        delta = torch.concat((base_delta, base_delta), axis=1)
+                        #Concat delta to match length with data point x
+                        while wav_init.shape[1] > delta.shape[1]:
+                            delta = torch.concat((delta, base_delta), axis=1)
+                        delta_x = torch.zeros_like(wav_init)
+                        delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]].detach()
+
+                    else:
+                        delta = torch.zeros_like(wav_init)
+                        # Slice or Pad to match the shape with data point x
+                        if wav_init.shape[1] <= delta.shape[1]:
+                            delta_x = torch.zeros_like(wav_init)
+                            delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]].detach()
+                        else:
+                            delta_x = torch.zeros_like(wav_init)
+                            delta_x[:,:wav_init.shape[1]] = delta.detach()
+                        
+                else:
+                    if use_time_universal:
+                        base_delta = delta_x[:,:testing_delta_size]
+                        delta = torch.concat((base_delta, base_delta), axis=1)
+                        #Concat delta to match length with data point x
+                        while wav_init.shape[1] > delta.shape[1]:
+                            delta = torch.concat((delta, base_delta), axis=1)
+                        delta_x = torch.zeros_like(wav_init)
+                        delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]].detach()
+                    else:
+                        # Slice or Pad to match the shape with data point x
+                        if wav_init.shape[1] <= delta.shape[1]:
+                            delta_x = torch.zeros_like(wav_init)
+                            delta_x[:,:wav_init.shape[1]] = delta[:,:wav_init.shape[1]].detach()
+                        else:
+                            delta_x = torch.zeros_like(wav_init)
+                            delta_x[:,:wav_init.shape[1]] = delta.detach()
                 
                 # if idx == 20:
                 #     break
                 #     # raise NotImplementedError
-            
-
-                # Slice or Pad to match the shape with data point x
-                if wav_init.shape[1] <= delta.shape[1]:
-                    delta_x = torch.zeros_like(wav_init)
-                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]].detach()
-                else:
-                    delta_x = torch.zeros_like(wav_init)
-                    delta_x[:,:delta.shape[1]] = delta.detach()
+                #pdb.set_trace()
 
                 _,_,predicted_tokens_origin = self.asr_brain.compute_forward(batch, rs.Stage.ADVTRUTH)
                 predicted_words_origin = [
@@ -152,8 +187,17 @@ class UniversalAttack(Attacker):
                     for utt_seq in predicted_tokens_origin
                 ]
 
-                r = torch.rand_like(delta_x) / 1e+4
+                if use_time_universal:
+                    base_r = torch.rand((1, testing_delta_size)) / 1e+4
+                    r_temp = torch.concat((base_r, base_r), axis=1)
+                    while wav_init.shape[1] > r_temp.shape[1]:
+                        r_temp = torch.concat((r_temp, base_r), axis=1)
+                    r = torch.zeros_like(wav_init)
+                    r[:,:wav_init.shape[1]] = r_temp[:,:wav_init.shape[1]].detach()
+                else:
+                    r = torch.rand_like(delta_x) / 1e+4
                 r.requires_grad_()
+                
 
                 batch.sig = wav_init + delta_x, wav_lens
                 _,_,predicted_tokens_adv = self.asr_brain.compute_forward(batch, rs.Stage.ADVTARGET)

@@ -8,6 +8,9 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from robust_speech.models.seq2seq import S2SASR
+from robust_speech.models.ctc import CTCASR
+
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import (
@@ -63,7 +66,7 @@ class UniversalAttack(Attacker):
         self,
         asr_brain,
         snr=5,
-        eps=0.05,
+        eps=0.3,
         nb_iter=40,
         rel_eps_iter=5.,
         rand_init=True,
@@ -96,7 +99,13 @@ class UniversalAttack(Attacker):
         assert isinstance(self.eps, torch.Tensor) or isinstance(self.eps, float)
 
     def compute_universal_perturbation(self, loader):
-
+        if isinstance(self.asr_brain,S2SASR):
+            decode = self.asr_brain.tokenizer.decode_ids
+        elif isinstance(self.asr_brain,CTCASR):
+            decode = self.asr_brain.tokenizer.decode_ids
+        else:
+            raise NotImplementedError
+        
         if isinstance(self.rel_eps_iter, torch.Tensor):
             assert self.eps_iter.dim() == 1
             eps_iter = self.rel_eps_iter.unsqueeze(1).to(self.asr_brain.device)
@@ -107,13 +116,15 @@ class UniversalAttack(Attacker):
 
         delta = None
         success_rate = 0
-        while success_rate < 0.01:
+        
+        epoch = 0
+        while success_rate < 0.8:
+            print(f'{epoch}s epoch')
+            epoch+=1
             print("GENERATE UNIVERSAL PERTURBATION")
             ### GENERATE CANDIDATE FOR UNIVERSAL PERTURBATION
             for idx, batch in enumerate(tqdm(loader, dynamic_ncols=True)):
                 batch = batch.to(self.asr_brain.device)
-                # self.eps = reverse_bound_from_rel_bound(batch, self.rel_eps, order=np.inf)
-                # print(self.eps)
                 wav_init, wav_lens = batch.sig
 
                 if delta is None:
@@ -126,53 +137,60 @@ class UniversalAttack(Attacker):
 
                 # Slice or Pad to match the shape with data point x
                 if wav_init.shape[1] <= delta.shape[1]:
-                    delta_x = delta[:,:wav_init.shape[1]].detach()
+                    delta_x = torch.zeros_like(wav_init)
+                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]].detach()
                 else:
                     delta_x = torch.zeros_like(wav_init)
                     delta_x[:,:delta.shape[1]] = delta.detach()
 
-                batch.sig = wav_init + delta_x, wav_lens
                 _,_,predicted_tokens_origin = self.asr_brain.compute_forward(batch, rs.Stage.ADVTRUTH)
                 predicted_words_origin = [
-                    self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
+                    decode(utt_seq).split(" ")
                     for utt_seq in predicted_tokens_origin
                 ]
 
-                r = torch.zeros_like(delta_x)
+                r = torch.rand_like(delta_x) / 1e+4
                 r.requires_grad_()
 
+                batch.sig = wav_init + delta_x, wav_lens
                 _,_,predicted_tokens_adv = self.asr_brain.compute_forward(batch, rs.Stage.ADVTARGET)
                 predicted_words_adv = [
-                    self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
+                    decode(utt_seq).split(" ")
                     for utt_seq in predicted_tokens_adv
                 ]
-                self.asr_brain.cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin)
-                
+
+                # self.asr_brain.cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin)
+                self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                 CER = self.asr_brain.cer_metric.summarize("error_rate")
                 self.asr_brain.cer_metric.clear()
                 # print(CER)
 
-                while CER < 30.:
+                while CER < 50.:
                     batch.sig = wav_init + delta_x + r, wav_lens
                     predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
                     # loss = 0.5 * r.norm(dim=1, p=2) - self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK)
-                    loss = 0.5 * r.norm(dim=1, p=2) - self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK) 
-                    # print(loss)
+                    ctc = -self.asr_brain.compute_objectives(predictions, batch, rs.Stage.ATTACK) 
+                    l2_norm = r.norm(dim=1, p=2).to(self.asr_brain.device)
+                    loss = 0.5 * l2_norm + ctc
+                    # loss = ctc
                     loss.backward()
-                
+                    # print(l2_norm,ctc,CER)
                     grad_sign = r.grad.data.sign()
-                    r.data = r.data - eps_iter * grad_sign
-                    # r.data = r.data - eps_iter * r.grad.data
+                    r.data = r.data - 0.001 * grad_sign
+                    # r.data = r.data - 0.1 * r.grad.data
                     r.data = linf_clamp(delta_x.data + r.data, self.eps) - delta_x.data
+                    
+                    # print("delta's mean : ", torch.mean(delta_x).data)
+                    # print("r's mean : ",torch.mean(r).data)
                     r.grad.data.zero_()
 
                     _,_,predicted_tokens_adv = self.asr_brain.compute_forward(batch, rs.Stage.ADVTARGET)
                     predicted_words_adv = [
-                        self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
+                        decode(utt_seq).split(" ")
                         for utt_seq in predicted_tokens_adv
                     ]
-                    self.asr_brain.cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin)
-                    
+
+                    self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                     CER = self.asr_brain.cer_metric.summarize("error_rate")
                     self.asr_brain.cer_metric.clear()
                     # print(CER)
@@ -186,10 +204,10 @@ class UniversalAttack(Attacker):
                     delta = torch.zeros_like(delta)
                     delta[:,:delta_x.shape[1]] = delta_x.detach()
 
-            print(f'MAX OF INPUT WAVE IS {torch.max(wav_init).data}')
-            print(f'AVG OF INPUT WAVE IS {torch.mean(wav_init).data}')
-            print(f'MAX OF DELTA IS {torch.max(delta).data}')
-            print(f'AVG OF DELTA IS {torch.mean(delta).data}')
+            # print(f'MAX OF INPUT WAVE IS {torch.max(wav_init).data}')
+            # print(f'AVG OF INPUT WAVE IS {torch.mean(wav_init).data}')
+            # print(f'MAX OF DELTA IS {torch.max(delta).data}')
+            # print(f'AVG OF DELTA IS {torch.mean(delta).data}')
             print('CHECK SUCCESS RATE OVER ALL TRAIING SAMPLES')
             ### TO CHECK SUCCESS RATE OVER ALL TRAINING SAMPLES
             total_sample = 0.
@@ -199,18 +217,20 @@ class UniversalAttack(Attacker):
                 batch = batch.to(self.asr_brain.device)
                 wav_init, wav_lens = batch.sig
                 if wav_init.shape[1] <= delta.shape[1]:
-                    delta_x = delta[:,:wav_init.shape[1]]
+                    delta_x = torch.zeros_like(wav_init)
+                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]]
                 else:
                     delta_x = torch.zeros_like(wav_init)
-                    delta_x[:,:delta.shape[1]] = delta
+                    delta_x[:,:delta.shape[1]] = delta[:,:wav_init.shape[1]]
                 # if idx == 400:
                 #     break
                 #     raise NotImplementedError
 
                 ### CER(Xi)
                 _,_,predicted_tokens_origin = self.asr_brain.compute_forward(batch, rs.Stage.ADVTRUTH)
+                
                 predicted_words_origin = [
-                    self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
+                    decode(utt_seq).split(" ")
                     for utt_seq in predicted_tokens_origin
                 ]
 
@@ -218,11 +238,10 @@ class UniversalAttack(Attacker):
                 batch.sig = wav_init + delta_x, wav_lens
                 _,_,predicted_tokens_adv = self.asr_brain.compute_forward(batch, rs.Stage.ADVTRUTH)
                 predicted_words_adv = [
-                    self.asr_brain.tokenizer.decode_ids(utt_seq).split(" ")
+                    decode(utt_seq).split(" ")
                     for utt_seq in predicted_tokens_adv
                 ]
- 
-                self.asr_brain.cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin)
+                self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                 CER = self.asr_brain.cer_metric.summarize("error_rate")
                 self.asr_brain.cer_metric.clear()
 

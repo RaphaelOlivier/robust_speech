@@ -76,11 +76,14 @@ class UniversalAttack(Attacker):
         l1_sparsity=None,
         targeted=False,
         train_mode_for_backward=True,
+        success_rate=0,
+        lr=0.001,
     ):
-
         self.clip_min = clip_min if clip_min is not None else -10
         self.clip_max = clip_max if clip_max is not None else 10
         self.eps = eps
+        self.lr = lr
+        self.success_rate = success_rate
         self.nb_iter = nb_iter
         self.rel_eps_iter = rel_eps_iter
         self.rand_init = rand_init
@@ -118,7 +121,7 @@ class UniversalAttack(Attacker):
         success_rate = 0
         
         epoch = 0
-        while success_rate < 0.8:
+        while success_rate < self.success_rate:
             print(f'{epoch}s epoch')
             epoch+=1
             print("GENERATE UNIVERSAL PERTURBATION")
@@ -176,7 +179,7 @@ class UniversalAttack(Attacker):
                     loss.backward()
                     # print(l2_norm,ctc,CER)
                     grad_sign = r.grad.data.sign()
-                    r.data = r.data - 0.001 * grad_sign
+                    r.data = r.data - self.lr * grad_sign
                     # r.data = r.data - 0.1 * r.grad.data
                     r.data = linf_clamp(delta_x.data + r.data, self.eps) - delta_x.data
                     
@@ -212,6 +215,7 @@ class UniversalAttack(Attacker):
             ### TO CHECK SUCCESS RATE OVER ALL TRAINING SAMPLES
             total_sample = 0.
             fooled_sample = 0.
+
 
             for idx, batch in enumerate(tqdm(loader, dynamic_ncols=True)):
                 batch = batch.to(self.asr_brain.device)

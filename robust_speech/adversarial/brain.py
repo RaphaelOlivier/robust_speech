@@ -346,6 +346,7 @@ class AdvASRBrain(ASRBrain):
                 checkpointer=None,
                 attacker=None,
             )
+            print(brain_to_attack)
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
@@ -963,6 +964,7 @@ class AdvASRBrain(ASRBrain):
             progressbar = not self.noprogressbar
 
         if not (isinstance(test_set, DataLoader) or isinstance(test_set, LoopedLoader)):
+            all_data = test_set
             test_loader_kwargs["ckpt_prefix"] = None
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
@@ -977,36 +979,91 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
         if mode == 'train':
-            for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
-                self.step += 1
-                loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
-                avg_test_loss = self.update_average(loss, avg_test_loss)
+            print("Now training universal perturbation..")
+            if type(self.attacker).__name__ == 'UniversalAttack':
+                if all_data is None:
+                    raise NotImplementedError
 
-                if self.attacker is not None:
-                    adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
-                        batch, stage=sb.Stage.TEST, target=target, mode='train'
-                    )
-                    avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
-                    if adv_loss_target:
-                        if avg_test_adv_loss_target is None:
-                            avg_test_adv_loss_target = 0.0
-                        avg_test_adv_loss_target = self.update_average(
-                            adv_loss_target, avg_test_adv_loss_target
+                univ_train_set = self.make_dataloader(
+                    all_data, sb.Stage.TEST, {"batch_size":1,"ckpt_prefix":None}
+                )
+                self.attacker.compute_universal_perturbation(univ_train_set)
+                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                    self.step += 1
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                    if self.attacker is not None:
+                        adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target
                         )
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
 
-                # Debug mode only runs a few batches
-                if self.debug and self.step == self.debug_batches:
-                    break
+                    # Debug mode only runs a few batches
+                    if self.debug and self.step == self.debug_batches:
+                        break
+            else:
+                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                    self.step += 1
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                    if self.attacker is not None:
+                        adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target, mode='train'
+                        )
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
+
+                    # Debug mode only runs a few batches
+                    if self.debug and self.step == self.debug_batches:
+                        break
         elif mode == 'eval':
-            for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
-                self.step += 1
-                loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
-                avg_test_loss = self.update_average(loss, avg_test_loss)
+            print("Now testing universal perturbation..")
+            if type(self.attacker).__name__ == 'UniversalAttack':
+                if all_data is None:
+                    raise NotImplementedError
+                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                    self.step += 1
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
 
-                if self.attacker is not None:
-                    adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
-                        batch, stage=sb.Stage.TEST, target=target, mode='eval'
-                    )
+                    if self.attacker is not None:
+                        adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target
+                        )
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
+
+                    # Debug mode only runs a few batches
+                    if self.debug and self.step == self.debug_batches:
+                        break
+            else:
+                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                    self.step += 1
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
+
+                    if self.attacker is not None:
+                        adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target, mode='eval'
+                        )
         else:
             raise ValueError("Invalid mode!")
 

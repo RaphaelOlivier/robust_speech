@@ -10,10 +10,14 @@ tokenizers_folder: !ref <root>/tokenizers
 # Attack information
 snr: 30
 nb_iter: 100
+success_rate: 0.4
+lr: 0.001
 attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
   snr: !ref <snr>
   nb_iter: !ref <nb_iter>
+  success_rate: !ref <success_rate>
+  lr: !ref <lr>
 save_audio: False
 
 # Model information

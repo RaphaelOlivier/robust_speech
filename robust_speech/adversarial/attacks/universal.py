@@ -76,14 +76,13 @@ class UniversalAttack(Attacker):
         l1_sparsity=None,
         targeted=False,
         train_mode_for_backward=True,
-        success_rate=0,
         lr=0.001,
     ):
+        print(f"Experiment with eps: {eps}")
         self.clip_min = clip_min if clip_min is not None else -10
         self.clip_max = clip_max if clip_max is not None else 10
         self.eps = eps
         self.lr = lr
-        self.success_rate = success_rate
         self.nb_iter = nb_iter
         self.rel_eps_iter = rel_eps_iter
         self.rand_init = rand_init
@@ -120,8 +119,9 @@ class UniversalAttack(Attacker):
         delta = None
         success_rate = 0
         
+        best_success_rate = -100
         epoch = 0
-        while success_rate < self.success_rate:
+        while epoch < self.nb_iter:
             print(f'{epoch}s epoch')
             epoch+=1
             print("GENERATE UNIVERSAL PERTURBATION")
@@ -255,10 +255,11 @@ class UniversalAttack(Attacker):
 
             success_rate = fooled_sample / total_sample
             print(f'SUCCESS RATE IS {success_rate}')
-
-        self.univ_perturb = delta.detach()
-
- 
+            if success_rate > best_success_rate:
+                best_success_rate = success_rate
+                self.univ_perturb = delta.detach()
+                print(f"Perturbation vector with best success rate saved. Success rate:{best_success_rate}")
+        print(f"Training finisihed. Best success rate: {best_success_rate}")
     def perturb(self, batch):
         """
         Compute an adversarial perturbation

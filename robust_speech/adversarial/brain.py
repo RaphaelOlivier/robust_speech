@@ -346,7 +346,6 @@ class AdvASRBrain(ASRBrain):
                 checkpointer=None,
                 attacker=None,
             )
-            print(brain_to_attack)
             self.attacker = attacker(brain_to_attack)
         else:
             self.attacker = None
@@ -372,6 +371,7 @@ class AdvASRBrain(ASRBrain):
             The outputs after all processing is complete.
             Directly passed to ``compute_objectives()``.
         """
+
         assert stage != rs.Stage.ATTACK
         wavs = batch.sig[0]
         if self.attacker is not None:
@@ -560,7 +560,7 @@ class AdvASRBrain(ASRBrain):
             )
         else:
             batch_to_attack = batch
-
+        
         predictions, adv_wav = self.compute_forward_adversarial(
             batch_to_attack, stage=stage
         )
@@ -580,7 +580,11 @@ class AdvASRBrain(ASRBrain):
                 batch.sig = batch_to_attack.sig
             else:
                 advloss = loss
-        return advloss, targetloss
+
+        if type(self.attacker).__name__ == 'UniversalAttack':
+            return advloss, targetloss, adv_wav
+        else:
+            return advloss, targetloss
     
     def universal_evaluate_batch_adversarial(self, batch, stage, target=None, mode='train'):
         """Evaluate one batch on adversarial examples.
@@ -994,7 +998,7 @@ class AdvASRBrain(ASRBrain):
                     avg_test_loss = self.update_average(loss, avg_test_loss)
 
                     if self.attacker is not None:
-                        adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
+                        adv_loss, adv_loss_target, _ = self.evaluate_batch_adversarial(
                             batch, stage=sb.Stage.TEST, target=target
                         )
                         avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
@@ -1015,7 +1019,7 @@ class AdvASRBrain(ASRBrain):
                     avg_test_loss = self.update_average(loss, avg_test_loss)
 
                     if self.attacker is not None:
-                        adv_loss, adv_loss_target = self.universal_evaluate_batch_adversarial(
+                        adv_loss, adv_loss_target= self.universal_evaluate_batch_adversarial(
                             batch, stage=sb.Stage.TEST, target=target, mode='train'
                         )
                         avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
@@ -1034,15 +1038,36 @@ class AdvASRBrain(ASRBrain):
             if type(self.attacker).__name__ == 'UniversalAttack':
                 if all_data is None:
                     raise NotImplementedError
+                total_sample = 0
+                fooled_sample = 0
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
+
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                    ### CER(X)
+                    predicted_words_origin = [
+                        self.tokenizer.decode_ids(utt_seq).split(" ")
+                        for utt_seq in predicted_tokens_origin
+                    ]
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                     avg_test_loss = self.update_average(loss, avg_test_loss)
-
                     if self.attacker is not None:
-                        adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
+                        adv_loss, adv_loss_target,adv_wav = self.evaluate_batch_adversarial(
                             batch, stage=sb.Stage.TEST, target=target
                         )
+                        ### CER(Xi + v)
+                        batch.sig = adv_wav, batch.sig[1]
+                        _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                        predicted_words_adv = [
+                            self.tokenizer.decode_ids(utt_seq).split(" ")
+                            for utt_seq in predicted_tokens_adv
+                        ]
+                        self.eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
+                        CER = self.eval_cer_metric.summarize("error_rate")
+                        self.eval_cer_metric.clear()
+                        total_sample += 1.
+                        if CER > 50.:
+                            fooled_sample += 1.
                         avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
                         if adv_loss_target:
                             if avg_test_adv_loss_target is None:
@@ -1054,6 +1079,7 @@ class AdvASRBrain(ASRBrain):
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
             else:
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
@@ -1100,6 +1126,7 @@ class AdvASRBrain(ASRBrain):
             self.adv_wer_metric = self.hparams.error_rate_computer()
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
+            self.eval_cer_metric = self.hparams.cer_computer()
 
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None

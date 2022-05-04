@@ -77,7 +77,6 @@ class AudioSaver:
 
     def save_wav(self, audio_id, wav, adv_wav):
         """Save the original and the adversarial versions of a single audio file"""
-        print(wav.size())
         nat_path = audio_id + "_nat.wav"
         adv_path = audio_id + "_adv.wav"
         torchaudio.save(

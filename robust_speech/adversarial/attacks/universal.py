@@ -305,8 +305,8 @@ class UniversalAttack(Attacker):
                 if CER > 50.:
                     fooled_sample += 1.
 
-            success_rate = fooled_sample / total_sample
-            print(f'SUCCESS RATE IS {success_rate}')
+            success_rate = fooled_sample / total_sample * 100.
+            print(f'SUCCESS RATE IS {success_rate:.4f}')
             if success_rate > best_success_rate:
                 best_success_rate = success_rate
                 if use_time_universal:

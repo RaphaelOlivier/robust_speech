@@ -207,9 +207,9 @@ class UniversalAttack(Attacker):
                 ]
 
                 # self.asr_brain.cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin)
-                self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
-                CER = self.asr_brain.cer_metric.summarize("error_rate")
-                self.asr_brain.cer_metric.clear()
+                self.asr_brain.train_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
+                CER = self.asr_brain.train_cer_metric.summarize("error_rate")
+                self.asr_brain.train_cer_metric.clear()
                 # print(CER)
 
                 while CER < 50.:
@@ -237,9 +237,9 @@ class UniversalAttack(Attacker):
                         for utt_seq in predicted_tokens_adv
                     ]
 
-                    self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
-                    CER = self.asr_brain.cer_metric.summarize("error_rate")
-                    self.asr_brain.cer_metric.clear()
+                    self.asr_brain.train_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
+                    CER = self.asr_brain.train_cer_metric.summarize("error_rate")
+                    self.asr_brain.train_cer_metric.clear()
                     # print(CER)
                 
                 # print(f'CER = {CER}')
@@ -297,9 +297,9 @@ class UniversalAttack(Attacker):
                     decode(utt_seq).split(" ")
                     for utt_seq in predicted_tokens_adv
                 ]
-                self.asr_brain.cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
-                CER = self.asr_brain.cer_metric.summarize("error_rate")
-                self.asr_brain.cer_metric.clear()
+                self.asr_brain.train_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
+                CER = self.asr_brain.train_cer_metric.summarize("error_rate")
+                self.asr_brain.train_cer_metric.clear()
 
                 total_sample += 1.
                 if CER > 50.:
@@ -313,8 +313,8 @@ class UniversalAttack(Attacker):
                     self.univ_perturb = base_delta.detach()
                 else:
                     self.univ_perturb = delta.detach()
-                print(f"Perturbation vector with best success rate saved. Success rate:{best_success_rate}")
-        print(f"Training finisihed. Best success rate: {best_success_rate}")
+                print(f"Perturbation vector with best success rate saved. Success rate:{best_success_rate:.2f}%")
+        print(f"Training finisihed. Best success rate: {best_success_rate:.2f}%")
     def perturb(self, batch):
         """
         Compute an adversarial perturbation

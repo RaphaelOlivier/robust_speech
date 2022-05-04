@@ -1127,6 +1127,7 @@ class AdvASRBrain(ASRBrain):
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
             self.eval_cer_metric = self.hparams.cer_computer()
+            self.train_cer_metric = self.hparams.cer_computer()
 
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None

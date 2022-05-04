@@ -11,7 +11,7 @@ tokenizers_folder: !ref <root>/tokenizers
 snr: 30
 nb_iter: 50
 lr: 0.001
-eps: 0.3
+eps: 0.005
 attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
   snr: !ref <snr>

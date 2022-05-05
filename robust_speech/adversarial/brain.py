@@ -1059,7 +1059,7 @@ class AdvASRBrain(ASRBrain):
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
-                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
+                print(f"Success rate on Training set : {fooled_sample/total_sample*100.:.4f}")
         elif mode == 'eval':
             print("Now testing universal perturbation..")
             if type(self.attacker).__name__ == 'UniversalAttack':
@@ -1165,16 +1165,17 @@ class AdvASRBrain(ASRBrain):
             raise ValueError("Invalid mode!")
 
             # Only run evaluation "on_stage_end" on main process
-        run_on_main(
-            self.on_stage_end,
-            args=[sb.Stage.TEST, avg_test_loss, None],
-            kwargs={
-                "stage_adv_loss": avg_test_adv_loss,
-                "stage_adv_loss_target": avg_test_adv_loss_target,
-            },
-        )
-        self.step = 0
-        self.on_evaluate_end()
+        if mode == "train":
+            run_on_main(
+                self.on_stage_end,
+                args=[sb.Stage.TEST, avg_test_loss, None],
+                kwargs={
+                    "stage_adv_loss": avg_test_adv_loss,
+                    "stage_adv_loss_target": avg_test_adv_loss_target,
+                },
+            )
+            self.step = 0
+            self.on_evaluate_end()
         return avg_test_loss
 
 

@@ -17,8 +17,6 @@ import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 
-import pdb
-
 warnings.simplefilter("once", RuntimeWarning)
 
 logger = logging.getLogger(__name__)
@@ -1070,55 +1068,48 @@ class AdvASRBrain(ASRBrain):
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
 
-                    target_words = [wrd for wrd in batch.wrd]
-                    target_words = [t.split(" ") for t in target_words]
-
                     _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                     ### CER(X)
                     predicted_words_origin = [
                         self.tokenizer.decode_ids(utt_seq).split(" ")
                         for utt_seq in predicted_tokens_origin
                     ]
-
-                    self.univ_test_cer_metric.append(batch.id, predicted_words_origin, target_words)
-                    self.univ_test_wer_metric.append(batch.id, predicted_words_origin, target_words)
-
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
                     if self.attacker is not None:
+                        adv_loss, adv_loss_target,adv_wav = self.evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target
+                        )
                         ### CER(Xi + v)
-                        adv_wav = self.attacker.perturb(batch)
                         batch.sig = adv_wav, batch.sig[1]
                         _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                         predicted_words_adv = [
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
                         ]
-                        # pdb.set_trace()
-                        self.adv_univ_test_cer_metric.append(batch.id, predicted_words_adv, target_words)
-                        self.adv_univ_test_wer_metric.append(batch.id, predicted_words_adv, target_words)
-
                         self.univ_eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                         CER = self.univ_eval_cer_metric.summarize("error_rate")
                         self.univ_eval_cer_metric.clear()
                         total_sample += 1.
                         if CER > 50.:
                             fooled_sample += 1.
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
-                neutral_CER = self.univ_test_cer_metric.summarize("error_rate")
-                neutral_WER = self.univ_test_wer_metric.summarize("error_rate")
-
-                adv_CER = self.adv_univ_test_cer_metric.summarize("error_rate")
-                adv_WER = self.adv_univ_test_wer_metric.summarize("error_rate")
-                print(f"<TEST SET> neutral CER : {neutral_CER} neutral WER : {neutral_WER} adv CER : {adv_CER} adv WER : {adv_WER} success rate : {fooled_sample/total_sample*100.:.4f}")
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
             else:
                 total_sample = 0
                 fooled_sample = 0
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
-                    target_words = [wrd for wrd in batch.wrd]
-                    target_words = [t.split(" ") for t in target_words]
 
                     _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                     ### CER(X)
@@ -1126,8 +1117,6 @@ class AdvASRBrain(ASRBrain):
                         self.tokenizer.decode_ids(utt_seq).split(" ")
                         for utt_seq in predicted_tokens_origin
                     ]
-                    self.pgd_test_cer_metric.append(batch.id, predicted_words_origin, target_words)
-                    self.pgd_test_wer_metric.append(batch.id, predicted_words_origin, target_words)
 
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
 
@@ -1144,22 +1133,13 @@ class AdvASRBrain(ASRBrain):
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
                         ]
-                        self.adv_pgd_test_cer_metric.append(batch.id, predicted_words_adv, target_words)
-                        self.adv_pgd_test_wer_metric.append(batch.id, predicted_words_adv, target_words)
-
                         self.pgd_eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                         CER = self.pgd_eval_cer_metric.summarize("error_rate")
                         self.pgd_eval_cer_metric.clear()
                         total_sample += 1.
                         if CER > 50.:
                             fooled_sample += 1.
-                
-                neutral_CER = self.pgd_test_cer_metric.summarize("error_rate")
-                neutral_WER = self.pgd_test_wer_metric.summarize("error_rate")
-
-                adv_CER = self.adv_pgd_test_cer_metric.summarize("error_rate")
-                adv_WER = self.adv_pgd_test_wer_metric.summarize("error_rate")
-                print(f"<TEST SET> neutral CER : {neutral_CER} neutral WER : {neutral_WER} adv CER : {adv_CER} adv WER : {adv_WER} success rate : {fooled_sample/total_sample*100.:.4f}")
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
 
         else:
             raise ValueError("Invalid mode!")

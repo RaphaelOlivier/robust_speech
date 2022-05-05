@@ -217,10 +217,23 @@ def pgd_loop_with_return_delta(
       else:
          import torch.nn.functional as F
          delta = F.pad(existing_perturbation, (0, wav_length - perturb_length), mode='constant')
+        
+      if order == np.inf:
+         delta.data = linf_clamp(delta.data, eps)
+         delta.data = (
+               torch.clamp(wav_init.data + delta.data, clip_min, clip_max)
+               - wav_init.data
+         )
+      elif order == 2:
+         delta.data = (
+               torch.clamp(wav_init.data + delta.data, clip_min, clip_max)
+               - wav_init.data
+         )
+         if eps is not None:
+            delta.data = l2_clamp_or_normalize(delta.data, eps)
     if isinstance(eps_iter, torch.Tensor):
         eps_iter = eps_iter.squeeze(1)
-    if eps is not None:
-      delta.data = l2_clamp_or_normalize(delta.data, eps)
+
 
     wav_adv = torch.clamp(wav_init + delta, clip_min, clip_max)
     return wav_adv, delta

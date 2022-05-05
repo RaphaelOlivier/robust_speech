@@ -1015,6 +1015,7 @@ class AdvASRBrain(ASRBrain):
             else:
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
+
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                     avg_test_loss = self.update_average(loss, avg_test_loss)
 

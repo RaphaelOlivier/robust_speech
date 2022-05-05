@@ -238,7 +238,6 @@ def pgd_loop_with_return_delta(
     wav_adv = torch.clamp(wav_init + delta, clip_min, clip_max)
     return wav_adv, delta
 
-
 class ASRPGDAttack(Attacker):
     """
     Implementation of the PGD attack (https://arxiv.org/abs/1706.06083)

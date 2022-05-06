@@ -1020,7 +1020,7 @@ class AdvASRBrain(ASRBrain):
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
 
-                    _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
                     ### CER(X)
                     predicted_words_origin = [
                         self.tokenizer.decode_ids(utt_seq).split(" ")
@@ -1036,7 +1036,7 @@ class AdvASRBrain(ASRBrain):
                         )
                         ### CER(Xi + v)
                         batch.sig = adv_wav, batch.sig[1]
-                        _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                        _,_,predicted_tokens_adv = self.compute_forward(batch, stage=sb.Stage.TEST)
                         predicted_words_adv = [
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
@@ -1120,7 +1120,7 @@ class AdvASRBrain(ASRBrain):
                     target_words = [wrd for wrd in batch.wrd]
                     target_words = [t.split(" ") for t in target_words]
 
-                    _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
                     ### CER(X)
                     predicted_words_origin = [
                         self.tokenizer.decode_ids(utt_seq).split(" ")
@@ -1128,10 +1128,8 @@ class AdvASRBrain(ASRBrain):
                     ]
                     self.pgd_test_cer_metric.append(batch.id, predicted_words_origin, target_words)
                     self.pgd_test_wer_metric.append(batch.id, predicted_words_origin, target_words)
-
-                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
-
-                    avg_test_loss = self.update_average(loss, avg_test_loss)
+                    if self.pgd_test_cer_metric.summarize("error_rate") > 70.:
+                        pdb.set_trace()
 
                     if self.attacker is not None:
                         adv_loss, adv_loss_target, adv_wav = self.universal_evaluate_batch_adversarial(
@@ -1139,14 +1137,13 @@ class AdvASRBrain(ASRBrain):
                         )
                         ### CER(Xi + v)
                         batch.sig = adv_wav, batch.sig[1]
-                        _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                        _,_,predicted_tokens_adv = self.compute_forward(batch, stage=sb.Stage.TEST)
                         predicted_words_adv = [
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
                         ]
                         self.adv_pgd_test_cer_metric.append(batch.id, predicted_words_adv, target_words)
                         self.adv_pgd_test_wer_metric.append(batch.id, predicted_words_adv, target_words)
-
                         self.pgd_eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                         CER = self.pgd_eval_cer_metric.summarize("error_rate")
                         self.pgd_eval_cer_metric.clear()
@@ -1176,6 +1173,17 @@ class AdvASRBrain(ASRBrain):
             )
             self.step = 0
             self.on_evaluate_end()
+        elif mode == "eval":
+            pdb.set_trace()
+            snr = self.attacker.snr_metric.summarize()
+            average_snr = snr["average"]
+            min_snr = snr["min_score"]
+            max_snr = snr["max_score"]
+            print(f"test Adversarial SNR: average: {average_snr}, min: {min_snr}, max: {max_snr}")
+
+        else:
+            raise ValueError("Invalid type!")
+
         return avg_test_loss
 
 

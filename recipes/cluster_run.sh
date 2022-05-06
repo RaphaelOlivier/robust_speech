@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J l2pgd # job name
+#SBATCH -J upgd_0_03 # job name
 #SBATCH -o sbatch_output_log/output_%x_%j.out # standard output and error log
 #SBATCH -p A5000 # queue name or partiton name
 #SBATCH -t 72:00:00 # Run time (hh:mm:ss)
@@ -16,6 +16,6 @@ module purge
 
 date
 
-sh l2_upgd_0_02.sh
+sh upgd_0_03.sh
 
 date

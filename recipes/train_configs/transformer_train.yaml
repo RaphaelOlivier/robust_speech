@@ -30,7 +30,7 @@ dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
 dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
 enable_train_smoothing: True
-train_smoothing_sigma: 0.01
+train_smoothing_sigma: 0.02
 
 pretrained_lm_tokenizer_path: speechbrain/asr-crdnn-rnnlm-librispeech
 

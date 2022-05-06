@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 snr: 30
-nb_iter: 100
+nb_iter: 1
 attack_class: !name:robust_speech.adversarial.attacks.pgd.SNRPGDAttack
   targeted: False
   snr: !ref <snr>
@@ -26,12 +26,14 @@ target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 
 # Tokenizer information (compatible with target and source)
 pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
+# pretrained_tokenizer_path: facebook/wav2vec2-base-960h
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 
 # Pretrainer loading parameters
 pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
    collect_in: !ref <tokenizers_folder>/<model_name>
+   # collect_in: !ref <pretrained_tokenizer_path>
    loadables:
       tokenizer: !ref <tokenizer>
    paths:

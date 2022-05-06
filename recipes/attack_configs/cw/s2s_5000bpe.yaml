@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 eps: 1
-max_iter: 4000
+max_iter: 3
 const: 10
 target_sentence: ["THIS IS A SENTENCE OF MEDIUM LENGTH THAT WE USE AS TARGET", "A SHORT TARGET SENTENCE", "HERE IS A RATHER LONG TEST STRING THAT WE USE AS TARGET FOR THE LONGEST UTTERANCES IN LIBRISPEECH WHICH CAN CONTAIN DOZENS OF WORDS"]
 attack_class: !name:robust_speech.adversarial.attacks.cw.ASRCarliniWagnerAttack
@@ -32,7 +32,8 @@ target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref speechbrain/<model_name>
+# pretrained_tokenizer_path: !ref speechbrain/<model_name>
+pretrained_tokenizer_path: !ref <root>/trainings/conformer/1006/save/CKPT+2022-05-01+00-32-32+00
 tokenizer: !new:sentencepiece.SentencePieceProcessor
 # -------------------------------------------------------------
 

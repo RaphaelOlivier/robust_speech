@@ -617,6 +617,7 @@ class AdvASRBrain(ASRBrain):
 
         if self.voting_module is not None:
             preds = []
+            # print("doing rover")
             for i in range(self.rover_iters):
                 predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
                 predicted_tokens = predictions[-1][0]

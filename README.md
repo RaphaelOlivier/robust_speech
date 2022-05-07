@@ -78,10 +78,11 @@ python evaluate.py attack_configs/pgd/trf_5000bpe.yaml --root=/path/to/results/f
 
 # This will download the speechbrain/asr-crdnn-rnnlm-librispeech model from huggingface
 # Using ctc model as brain with eps 0.2
-python universal_evaluate.py attack_configs/universal/s2s_5000bpe_universal.yaml --data_csv_name=test-clean-adv-100 --root=[PATH TO ROOT] --nb_iter=30 --eps=0.2 --lr 0.001 --seed=1026
+python universal_evaluate.py attack_configs/universal/ctc_5000bpe_universal.yaml --data_csv_name=test-clean-adv-100 --root=[PATH TO ROOT] --nb_iter=30 --eps=0.2 --lr 0.001 --seed=1026
 ```
-
 Also, you can download the csv files that we used in [here](https://drive.google.com/file/d/1WWSB6YrckR7sUp5wwoVaFFi6OwtwhVww/view?usp=sharing).
+
+For more details, check scripts in recipes folder.
 
 ### Computation time
 

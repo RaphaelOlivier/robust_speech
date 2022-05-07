@@ -137,6 +137,8 @@ class W2VASR(AdvASRBrain):
         if not stage == rs.Stage.ATTACK:
             batch = batch.to(self.device)
         wavs, wav_lens = batch.sig
+        # if self.filter is not None:
+        #     wavs = self.filter(wavs)
         tokens_bos, _ = batch.tokens_bos
         # wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Add augmentation if specified

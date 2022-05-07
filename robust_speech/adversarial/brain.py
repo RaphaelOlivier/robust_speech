@@ -975,6 +975,8 @@ class AdvASRBrain(ASRBrain):
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
             )
+        initial_module = torch.nn.ModuleDict(self.modules.items()).to(self.device)
+        # raise NotImplementedError
         self.on_evaluate_start(max_key=max_key, min_key=min_key)
         self.on_stage_start(sb.Stage.TEST, epoch=None)
         self.modules.eval()
@@ -994,10 +996,28 @@ class AdvASRBrain(ASRBrain):
                     all_data, sb.Stage.TEST, {"batch_size":1,"ckpt_prefix":None}
                 )
                 self.attacker.compute_universal_perturbation(univ_train_set)
+                #print(f"Universal 1: {self.modules.training}")
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
+
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
+                    #print(f"Universal 2: {self.modules.training}")
+
+                    ### CER(X)
+                    predicted_words_origin = [
+                        self.tokenizer.decode_ids(utt_seq).split(" ")
+                        for utt_seq in predicted_tokens_origin
+                    ]
+                    target_words = [wrd for wrd in batch.wrd]
+                    target_words = [t.split(" ") for t in target_words]
+
+                    self.univ_train_CER_metric.append(batch.id, predicted_words_origin, target_words)
+                    univ_train_CER = self.univ_train_CER_metric.summarize("error_rate")
+                    self.univ_train_CER_metric.clear()
+                    
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                     avg_test_loss = self.update_average(loss, avg_test_loss)
+                    #print(f"Universal 3: {self.modules.training}")
 
                     if self.attacker is not None:
                         adv_loss, adv_loss_target, _ = self.evaluate_batch_adversarial(
@@ -1010,6 +1030,7 @@ class AdvASRBrain(ASRBrain):
                             avg_test_adv_loss_target = self.update_average(
                                 adv_loss_target, avg_test_adv_loss_target
                             )
+                    #print(f"Universal 4: {self.modules.training}")
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
@@ -1017,23 +1038,33 @@ class AdvASRBrain(ASRBrain):
             else:
                 total_sample = 0
                 fooled_sample = 0
+                #print(f"PGD 1: {self.modules.training}")
+
+                # self.step = 0
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
-
                     _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
+                    #print(f"PGD 2: {self.modules.training}")
                     ### CER(X)
                     predicted_words_origin = [
                         self.tokenizer.decode_ids(utt_seq).split(" ")
                         for utt_seq in predicted_tokens_origin
                     ]
-
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                     avg_test_loss = self.update_average(loss, avg_test_loss)
+                    #print(f"PGD 3: {self.modules.training}")
+
+                    target_words = [wrd for wrd in batch.wrd]
+                    target_words = [t.split(" ") for t in target_words]
+
 
                     if self.attacker is not None:
+                        #print("===== With adversarial =====")
                         adv_loss, adv_loss_target, adv_wav = self.universal_evaluate_batch_adversarial(
                             batch, stage=sb.Stage.TEST, target=target, mode='train'
                         )
+                        #print(f"PGD 4: {self.modules.training}")
+
                         ### CER(Xi + v)
                         batch.sig = adv_wav, batch.sig[1]
                         _,_,predicted_tokens_adv = self.compute_forward(batch, stage=sb.Stage.TEST)
@@ -1049,13 +1080,9 @@ class AdvASRBrain(ASRBrain):
                             fooled_sample += 1.
 
                         avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
-                        if adv_loss_target:
-                            if avg_test_adv_loss_target is None:
-                                avg_test_adv_loss_target = 0.0
-                            avg_test_adv_loss_target = self.update_average(
-                                adv_loss_target, avg_test_adv_loss_target
-                            )
+                        #print(f"PGD 5: {self.modules.training}")
 
+                    #print("==== finished ====")
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
@@ -1211,6 +1238,10 @@ class AdvASRBrain(ASRBrain):
 
             self.univ_eval_cer_metric = self.hparams.cer_computer()
             self.pgd_eval_cer_metric = self.hparams.cer_computer()
+
+            ### FOR TRAIN SET
+            #self.pgd_train_CER_metric = self.hparams.cer_computer()
+            self.univ_train_CER_metric = self.hparams.cer_computer()
 
             ### FOR TEST SET
             self.univ_test_cer_metric = self.hparams.cer_computer()

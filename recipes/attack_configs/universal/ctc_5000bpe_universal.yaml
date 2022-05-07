@@ -12,13 +12,14 @@ snr: 30
 nb_iter: 50
 lr: 0.001
 eps: 0.005
+time_universal: False
 attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
   snr: !ref <snr>
   nb_iter: !ref <nb_iter>
   lr: !ref <lr>
   eps: !ref <eps>
-  time_universal: True
+  time_universal: !ref <time_universal>
 save_audio: True
 
 # Model information

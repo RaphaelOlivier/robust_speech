@@ -46,7 +46,7 @@ log: !ref <output_folder>/log.txt
 save_audio_path: !ref <output_folder>/save
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech

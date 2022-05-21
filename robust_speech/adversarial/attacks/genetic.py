@@ -1,5 +1,7 @@
 """
-Genetic adversarial attack (https://arxiv.org/abs/1801.00554)
+Genetic adversarial attack 
+Based on https://arxiv.org/abs/1801.00554
+Enhanced with the momentum mutation from https://arxiv.org/pdf/1805.07820.pdf
 """
 
 import copy
@@ -7,6 +9,7 @@ import copy
 import numpy as np
 import speechbrain as sb
 import torch
+import torch.nn.functional as F
 from speechbrain.dataio.batch import PaddedBatch, PaddedData
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
 
@@ -15,9 +18,10 @@ from robust_speech.adversarial.attacks.attacker import Attacker
 
 ELITE_SIZE = 2
 TEMPERATURE = 0.02
-MUTATION_PROB = 0.0005
+MUTATION_PROB_INIT = 0.0005
 EPS_NUM_STRIDES = 4
-
+ALPHA_MOMENTUM = 0.99
+EPS_MOMENTUM = 0.001
 
 class GeneticAttack(Attacker):
     """
@@ -51,16 +55,17 @@ class GeneticAttack(Attacker):
         self.targeted = targeted
 
     def perturb(self, batch):
+        self.mutation_prob = MUTATION_PROB_INIT
+        self.prev_score = None
         pop_batch, max_wavs, min_wavs = self._gen_population(batch)
 
         for _ in range(self.nb_iter):
             pop_scores = self._score(pop_batch)
+            self._momentum_mutation_prob(pop_scores)
             _, elite_indices = torch.topk(
-                pop_scores, ELITE_SIZE, largest=not self.targeted, sorted=True, dim=-1
+                pop_scores, ELITE_SIZE, largest= True , sorted=True, dim=-1
             )
-            scores_logits = torch.exp((pop_scores) / TEMPERATURE)
-            if self.targeted:
-                scores_logits = 1.0 - scores_logits
+            scores_logits = F.softmax((pop_scores) / TEMPERATURE)
             pop_probs = scores_logits / torch.sum(scores_logits, dim=-1, keepdim=True)
             elite_sig = self._extract_elite(pop_batch, elite_indices)
             child_sig = self._crossover(
@@ -72,8 +77,14 @@ class GeneticAttack(Attacker):
             )
 
         wav_adv = self._extract_best(pop_batch, elite_indices).to(batch.sig[0].device)
-
         return wav_adv
+
+    def _momentum_mutation_prob(pop_scores):
+        new_score = pop_scores.mean()
+        if self.prev_score is not None:
+            coeff = abs(new_score-self.prev_score)
+            self.mutation_prob = ALPHA *self.mutation_prob + (1-ALPHA)*EPS_MOMENTUM/max(EPS_MOMENTUM,coeff)
+        self.prev_score = new_score
 
     def _update_pop(self, batches, elite_sig, child_sig, min_wavs, max_wavs):
         # elite_sig : batch_size * elite_size
@@ -107,12 +118,11 @@ class GeneticAttack(Attacker):
     def _mutation(self, wavs):
         wav_size = wavs.size()
         mutation_mask = (
-            torch.rand(*wav_size, device=wavs.device) < MUTATION_PROB
+            torch.rand(*wav_size, device=wavs.device) < self.mutation_prob
         ).reshape(-1)
         n_mutations = int(mutation_mask.sum())
-        rg_mutations = np.arange(-self.eps, self.eps, self.eps / EPS_NUM_STRIDES)
         mutations = torch.tensor(
-            np.random.choice(rg_mutations, size=n_mutations),
+            np.random.normal(scale=self.eps,size=n_mutations),
             device=wavs.device,
             dtype=wavs.dtype,
         )
@@ -148,7 +158,8 @@ class GeneticAttack(Attacker):
             )
             scores.append(loss.detach())
         scores = torch.stack(scores, dim=1)  # (batch_size x pop_size)
-        scores = scores / scores.max(dim=1, keepdim=True)[0]
+        if self.targeted:
+            scores = -scores
         return scores
 
     def _crossover(self, batches, pop_probs, num_crossovers):

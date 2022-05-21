@@ -42,9 +42,9 @@ We also provide data preparation and loading functions for the LibriSpeech packa
 Before installing robust_speech you should have installed PyTorch (>=1.8.0,<=1.10.1) and cuda support (if you want GPU support) in your environment. Testing was conducting with CUDA 9.2 and 10.2 on a Nvidia RTX 2080Ti. Default options assume GPU support; use the `--device=cpu` option in your scripts if do not have it.
 
 ```
-git clone https://github.com/RaphaelOlivier/robust_speech.git
+git clone https://github.com/deokhk/robust_speech.git
 cd robust_speech
-pip install .
+pip install -e .
 ```
 
 ## Usage
@@ -70,7 +70,21 @@ mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transforme
 python evaluate.py attack_configs/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
 ```
 
+(Updated!) To use universal attack, please follow commands below. We used LibriSpeech Dataset to train and evaluate the attack.
+
+```
+# in ./recipes/
+
+# This will download the speechbrain/asr-crdnn-rnnlm-librispeech model from huggingface
+# Using ctc model as brain with eps 0.2
+python universal_evaluate.py attack_configs/universal/ctc_5000bpe_universal.yaml --data_csv_name=test-clean-adv-100 --root=[PATH TO ROOT] --nb_iter=30 --eps=0.2 --lr 0.001 --seed=1026
+```
+Also, you can download the csv files that we used in [here](https://drive.google.com/file/d/1WWSB6YrckR7sUp5wwoVaFFi6OwtwhVww/view?usp=sharing).
+
+For more details, check scripts in recipes folder.
+
 ### Computation time
+
 Running strong adversarial attacks on ASR models takes time. The first evaluation script above would run for about 30h on a single RTX 2080Ti. [Speechbrain supports multi-GPU computations](https://speechbrain.readthedocs.io/en/latest/multigpu.html), for instance with the `--data_parallel_backend` option. You may use it with robust_speech if you have many GPUs available, however we have not extensively tested it. 
 
 Alternatively, we recommend that you run all but your final round of experiments using a smaller data split. You can extract a csv yourself (`head -n 101 test-clean.csv > test-clean-short.csv`) and override the csv name in evaluation recipes (`--data_csv_name=test-clean-short`)
@@ -100,6 +114,10 @@ root
 │
 └───data
 │   │ # where datasets are dumped (e.g. download LibriSpeech here)
+	(EX)
+|	└───LibriSpeech
+|	|	└───csv
+|	|	└───test-clean	
 │
 └───models
 │   │

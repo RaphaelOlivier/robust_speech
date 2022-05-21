@@ -25,17 +25,12 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     rel_length : torch.tensor
         the relative length of the wavs in the batch
     """
-
-    length = (audio.size(1) * rel_length).long()
-    num = torch.tensor(
-        [torch.square(audio[i, : length[i]]).sum() for i in range(audio.size(0))]
-    )
-    den = torch.tensor(
-        [torch.square(perturbation[i, : length[i]]).sum() for i in range(audio.size(0))]
-    )
-    ratio = 10 * torch.log10(num / den)
-    return torch.round(ratio).long()
-
+    num = torch.max(audio, dim=1)
+    den = torch.max(perturbation, dim=1)
+    ratio = num[0]/den[0]
+    
+    snr = 20. * torch.log10(ratio)
+    return torch.round(snr).long()
 
 class SNRComputer(MetricStats):
     """Tracks Signal to Noise Ratio"""

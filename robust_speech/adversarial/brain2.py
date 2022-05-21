@@ -17,9 +17,6 @@ import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 
-import pdb
-from copy import deepcopy
-
 warnings.simplefilter("once", RuntimeWarning)
 
 logger = logging.getLogger(__name__)
@@ -823,7 +820,6 @@ class AdvASRBrain(ASRBrain):
         progressbar=None,
         test_loader_kwargs={},
         save_audio_path=None,
-        load_audio=False,
         sample_rate=16000,
         target=None,
     ):
@@ -850,8 +846,6 @@ class AdvASRBrain(ASRBrain):
             is not added to the checkpointer).
         save_audio_path : str
             optional path where to store adversarial audio files
-        load_audio : bool
-            whether to load audio files from save_audio_path instead of running the attack
         sample_rate = 16000
             the audio sample rate
         target : str
@@ -880,7 +874,7 @@ class AdvASRBrain(ASRBrain):
         avg_test_adv_loss_target = None
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
-            self.attacker.on_evaluation_start(load_audio=load_audio,save_audio_path=save_audio_path)
+            self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
 
         ######
         if type(self.attacker).__name__ == 'UniversalAttack':
@@ -970,8 +964,6 @@ class AdvASRBrain(ASRBrain):
         -------
         average test loss
         """
-
-
         if progressbar is None:
             progressbar = not self.noprogressbar
 
@@ -981,7 +973,6 @@ class AdvASRBrain(ASRBrain):
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
             )
-
         self.on_evaluate_start(max_key=max_key, min_key=min_key)
         self.on_stage_start(sb.Stage.TEST, epoch=None)
         self.modules.eval()
@@ -992,8 +983,7 @@ class AdvASRBrain(ASRBrain):
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(save_audio_path=save_audio_path)
         if mode == 'train':
-            print("=== Universal evaluate: Training Phase === ")
-            self.alternative_module = torch.nn.ModuleDict([('enc',deepcopy(self.modules['enc'])),('emb',deepcopy(self.modules['emb'])),('dec',deepcopy(self.modules['dec'])),('ctc_lin',deepcopy(self.modules['ctc_lin'])),('seq_lin',deepcopy(self.modules['seq_lin'])),('normalize',deepcopy(self.modules['normalize'])),('env_corrupt',deepcopy(self.modules['env_corrupt'])),('lm_model',deepcopy(self.modules['lm_model']))]).to(self.device)
+            print("Now training universal perturbation..")
             if type(self.attacker).__name__ == 'UniversalAttack':
                 if all_data is None:
                     raise NotImplementedError
@@ -1004,7 +994,6 @@ class AdvASRBrain(ASRBrain):
                 self.attacker.compute_universal_perturbation(univ_train_set)
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
-                    
                     loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
                     avg_test_loss = self.update_average(loss, avg_test_loss)
 
@@ -1026,65 +1015,8 @@ class AdvASRBrain(ASRBrain):
             else:
                 total_sample = 0
                 fooled_sample = 0
-                predicted_words_origin = []
-                print("NEUTRAL EVALUATION ON TRAINING SET")
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
-                    
-                    _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
-                    ### CER(X)
-                    predicted_words_origin_ = [
-                        self.tokenizer.decode_ids(utt_seq).split(" ")
-                        for utt_seq in predicted_tokens_origin
-                    ]
-                    predicted_words_origin.append(predicted_words_origin_)
-                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
-                    avg_test_loss = self.update_average(loss, avg_test_loss)
-
-                print("ADVERSARIAL EVALUATION ON TRAINING SET")
-                self.step = 0
-                for idx, batch in enumerate(tqdm(test_set, dynamic_ncols=True, disable=not progressbar)):
-                    self.step += 1
-
-                    if self.attacker is not None:
-                        #print("===== With adversarial =====")
-                        adv_loss, adv_loss_target, adv_wav = self.universal_evaluate_batch_adversarial(
-                            batch, stage=sb.Stage.TEST, target=target, mode='train'
-                        )
-
-                        ### CER(Xi + v)
-                        batch.sig = adv_wav, batch.sig[1]
-                        _,_,predicted_tokens_adv = self.compute_forward(batch, stage=sb.Stage.TEST)
-                        predicted_words_adv = [
-                            self.tokenizer.decode_ids(utt_seq).split(" ")
-                            for utt_seq in predicted_tokens_adv
-                        ]
-                        self.train_cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin[idx])
-                        CER = self.train_cer_metric.summarize("error_rate")
-                        self.train_cer_metric.clear()
-                        total_sample += 1.
-                        if CER > 50.:
-                            fooled_sample += 1.
-
-                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
-
-                    # Debug mode only runs a few batches
-                    if self.debug and self.step == self.debug_batches:
-                        break
-                predicted_words_origin.clear()
-                print(f"Success rate on Training set : {fooled_sample/total_sample*100.:.4f}")
-        elif mode == 'eval':
-            print("=== Universal evaluate: Test Phase === ")
-            if type(self.attacker).__name__ == 'UniversalAttack':
-                if all_data is None:
-                    raise NotImplementedError
-                total_sample = 0
-                fooled_sample = 0
-                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
-                    self.step += 1
-
-                    target_words = [wrd for wrd in batch.wrd]
-                    target_words = [t.split(" ") for t in target_words]
 
                     _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                     ### CER(X)
@@ -1093,65 +1025,102 @@ class AdvASRBrain(ASRBrain):
                         for utt_seq in predicted_tokens_origin
                     ]
 
-                    self.univ_test_cer_metric.append(batch.id, predicted_words_origin, target_words)
-                    self.univ_test_wer_metric.append(batch.id, predicted_words_origin, target_words)
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
 
                     if self.attacker is not None:
+                        adv_loss, adv_loss_target, adv_wav = self.universal_evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target, mode='train'
+                        )
                         ### CER(Xi + v)
-                        adv_wav = self.attacker.perturb(batch)
                         batch.sig = adv_wav, batch.sig[1]
                         _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                         predicted_words_adv = [
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
                         ]
-                        # pdb.set_trace()
-                        self.adv_univ_test_cer_metric.append(batch.id, predicted_words_adv, target_words)
-                        self.adv_univ_test_wer_metric.append(batch.id, predicted_words_adv, target_words)
+                        self.train_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
+                        CER = self.train_cer_metric.summarize("error_rate")
+                        self.train_cer_metric.clear()
+                        total_sample += 1.
+                        if CER > 50.:
+                            fooled_sample += 1.
 
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
+
+                    # Debug mode only runs a few batches
+                    if self.debug and self.step == self.debug_batches:
+                        break
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
+        elif mode == 'eval':
+            print("Now testing universal perturbation..")
+            if type(self.attacker).__name__ == 'UniversalAttack':
+                if all_data is None:
+                    raise NotImplementedError
+                total_sample = 0
+                fooled_sample = 0
+                for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
+                    self.step += 1
+
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                    ### CER(X)
+                    predicted_words_origin = [
+                        self.tokenizer.decode_ids(utt_seq).split(" ")
+                        for utt_seq in predicted_tokens_origin
+                    ]
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
+                    if self.attacker is not None:
+                        adv_loss, adv_loss_target,adv_wav = self.evaluate_batch_adversarial(
+                            batch, stage=sb.Stage.TEST, target=target
+                        )
+                        ### CER(Xi + v)
+                        batch.sig = adv_wav, batch.sig[1]
+                        _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
+                        predicted_words_adv = [
+                            self.tokenizer.decode_ids(utt_seq).split(" ")
+                            for utt_seq in predicted_tokens_adv
+                        ]
                         self.univ_eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                         CER = self.univ_eval_cer_metric.summarize("error_rate")
                         self.univ_eval_cer_metric.clear()
                         total_sample += 1.
                         if CER > 50.:
                             fooled_sample += 1.
+                        avg_test_adv_loss = self.update_average(adv_loss, avg_test_adv_loss)
+                        if adv_loss_target:
+                            if avg_test_adv_loss_target is None:
+                                avg_test_adv_loss_target = 0.0
+                            avg_test_adv_loss_target = self.update_average(
+                                adv_loss_target, avg_test_adv_loss_target
+                            )
 
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
-                neutral_CER = self.univ_test_cer_metric.summarize("error_rate")
-                neutral_WER = self.univ_test_wer_metric.summarize("error_rate")
-
-                adv_CER = self.adv_univ_test_cer_metric.summarize("error_rate")
-                adv_WER = self.adv_univ_test_wer_metric.summarize("error_rate")
-                print(f"<TEST SET> neutral CER : {neutral_CER} neutral WER : {neutral_WER} adv CER : {adv_CER} adv WER : {adv_WER} success rate : {fooled_sample/total_sample*100.:.4f}")
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
             else:
-                self.modules = self.alternative_module
                 total_sample = 0
                 fooled_sample = 0
-                predicted_words_origin = []
-                print("NEUTRAL EVALUATION ON TEST SET")
                 for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
                     self.step += 1
-                    target_words = [wrd for wrd in batch.wrd]
-                    target_words = [t.split(" ") for t in target_words]
 
-                    _,_,predicted_tokens_origin = self.compute_forward(batch, stage=sb.Stage.TEST)
+                    _,_,predicted_tokens_origin = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                     ### CER(X)
-                    predicted_words_origin_ = [
+                    predicted_words_origin = [
                         self.tokenizer.decode_ids(utt_seq).split(" ")
                         for utt_seq in predicted_tokens_origin
                     ]
-                    predicted_words_origin.append(predicted_words_origin_)
-                    self.pgd_test_cer_metric.append(batch.id, predicted_words_origin_, target_words)
-                    self.pgd_test_wer_metric.append(batch.id, predicted_words_origin_, target_words)
 
-                print("ADVERSARIAL EVALUATION ON TEST SET")
-                self.step = 0
-                for idx, batch in enumerate(tqdm(test_set, dynamic_ncols=True, disable=not progressbar)):
-                    self.step += 1
-                    target_words = [wrd for wrd in batch.wrd]
-                    target_words = [t.split(" ") for t in target_words]
+                    loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
+
+                    avg_test_loss = self.update_average(loss, avg_test_loss)
 
                     if self.attacker is not None:
                         adv_loss, adv_loss_target, adv_wav = self.universal_evaluate_batch_adversarial(
@@ -1159,48 +1128,33 @@ class AdvASRBrain(ASRBrain):
                         )
                         ### CER(Xi + v)
                         batch.sig = adv_wav, batch.sig[1]
-                        _,_,predicted_tokens_adv = self.compute_forward(batch, stage=sb.Stage.TEST)
+                        _,_,predicted_tokens_adv = self.compute_forward(batch, rs.Stage.ADVTRUTH)
                         predicted_words_adv = [
                             self.tokenizer.decode_ids(utt_seq).split(" ")
                             for utt_seq in predicted_tokens_adv
                         ]
-                        self.adv_pgd_test_cer_metric.append(batch.id, predicted_words_adv, target_words)
-                        self.adv_pgd_test_wer_metric.append(batch.id, predicted_words_adv, target_words)
-                        self.pgd_eval_cer_metric.append(batch.id, predicted_words_adv, predicted_words_origin[idx])
+                        self.pgd_eval_cer_metric.append(batch.id, predicted_words_origin, predicted_words_adv)
                         CER = self.pgd_eval_cer_metric.summarize("error_rate")
                         self.pgd_eval_cer_metric.clear()
                         total_sample += 1.
                         if CER > 50.:
                             fooled_sample += 1.
-                predicted_words_origin.clear()
-                neutral_CER = self.pgd_test_cer_metric.summarize("error_rate")
-                neutral_WER = self.pgd_test_wer_metric.summarize("error_rate")
-
-                adv_CER = self.adv_pgd_test_cer_metric.summarize("error_rate")
-                adv_WER = self.adv_pgd_test_wer_metric.summarize("error_rate")
-                print(f"<TEST SET> neutral CER : {neutral_CER} neutral WER : {neutral_WER} adv CER : {adv_CER} adv WER : {adv_WER} success rate : {fooled_sample/total_sample*100.:.4f}")
+                print(f"success rate : {fooled_sample/total_sample*100.:.4f}")
 
         else:
             raise ValueError("Invalid mode!")
 
             # Only run evaluation "on_stage_end" on main process
-        if mode == "train":
-            run_on_main(
-                self.on_stage_end,
-                args=[sb.Stage.TEST, avg_test_loss, None],
-                kwargs={
-                    "stage_adv_loss": avg_test_adv_loss,
-                    "stage_adv_loss_target": avg_test_adv_loss_target,
-                },
-            )
-            self.step = 0
-            self.on_evaluate_end()
-        elif mode == "eval":
-            avg_test_loss = -999.
-            pass
-        else:
-            raise ValueError("Invalid type!")
-
+        run_on_main(
+            self.on_stage_end,
+            args=[sb.Stage.TEST, avg_test_loss, None],
+            kwargs={
+                "stage_adv_loss": avg_test_adv_loss,
+                "stage_adv_loss_target": avg_test_adv_loss_target,
+            },
+        )
+        self.step = 0
+        self.on_evaluate_end()
         return avg_test_loss
 
 
@@ -1228,10 +1182,6 @@ class AdvASRBrain(ASRBrain):
 
             self.univ_eval_cer_metric = self.hparams.cer_computer()
             self.pgd_eval_cer_metric = self.hparams.cer_computer()
-
-            ### FOR TRAIN SET
-            #self.pgd_train_CER_metric = self.hparams.cer_computer()
-            self.univ_train_CER_metric = self.hparams.cer_computer()
 
             ### FOR TEST SET
             self.univ_test_cer_metric = self.hparams.cer_computer()

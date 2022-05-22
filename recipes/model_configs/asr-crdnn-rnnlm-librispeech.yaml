@@ -16,8 +16,8 @@ pretrained_path: !ref speechbrain/<model_name>
 
 
 tokenizer: !new:sentencepiece.SentencePieceProcessor
-number_of_epochs: 15
-number_of_ctc_epochs: 5
+number_of_epochs: 1
+number_of_ctc_epochs: 1
 ctc_weight: 0.
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <number_of_epochs>
@@ -204,3 +204,17 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
       lm: !ref <pretrained_path>/lm.ckpt
       tokenizer: !ref <pretrained_path>/tokenizer.ckpt
     collect_in: !ref <output_folder>
+
+enable_eval_smoothing: True
+eval_smoothing_sigma: 0.02
+# filter config
+filter_config:
+  filter_package: robust_speech.adversarial.filters.ASNRWiener
+  filter_class: ASNRWiener
+  sr: 16000
+  hop: 160
+  nfft: 320
+voting_config:
+  voting: rover_freq
+  rover_iters: 3 
+  rover_path: /home/ubuntu/IDL/SCTK/bin/rover

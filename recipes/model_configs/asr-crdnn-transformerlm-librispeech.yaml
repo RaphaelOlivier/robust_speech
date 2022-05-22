@@ -14,6 +14,20 @@ train_log: !ref <output_folder>/train_log.txt
 
 pretrained_path: !ref speechbrain/<model_name>
 
+enable_eval_smoothing: True
+eval_smoothing_sigma: 0.02
+# filter config
+filter_config:
+  filter_package: robust_speech.adversarial.filters.ASNRWiener
+  filter_class: ASNRWiener
+  sr: 16000
+  hop: 160
+  nfft: 320
+voting_config:
+  voting: rover_freq
+  rover_iters: 3
+  rover_path: /home/ubuntu/SCTK/bin/rover
+
 # Feature parameters
 sample_rate: 16000
 n_fft: 400
@@ -183,8 +197,8 @@ env_corrupt: !new:speechbrain.lobes.augment.EnvCorrupt
    noise_snr_low: 0
    noise_snr_high: 15
 
-number_of_epochs: 15
-number_of_ctc_epochs: 5
+number_of_epochs: 1
+number_of_ctc_epochs: 1
 ctc_weight: 0.
 valid_search: !ref <decoder>
 test_search: !ref <decoder>

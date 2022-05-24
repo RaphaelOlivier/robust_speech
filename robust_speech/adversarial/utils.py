@@ -7,6 +7,7 @@ from enum import Enum, auto
 import numpy as np
 import speechbrain as sb
 import torch
+import torch.nn as nn
 import torchaudio
 from speechbrain.dataio.batch import PaddedBatch  # noqa
 from speechbrain.dataio.preprocess import AudioNormalizer
@@ -113,7 +114,8 @@ def predict_words_from_wavs(hparams, wavs, rel_length):
         hparams_file=hparams["pretrained_model_hparams_file"],
         savedir=hparams["saved_model_folder"],
     )
-    predicted_words, predicted_tokens = asr_model.transcribe_batch(wavs, rel_length)
+    predicted_words, predicted_tokens = asr_model.transcribe_batch(
+        wavs, rel_length)
     return predicted_words[0], predicted_tokens[0]
 
 
@@ -151,3 +153,9 @@ def linf_clamp(tensor, eps):
     if isinstance(eps, torch.Tensor) and eps.dim() == 1:
         eps = eps.unsqueeze(1)
     return torch.clamp(tensor, min=-eps, max=eps)
+
+
+class TensorModule(nn.Module):
+    def __init__(self, size):
+        super(TensorModule, self).__init__()
+        self.tensor = nn.Parameter(torch.zeros(size=size))

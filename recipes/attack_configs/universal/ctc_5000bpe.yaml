@@ -9,40 +9,70 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 snr: 30
-attack_class: !name:robust_speech.adversarial.attacks.yeehaw.KenansvilleAttack
+nb_epochs: 10
+nb_iter: 20
+lr: 0.001
+eps: 0.01
+eps_item: 0.003
+time_universal: False
+
+delta: !new:robust_speech.adversarial.utils.TensorModule
+   size: (1,288000)
+
+attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
   snr: !ref <snr>
-save_audio: False
+  nb_epochs: !ref <nb_epochs>
+  nb_iter: !ref <nb_iter>
+  lr: !ref <lr>
+  eps: !ref <eps>
+  eps_item: !ref <eps_item>
+  time_universal: !ref <time_universal>
+  univ_perturb: !ref <delta>
+save_audio: True
 
 # Model information
-model_name: wav2vec2-base-100h
-attack_name: kanansville
-target_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
+model_name: asr-crdnn-transformerlm-librispeech-ctc
+attack_name: universal
+target_brain_class: !name:robust_speech.models.seq2seq.S2SASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
-tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
+pretrained_tokenizer_path: !ref speechbrain/asr-crdnn-transformerlm-librispeech
+tokenizer: !new:sentencepiece.SentencePieceProcessor
 # -------------------------------------------------------------
 
-# Pretrainer loading parameters
-pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
-   collect_in: !ref <tokenizers_folder>/<model_name>
-   loadables:
-      tokenizer: !ref <tokenizer>
-   paths:
-      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
-
-output_folder: !ref <root>/attacks/<attack_name>/<model_name>/<seed>
+# Output files
+output_folder: !ref <root>/attacks/<attack_name>/<model_name>/universal_<eps>
 wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt
 save_audio_path: !ref <output_folder>/save
+params_subfolder: !PLACEHOLDER # replace with the checkpoint of your universal perturbation
+params_folder: !ref <output_folder>/<params_subfolder>
+
+# Pretrainer loading parameters
+# Comment delta for attacker training, and move 
+# Uncomment delta for evaluation
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+   collect_in: !ref <output_folder>
+   loadables:
+      tokenizer: !ref <tokenizer>
+      delta: !ref <delta>
+   paths:
+      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
+      delta: !ref <params_folder>/delta.ckpt
+      
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+   checkpoints_dir: !ref <output_folder>
+   recoverables:
+      delta: !ref <delta>
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
+dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
@@ -53,9 +83,11 @@ csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
 test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
-data_csv_name: test-clean
+data_csv_name: test-clean-20
 test_csv:
    - !ref <data_folder>/csv/<data_csv_name>.csv
+data_csv_name_train: dev-clean-20
+train_csv: !ref <data_folder>/csv/<data_csv_name_train>.csv
 batch_size: 1 # This works for 2x GPUs with 32GB
 avoid_if_longer_than: 24.0
 sorting: random
@@ -71,6 +103,8 @@ bos_index: 1
 eos_index: 2
 
 test_dataloader_opts:
+    batch_size: 1
+train_dataloader_opts:
     batch_size: 1
 
 logger: !new:speechbrain.utils.train_logger.FileTrainLogger

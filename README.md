@@ -24,17 +24,20 @@ Several robustness-oriented packages already exist ([Advertorch](https://github.
 Supported attacks:
 * [PGD](https://arxiv.org/abs/1706.06083)
 * [CW](https://people.eecs.berkeley.edu/~daw/papers/audio-dls18.pdf)
-* [Kenansville](https://arxiv.org/abs/1910.05262) 
+* [Kenansville](https://arxiv.org/abs/1910.05262)
+* [Yeehaw Junction](https://arxiv.org/abs/2203.05408) (In development)
 * [Imperceptible](https://arxiv.org/abs/1903.10346) 
 * [Genetic](https://arxiv.org/abs/1801.00554)
-* [Self-supervised attacks](https://arxiv.org/abs/2111.04330) for Wav2Vec2
+* [Self-supervised attacks](https://arxiv.org/abs/2111.04330) for Wav2Vec2-type models
 * [MGAA](https://arxiv.org/abs/2108.04204)
+* [Universal](https://arxiv.org/abs/1905.03828) (In development)
+
 
 The package provised model classes in the form of Speechbrain Brain classes, that are compatible with the attacks above. Currently implemented:
 * Sequence-to-Sequence models with RNNs and Transformers, also supporting the CTC loss and CTC decoding. Compatible with [pretrained](https://huggingface.co/speechbrain/asr-crdnn-rnnlm-librispeech) [speechbrain](https://huggingface.co/speechbrain/asr-crdnn-transformerlm-librispeech) [models](https://huggingface.co/speechbrain/asr-transformer-transformerlm-librispeech).
 * RNN-CTC model (DeepSpeech-like) with character tokenizer.
 * RNN-Transducer models
-* Wav2Vec2 ASR and Pretraining (compatible with pretrained huggingface Wav2Vec2 models).
+* Wav2Vec2 ASR and Pretraining (compatible with pretrained huggingface and fairseq models).
 
 We also provide data preparation and loading functions for the LibriSpeech package, based on SpeechBrain recipes.
 
@@ -129,10 +132,7 @@ You may change this at will in your custom `.yaml` files or with command line ar
     * [Speech Commands](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html)
     * [Common Voice](https://commonvoice.mozilla.org/en)
 * Attacks:
-    * [Universal](https://arxiv.org/abs/1905.03828)
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
-    * [Targeted Black Box](https://arxiv.org/abs/1805.07820)
-    * [Yeehaw Junction](https://arxiv.org/abs/2203.05408)
 * Defenses:
     * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
 * Data poisoning

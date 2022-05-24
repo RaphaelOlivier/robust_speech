@@ -9,7 +9,7 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 snr: 30
-attack_class: !name:robust_speech.adversarial.attacks.kenansville.KenansvilleAttack
+attack_class: !name:robust_speech.adversarial.attacks.yeehaw.KenansvilleAttack
   targeted: False
   snr: !ref <snr>
 save_audio: False

@@ -1,19 +1,6 @@
 """
-Evaluation script supporting adversarial attacks.
-Similar to the training script without the brain.fit() call, with one key difference:
-To support transferred attacks or attacks conducted on multiple models like MGAA,
-the model hparams files was decoupled from the main hparams file.
-
-hparams contains target_brain_class and target_brain_hparams_file arguments,
-which are used to load corresponding brains, modules and pretrained parameters.
-Optional source_brain_class and source_brain_hparams_file can be specified to transfer
-the adversarial perturbations. Each of them can be specified as a (nested) list, in which case
-the brain will be an EnsembleASRBrain object.
-
-Example:
-python evaluate.py attack_configs/pgd/attack.yaml\
-     --root=/path/to/data/and/results/folder\
-     --auto_mix_prec`
+Attacker training script supporting adversarial attacks.
+Useful for attacks that have trainable parameters, e.g. universal attacks
 """
 import os
 import sys
@@ -34,7 +21,7 @@ def read_brains(
     run_opts={},
     overrides={},
     tokenizer=None,
-): 
+):
     if isinstance(brain_classes, list):
         brain_list = []
         assert len(brain_classes) == len(brain_hparams)
@@ -60,12 +47,13 @@ def read_brains(
         )
         if "pretrainer" in brain_hparams:
             run_on_main(brain_hparams["pretrainer"].collect_files)
-            brain_hparams["pretrainer"].load_collected(device=run_opts["device"])
+            brain_hparams["pretrainer"].load_collected(
+                device=run_opts["device"])
         brain.tokenizer = tokenizer
     return brain
 
 
-def evaluate(hparams_file, run_opts, overrides):
+def fit(hparams_file, run_opts, overrides):
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
@@ -99,7 +87,7 @@ def evaluate(hparams_file, run_opts, overrides):
     dataio_prepare = hparams["dataio_prepare_fct"]
 
     # here we create the datasets objects as well as tokenization and encoding
-    _, _, test_datasets, _, _, tokenizer = dataio_prepare(hparams)
+    train_dataset, _, test_datasets, _, _, tokenizer = dataio_prepare(hparams)
     source_brain = None
     if "source_brain_class" in hparams:  # loading source model
         source_brain = read_brains(
@@ -137,6 +125,16 @@ def evaluate(hparams_file, run_opts, overrides):
     target = hparams["target_sentence"] if "target_sentence" in hparams else None
     load_audio = hparams["load_audio"] if "load_audio" in hparams else None
     save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None
+
+    # Training
+    target_brain.fit_attacker(
+        train_dataset,
+        loader_kwargs=hparams["train_dataloader_opts"],
+    )
+
+    # saving parameters
+    checkpointer = hparams["checkpointer"]
+    checkpointer.save_checkpoint()
     # Evaluation
     for k in test_datasets.keys():  # keys are test_clean, test_other etc
         target_brain.hparams.wer_file = os.path.join(
@@ -145,7 +143,7 @@ def evaluate(hparams_file, run_opts, overrides):
         target_brain.evaluate(
             test_datasets[k],
             test_loader_kwargs=hparams["test_dataloader_opts"],
-            load_audio = load_audio,
+            load_audio=load_audio,
             save_audio_path=save_audio_path,
             sample_rate=hparams["sample_rate"],
             target=target,
@@ -160,5 +158,4 @@ if __name__ == "__main__":
     # create ddp_group with the right communication protocol
     sb.utils.distributed.ddp_init_group(run_opts)
 
-    evaluate(hparams_file, run_opts, overrides)
-
+    fit(hparams_file, run_opts, overrides)

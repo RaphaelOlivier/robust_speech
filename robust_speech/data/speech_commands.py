@@ -4,6 +4,7 @@ Data preparation and loading scripts for SpeechCommands.
 
 import os
 import csv
+import random
 import re
 import logging
 import torchaudio
@@ -34,12 +35,13 @@ def prepare_speech_commands(
     else:
         logger.info("Data_preparation...")
 
-    dataset = torchaudio.datasets.SPEECHCOMMANDS(data_folder,download=True)
+    dataset = torchaudio.datasets.SPEECHCOMMANDS(data_folder, download=True)
     all_files = load_files_list(dataset._path)
-    files_splits = split_files(dataset._path,all_files,splits)
+    files_splits = split_files(dataset._path, all_files, splits)
+    for i in range(len(splits)):
+        csv_file = os.path.join(save_folder, splits[i]+'.csv')
+        create_csv(files_splits[i], csv_file, dataset._path)
 
-    for i in in range(splits):
-        create_csv(splits[i],files_splits[i],dataset._path)
 
 def skip(splits, save_folder, conf):
     """
@@ -66,38 +68,40 @@ def skip(splits, save_folder, conf):
 
     for split in splits:
         if not os.path.isfile(os.path.join(save_folder, split + ".csv")):
-            skip = False 
+            skip = False
     return skip
+
 
 def load_files_list(root):
     classes = os.listdir(root)
-    classes = [c for c in classes if os.path.isdir(c)]
+    classes = [c for c in classes if os.path.isdir(os.path.join(root, c))]
     all_files = []
     for c in classes:
-        folder = os.path.join(root,c)
+        folder = os.path.join(root, c)
         wavs_list = os.listdir(folder)
         for w in wavs_list:
             if w.endswith('.wav'):
-                path = os.path.join(c,w)
-                all_files.append((w.split('.')[0],path,c))
+                path = os.path.join(c, w)
+                ID = c+'_'+w.split('.')[0]
+                all_files.append((ID, path, c))
     return all_files
 
-def split_files(root,allfiles,split_names):
-    validation_txt = os.path.join(root,'validation_list.txt')
-    testing_txt = os.path.join(root,'testing_list.txt')
+
+def split_files(root, allfiles, split_names):
+    validation_txt = os.path.join(root, 'validation_list.txt')
+    testing_txt = os.path.join(root, 'testing_list.txt')
     validation_list = []
-    testing_list=[]
-    with open(validation_txt,'r') as f:
+    testing_list = []
+    with open(validation_txt, 'r') as f:
         for line in f:
-            validation_list.append(line)
-    with open(testing_txt,'r') as f:
+            validation_list.append(line[:-1])
+    with open(testing_txt, 'r') as f:
         for line in f:
-            testing_list.append(line)
-    
+            testing_list.append(line[:-1])
+
     validation_set = set(validation_list)
     testing_set = set(testing_list)
-
-    training, validation, testing = [],[],[]
+    training, validation, testing = [], [], []
     for t in allfiles:
         if t[1] in validation_set:
             validation.append(t)
@@ -106,12 +110,15 @@ def split_files(root,allfiles,split_names):
         else:
             training.append(t)
 
-    d = {"training":training,"validation":validation,"testing":testing}
-    splits=[d[s] for s in split_names]
+    d = {"training": training, "validation": validation, "testing": testing}
+    splits = [d[s] for s in split_names]
     return splits
+
 
 def create_csv(
     file_list, csv_file, data_folder
+
+
 ):
     """
     Creates the csv file given a list of wav files.
@@ -126,8 +133,9 @@ def create_csv(
     None
     """
 
-
-    msg = "Preparing CSV files for %s samples ..." % (str(nb_samples))
+    assert len(file_list) > 0, "no files to add!"
+    random.shuffle(file_list)
+    msg = "Preparing CSV files for %s samples ..." % (str(len(file_list)))
     logger.info(msg)
 
     # Adding some Prints
@@ -140,13 +148,14 @@ def create_csv(
     total_duration = 0.0
     for t in file_list:
 
-        snt_id,wav,transcription = t
-        file_name = os.path.filename(wav)
-        filepath = os.path.join(data_folder,wav)
+        snt_id, wav, transcription = t
+        file_name = os.path.basename(wav)
+        filepath = os.path.join(data_folder, wav)
 
         # Setting torchaudio backend to sox-io (needed to read mp3 files)
         if torchaudio.get_audio_backend() != "sox_io":
-            logger.warning("This recipe needs the sox-io backend of torchaudio")
+            logger.warning(
+                "This recipe needs the sox-io backend of torchaudio")
             logger.warning("The torchaudio backend is changed to sox_io")
             torchaudio.set_audio_backend("sox_io")
 
@@ -162,14 +171,18 @@ def create_csv(
         total_duration += duration
 
         # Getting transcript
+
+        if transcription.startswith('_'):
+            continue  # ignore background noise
+
         words = transcription
 
         # Unicode Normalization
         words = unicode_normalisation(words)
 
         words = re.sub(
-                "[^’'A-Za-z0-9À-ÖØ-öø-ÿЀ-ӿéæœâçèàûî]+", " ", words
-            ).upper()
+            "[^’'A-Za-z0-9À-ÖØ-öø-ÿЀ-ӿéæœâçèàûî]+", " ", words
+        ).upper()
 
         # Remove multiple spaces
         words = re.sub(" +", " ", words)
@@ -180,8 +193,7 @@ def create_csv(
         # Getting chars
         chars = words.replace(" ", "_")
         chars = " ".join([char for char in chars][:])
-
-        assert words.aplit(" ") == 1
+        assert len(words.split(" ")) == 1
         # Composition of the csv_line
         csv_line = [snt_id, str(duration), filepath, str(words)]
 
@@ -189,6 +201,7 @@ def create_csv(
         csv_lines.append(csv_line)
 
     # Writing the csv lines
+    print(csv_file)
     with open(csv_file, mode="w", encoding="utf-8") as csv_f:
         csv_writer = csv.writer(
             csv_f, delimiter=",", quotechar='"', quoting=csv.QUOTE_MINIMAL
@@ -199,8 +212,6 @@ def create_csv(
 
     # Final prints
     msg = "%s successfully created!" % (csv_file)
-    logger.info(msg)
-    msg = "Number of samples: %s " % (str(len(loaded_csv)))
     logger.info(msg)
     msg = "Total duration: %s Hours" % (str(round(total_duration / 3600, 2)))
     logger.info(msg)

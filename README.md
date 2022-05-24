@@ -61,16 +61,16 @@ Example
 # in ./recipes/
 
 # This will download the speechbrain/asr-crdnn-rnnlm-librispeech model from huggingface
-python evaluate.py attack_configs/pgd/s2s_1000bpe.yaml --root=/path/to/results/folder
+python evaluate.py attack_configs/LibriSpeech/pgd/s2s_1000bpe.yaml --root=/path/to/results/folder
 ```
 
 ```
 # in ./recipes/
 
 # This will train a model first
-python train.py train_configs/transformer_train.yaml --root=/path/to/results/folder
+python train.py train_configs/LibriSpeech/transformer_train.yaml --root=/path/to/results/folder
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transformer-transformerlm-librispeech/
-python evaluate.py attack_configs/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
+python evaluate.py attack_configs/LibriSpeech/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
 ```
 
 ### Computation time
@@ -85,14 +85,14 @@ For pretrained Speechbrain Librispeech models the pretrainer will download weigh
 
 For the RNN-T and charachter CTC models, there is no pretrained model. You'll have to run the training script first - as in the second example above.
 
-For the Wav2Vec2 models things are slightly trickier. robust_speech can load HuggingFace wav2vec2 models as backend, and these models can be downloaded directly. However, at this point the tokenizers for these models (i.e. the character-label matching) cannot be simply extracted from huggingface and made compatible with robust_speech. Therefore it is necessary to first generate a tokenizer from the data, then do a slight retraining of the final linear layer in wav2vec2. This can be done with `train_configs/wav2vec2_fine_tune.py` recipe. One epoch of fine-tuning on the librispeech train-clean-100 split is plenty enough to match the official performance of wav2vec2 base and large models. See the example below
+For the Wav2Vec2 models things are slightly trickier. robust_speech can load HuggingFace wav2vec2 models as backend, and these models can be downloaded directly. However, at this point the tokenizers for these models (i.e. the character-label matching) cannot be simply extracted from huggingface and made compatible with robust_speech. Therefore it is necessary to first generate a tokenizer from the data, then do a slight retraining of the final linear layer in wav2vec2. This can be done with `train_configs/LibriSpeech/wav2vec2_fine_tune.py` recipe. One epoch of fine-tuning on the librispeech train-clean-100 split is plenty enough to match the official performance of wav2vec2 base and large models. See the example below
 ```
 # in ./recipes/
 
 # This will train a model first
-python train.py train_configs/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub: facebook/wav2vec2-base-100h
+python train.py train_configs/LibriSpeech/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub: facebook/wav2vec2-base-100h
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/wav2vec2-base-100h/
-python evaluate.py attack_configs/pgd/w2v2_base_100h.yaml --root=/path/to/results/folder --snr=25
+python evaluate.py attack_configs/LibriSpeech/pgd/w2v2_base_100h.yaml --root=/path/to/results/folder --snr=25
 ```
 
 ### Root structure

@@ -18,7 +18,7 @@ save_audio: True
 load_audio: True
 # Model information
 model_name: conformer-rnnlm-ctc
-attack_name: none
+attack_name: pgd
 target_brain_class: !name:robust_speech.models.transformer.TrfASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null

@@ -17,6 +17,7 @@ Several robustness-oriented packages already exist ([Advertorch](https://github.
 * Evaluate with Word-Error Rate(WER), Character-Error Rate (CER) and Signal-to-Noise Ratio (SNR)
 * Export adversarial examples
 * Run an attack over multiple models at once
+* Train and run attacks with trainable parameters
 * Transfer an attack from a source model to a target model.
 * Attacks on SpeechBrain models through the brain class over one file
 * (In development) Adversarial training
@@ -39,7 +40,7 @@ The package provised model classes in the form of Speechbrain Brain classes, tha
 * RNN-Transducer models
 * Wav2Vec2 ASR and Pretraining (compatible with pretrained huggingface and fairseq models).
 
-We also provide data preparation and loading functions for the LibriSpeech package, based on SpeechBrain recipes.
+We also provide data preparation and loading functions for the LibriSpeech, CommonVoice and SpeechCommands datasets, based on SpeechBrain recipes.
 
 ## Install 
 Before installing robust_speech you should have installed PyTorch (>=1.8.0,<=1.10.1) and cuda support (if you want GPU support) in your environment. Testing was conducting with CUDA 9.2 and 10.2 on a Nvidia RTX 2080Ti. Default options assume GPU support; use the `--device=cpu` option in your scripts if do not have it.
@@ -125,12 +126,9 @@ root
 │   │   │   │   │ # your attack results
 
 ```
-You may change this at will in your custom `.yaml` files or with command line arguments. These folders will be created automatically if the are missing - however, the dataset should already be downloaded in your data_folder.
+You may change this at will in your custom `.yaml` files or with command line arguments. These folders will be created automatically if the are missing - however, the dataset should already be downloaded in your data_folder. One exception is the light Speech Commands dataset, which will be downloaded automatically if missing.
 
 ## Incoming features
-* Datasets:
-    * [Speech Commands](https://ai.googleblog.com/2017/08/launching-speech-commands-dataset.html)
-    * [Common Voice](https://commonvoice.mozilla.org/en)
 * Attacks:
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
 * Defenses:

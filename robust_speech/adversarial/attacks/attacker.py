@@ -34,9 +34,10 @@ class Attacker:
             audio sample rate for wav encoding
         """
 
-        self.load_audio=load_audio
+        self.load_audio = load_audio
         if self.load_audio and (save_audio_path is None):
-            raise ValueError("save_audio_path must be provided in order to load audio files")
+            raise ValueError(
+                "save_audio_path must be provided in order to load audio files")
         self.snr_metric = SNRComputer()
         self.save_audio_path = save_audio_path
         if self.save_audio_path:
@@ -61,6 +62,22 @@ class Attacker:
             stats_meta={},
             test_stats={"Adversarial SNR": snr},
         )
+
+    def on_fit_start(self):
+        pass
+
+    def on_fit_end(self):
+        pass
+
+    def fit(self, loader):
+        """
+        Fitting the parameters of the attacker, if applicable (generative attack, universal attack, etc)
+        Arguments
+        ---------
+        loader:
+            data loader to use to fit the attacker
+        """
+        raise NotImplementedError
 
     def perturb_and_log(self, batch, target=None):
         """
@@ -162,7 +179,8 @@ class RandomAttack(Attacker):
         clip_max = self.clip_max if self.clip_max is not None else 10
         rand_assign(delta, self.order, self.eps)
         delta.data = (
-            torch.clamp(wav_init + delta.data, min=clip_min, max=clip_max) - wav_init
+            torch.clamp(wav_init + delta.data, min=clip_min,
+                        max=clip_max) - wav_init
         )
         wav_adv = wav_init + delta.data
         return wav_adv

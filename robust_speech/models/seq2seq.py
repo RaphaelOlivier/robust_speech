@@ -134,6 +134,7 @@ class S2SASR(AdvASRBrain):
                     self.adv_wer_metric.append(ids, predicted_words, target_words)
                     self.adv_cer_metric.append(ids, predicted_words, target_words)
             else:
+                #print("Neutral wer/cer metric has been updated!")
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
 

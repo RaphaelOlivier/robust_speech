@@ -9,14 +9,16 @@ tokenizers_folder: !ref <root>/tokenizers
 # -------------------------------------------------------------
 # Attack information
 snr: 30
-attack_class: !name:robust_speech.adversarial.attacks.yeehaw.KenansvilleAttack
+snr_dec: 40
+attack_class: !name:robust_speech.adversarial.attacks.yeehaw.YeehawJunctionAttack
   targeted: False
   snr: !ref <snr>
+  snr_decimation: !ref <snr_dec>
 save_audio: False
 
 # Model information
 model_name: wav2vec2-large-960h
-attack_name: kanansville
+attack_name: yeehaw
 target_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
 target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_class: null

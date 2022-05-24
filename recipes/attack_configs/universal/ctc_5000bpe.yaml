@@ -50,7 +50,7 @@ wer_file: !ref <output_folder>/wer.txt
 save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt
 save_audio_path: !ref <output_folder>/save
-params_subfolder: params
+params_subfolder: !PLACEHOLDER # replace with the checkpoint of your universal perturbation
 params_folder: !ref <output_folder>/<params_subfolder>
 
 # Pretrainer loading parameters
@@ -60,10 +60,10 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
    collect_in: !ref <output_folder>
    loadables:
       tokenizer: !ref <tokenizer>
-      #delta: !ref <delta>
+      delta: !ref <delta>
    paths:
       tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
-      #delta: !ref <params_folder>/delta.ckpt
+      delta: !ref <params_folder>/delta.ckpt
       
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer

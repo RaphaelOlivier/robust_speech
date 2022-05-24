@@ -23,6 +23,7 @@ EPS_NUM_STRIDES = 4
 ALPHA_MOMENTUM = 0.99
 EPS_MOMENTUM = 0.001
 
+
 class GeneticAttack(Attacker):
     """
     Implementation of the Black-Box genetic adversarial attack for ASR models
@@ -63,10 +64,9 @@ class GeneticAttack(Attacker):
             pop_scores = self._score(pop_batch)
             self._momentum_mutation_prob(pop_scores)
             _, elite_indices = torch.topk(
-                pop_scores, ELITE_SIZE, largest= True , sorted=True, dim=-1
+                pop_scores, ELITE_SIZE, largest=True, sorted=True, dim=-1
             )
-            scores_logits = F.softmax((pop_scores) / TEMPERATURE)
-            pop_probs = scores_logits / torch.sum(scores_logits, dim=-1, keepdim=True)
+            pop_probs = F.softmax((pop_scores) / TEMPERATURE, dim=-1)
             elite_sig = self._extract_elite(pop_batch, elite_indices)
             child_sig = self._crossover(
                 pop_batch, pop_probs, self.population_size - ELITE_SIZE
@@ -76,14 +76,16 @@ class GeneticAttack(Attacker):
                 pop_batch, elite_sig, child_sig, min_wavs, max_wavs
             )
 
-        wav_adv = self._extract_best(pop_batch, elite_indices).to(batch.sig[0].device)
+        wav_adv = self._extract_best(
+            pop_batch, elite_indices).to(batch.sig[0].device)
         return wav_adv
 
-    def _momentum_mutation_prob(pop_scores):
+    def _momentum_mutation_prob(self, pop_scores):
         new_score = pop_scores.mean()
         if self.prev_score is not None:
             coeff = abs(new_score-self.prev_score)
-            self.mutation_prob = ALPHA *self.mutation_prob + (1-ALPHA)*EPS_MOMENTUM/max(EPS_MOMENTUM,coeff)
+            self.mutation_prob = ALPHA_MOMENTUM * self.mutation_prob + \
+                (1-ALPHA_MOMENTUM)*EPS_MOMENTUM/max(EPS_MOMENTUM, coeff)
         self.prev_score = new_score
 
     def _update_pop(self, batches, elite_sig, child_sig, min_wavs, max_wavs):
@@ -122,7 +124,7 @@ class GeneticAttack(Attacker):
         ).reshape(-1)
         n_mutations = int(mutation_mask.sum())
         mutations = torch.tensor(
-            np.random.normal(scale=self.eps,size=n_mutations),
+            np.random.normal(scale=self.eps, size=n_mutations),
             device=wavs.device,
             dtype=wavs.dtype,
         )
@@ -134,7 +136,8 @@ class GeneticAttack(Attacker):
     def _gen_population(self, batch):
         # from (1,len) to (self.population_size,len)
         size = batch.sig[0].size()
-        new_wavs = batch.sig[0].unsqueeze(0).expand(self.population_size, *size)
+        new_wavs = batch.sig[0].unsqueeze(
+            0).expand(self.population_size, *size)
         max_wavs = torch.clone(new_wavs).transpose(0, 1) + self.eps
         min_wavs = max_wavs - 2 * self.eps
         new_wavs = self._mutation(new_wavs)
@@ -173,9 +176,11 @@ class GeneticAttack(Attacker):
                 p=pop_probs[i].detach().cpu().numpy(),
                 size=2 * num_crossovers,
             )
-            new_wavs_1_i = [batches[k].sig[0][i] for k in rg_crossover[:num_crossovers]]
+            new_wavs_1_i = [batches[k].sig[0][i]
+                            for k in rg_crossover[:num_crossovers]]
             new_wavs_1.append(torch.stack(new_wavs_1_i, 0))
-            new_wavs_2_i = [batches[k].sig[0][i] for k in rg_crossover[num_crossovers:]]
+            new_wavs_2_i = [batches[k].sig[0][i]
+                            for k in rg_crossover[num_crossovers:]]
             new_wavs_2.append(torch.stack(new_wavs_2_i, 0))
         # (batch_size x num_crossovers x ...)
         new_wavs_1 = torch.stack(new_wavs_1, 0)

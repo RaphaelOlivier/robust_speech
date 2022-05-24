@@ -63,22 +63,6 @@ class Attacker:
             test_stats={"Adversarial SNR": snr},
         )
 
-    def on_fit_start(self):
-        pass
-
-    def on_fit_end(self):
-        pass
-
-    def fit(self, loader):
-        """
-        Fitting the parameters of the attacker, if applicable (generative attack, universal attack, etc)
-        Arguments
-        ---------
-        loader:
-            data loader to use to fit the attacker
-        """
-        raise NotImplementedError
-
     def perturb_and_log(self, batch, target=None):
         """
         Compute an adversarial perturbation and log results
@@ -116,6 +100,35 @@ class Attacker:
         the tensor of the perturbed batch
         """
 
+        raise NotImplementedError
+
+
+class TrainableAttacker(Attacker):
+    """
+    Abstract class for running attacks with trainable parameters. Extra abstract methods for training are provided
+
+    Arguments
+    ---------
+    asr_brain: rs.adversarial.brain.ASRBrain
+        brain object.
+    targeted: bool
+        if the attack is targeted.
+    """
+
+    def on_fit_start(self):
+        pass
+
+    def on_fit_end(self):
+        pass
+
+    def fit(self, loader):
+        """
+        Fitting the parameters of the attacker, if applicable (generative attack, universal attack, etc)
+        Arguments
+        ---------
+        loader:
+            data loader to use to fit the attacker
+        """
         raise NotImplementedError
 
 

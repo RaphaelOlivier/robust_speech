@@ -1,5 +1,6 @@
 """
-Kenansville Attack (https://arxiv.org/abs/1910.05262)
+Yeehaw Junction Attack (https://arxiv.org/abs/2203.05408) and Kenansville Attack (https://arxiv.org/abs/1910.05262)
+In development
 """
 
 import torch
@@ -35,7 +36,7 @@ class YeehawJunctionAttack(Attacker):
     """
 
     def __init__(
-        self, asr_brain, targeted=False, snr=100, snr_decimation = None,
+        self, asr_brain, targeted=False, snr=100, snr_decimation=None,
         train_mode_for_backward=False
     ):
         """Carlini Wagner L2 Attack implementation in pytorch."""
@@ -43,10 +44,12 @@ class YeehawJunctionAttack(Attacker):
         # The last iteration (if we run many steps) repeat the search once.
         assert not targeted, "Kenansville is an untargeted attack"
         self.snr = snr
+        self.snr_decimation = snr_decimation
         if snr_decimation is None:
             self.snr_decimation = self.snr + 20
         self.threshold_decimation = 10 ** (-self.snr_decimation / 10)
-        self.threshold_clipping = 10 ** (-self.snr / 10) - self.threshold_decimation
+        self.threshold_clipping = 10 ** (-self.snr / 10) - \
+            self.threshold_decimation
         # not used, for compatibility only
         self.train_mode_for_backward = train_mode_for_backward
 
@@ -81,26 +84,48 @@ class YeehawJunctionAttack(Attacker):
             wav_psd_index = torch.argsort(wav_psd)
             reordered = wav_psd[wav_psd_index]
             cumulative = torch.cumsum(reordered, dim=0)
+
             norm_threshold = self.threshold_decimation * cumulative[-1]
             j_dec = torch.searchsorted(cumulative, norm_threshold, right=True)
             wav_rfft[wav_psd_index[:j_dec]] = 0
 
             # Clipping step
-            norm_threshold = self.threshold_clipping * cumulative[-1]
-            cumclip = 0
+            norm_threshold_clip = self.threshold_clipping * cumulative[-1]
             nfft = len(wav_rfft)
-            j_clip = nfft-1
-            while cumclip < norm_threshold and j_clip > j_dec
-                j_clip-=1
-                cumclip = cumclip + (reordered[j_clip]-reordered[j_clip-1])*(nfft-j_clip)
-            clip_threshold = reordered[j_clip-1] + (cumclip - norm_threshold)/(nfft-j_clip)
-            wav_rfft[wav_psd_index[j_clip:]] = clip_threshold
 
+            diffs = torch.flip(reordered[1:]-reordered[:-1], dims=(0,))
+            cumdiffs = diffs * \
+                (torch.arange(
+                    len(diffs), dtype=diffs.dtype, device=diffs.device))
+            cumulative_clip = torch.cumsum(cumdiffs, dim=0)
+            j_clip = nfft - torch.searchsorted(
+                cumulative_clip, norm_threshold_clip, right=False)
+
+            clip_threshold = reordered[j_clip-1]
+            # + (cumclip - norm_threshold)/(nfft-j_clip)
+            #print(norm_threshold, clip_threshold, reordered[-5:])
+            clip_threshold_abs = torch.sqrt(clip_threshold/2)
+            # print(torch.abs(
+            #    wav_rfft[wav_psd_index[j_clip:]]))
+            wav_rfft[wav_psd_index[j_clip:]] = wav_rfft[wav_psd_index[j_clip:]
+                                                        ] / torch.abs(wav_rfft[wav_psd_index[j_clip:]]) * clip_threshold_abs
+
+            wav_psd = torch.abs(wav_rfft) ** 2
+            if len(wav) % 2:  # odd: DC frequency
+                wav_psd[1:] *= 2
+            else:  # even: DC and Nyquist frequencies
+                wav_psd[1:-1] *= 2
+            # print(torch.abs(
+            #    wav_rfft[wav_psd_index[j_clip:]]))
+            # print(torch.abs(
+            #    wav_rfft[wav_psd_index[j_clip:]])**2 * 2)
             # Zero out low power frequencies and invert to time domain
             wav = torch.fft.irfft(wav_rfft, len(wav)).type(wav.dtype)
+
             wavs[i, :len_wav] = wav
         return wavs
-        
+
+
 class KenansvilleAttack(YeehawJunctionAttack):
     """
     Implementation of the Kenansville Attack
@@ -125,10 +150,10 @@ class KenansvilleAttack(YeehawJunctionAttack):
         train_mode_for_backward=False
     ):
 
-    super(KenansvilleAttack,self).__init__(
-        asr_brain, 
-        targeted=targeted, 
-        snr=snr,
-        snr_decimation=snr,
-        train_mode_for_backward=train_mode_for_backward
-    )
+        super(KenansvilleAttack, self).__init__(
+            asr_brain,
+            targeted=targeted,
+            snr=snr,
+            snr_decimation=snr,
+            train_mode_for_backward=train_mode_for_backward
+        )

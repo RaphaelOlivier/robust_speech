@@ -100,7 +100,8 @@ class TrfASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
+            tokens_eos_lens = torch.cat(
+                [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
         loss_seq = 0.0
@@ -136,8 +137,10 @@ class TrfASR(AdvASRBrain):
                             ids, predicted_words, target_words
                         )
                     else:
-                        self.adv_wer_metric.append(ids, predicted_words, target_words)
-                        self.adv_cer_metric.append(ids, predicted_words, target_words)
+                        self.adv_wer_metric.append(
+                            ids, predicted_words, target_words)
+                        self.adv_cer_metric.append(
+                            ids, predicted_words, target_words)
                 else:
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
@@ -149,7 +152,8 @@ class TrfASR(AdvASRBrain):
                         p_seq, tokens_eos, tokens_eos_lens
                     )
                 else:
-                    self.adv_acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
+                    self.adv_acc_metric.append(
+                        p_seq, tokens_eos, tokens_eos_lens)
             else:
                 self.acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
 
@@ -204,7 +208,8 @@ class TrfASR(AdvASRBrain):
         # if so change the optimizer from Adam to SGD
         self.check_and_reset_optimizer()
 
-        predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
+        predictions, _ = self.compute_forward_adversarial(
+            batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 
         # normalize the loss by gradient_accumulation step
@@ -260,8 +265,10 @@ class TrfASR(AdvASRBrain):
                 stage_stats["CER"] = self.cer_metric.summarize("error_rate")
 
                 if stage_adv_loss is not None:
-                    stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                    stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                    stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                        "error_rate")
+                    stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                        "error_rate")
                 if stage_adv_loss_target is not None:
                     stage_stats[
                         "adv CER target"

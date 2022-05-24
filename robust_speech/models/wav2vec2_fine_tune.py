@@ -84,7 +84,8 @@ class W2VASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
+            tokens_eos_lens = torch.cat(
+                [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
 
@@ -99,7 +100,8 @@ class W2VASR(AdvASRBrain):
                 self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
             ]
             target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ") for s in predicted_words]
+            predicted_words = ["".join(s).strip().split(" ")
+                               for s in predicted_words]
             target_words = [t.split(" ") for t in target_words]
             if adv:
                 if targeted:
@@ -110,8 +112,10 @@ class W2VASR(AdvASRBrain):
                         ids, predicted_words, target_words
                     )
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
@@ -134,8 +138,10 @@ class W2VASR(AdvASRBrain):
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
             if stage_adv_loss is not None:
-                stage_stats["adv CER"] = self.adv_cer_metric.summarize("error_rate")
-                stage_stats["adv WER"] = self.adv_wer_metric.summarize("error_rate")
+                stage_stats["adv CER"] = self.adv_cer_metric.summarize(
+                    "error_rate")
+                stage_stats["adv WER"] = self.adv_wer_metric.summarize(
+                    "error_rate")
             if stage_adv_loss_target is not None:
                 stage_stats["adv CER target"] = self.adv_cer_metric_target.summarize(
                     "error_rate"

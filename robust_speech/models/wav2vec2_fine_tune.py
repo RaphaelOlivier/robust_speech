@@ -102,9 +102,14 @@ class W2VASR(AdvASRBrain):
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             # Decode token terms to words
-            predicted_words = [
-                self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
-            ]
+            if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):
+                predicted_words = [
+                    self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
+                ]
+            else:
+                predicted_words = [
+                    self.tokenizer.decode_ids(utt_seq) for utt_seq in predicted_tokens
+                ]
             target_words = [wrd for wrd in batch.wrd]
             predicted_words = ["".join(s).strip().split(" ")
                                for s in predicted_words]

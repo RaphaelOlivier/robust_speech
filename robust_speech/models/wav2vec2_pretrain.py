@@ -42,7 +42,6 @@ from robust_speech.adversarial.brain import AdvASRBrain
 logger = logging.getLogger(__name__)
 
 
-
 # Define training procedure
 
 
@@ -65,6 +64,9 @@ class W2VPretrain(AdvASRBrain):
         if not stage == rs.Stage.ATTACK:
             batch = batch.to(self.device)
             wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
+
+        if hasattr(self.hparams, "smoothing") and self.hparams.smoothing:
+            wavs = self.hparams.smoothing(wavs, wav_lens)
         # Forward on w2v2 and take the loss.
         # It has to be on train mode even for eval. Otherwise it would deactivate
         # the loss computation ...
@@ -75,7 +77,8 @@ class W2VPretrain(AdvASRBrain):
             )
         else:
             # compute quantized representation on the fly
-            out, mask = self.modules.wav2vec2(wavs, quantized_representation=None)
+            out, mask = self.modules.wav2vec2(
+                wavs, quantized_representation=None)
 
         if stage == rs.Stage.ATTACK:
             loss = out.contrastive_loss
@@ -122,10 +125,12 @@ class W2VPretrain(AdvASRBrain):
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
                 predictions = self.compute_forward(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(
+                    predictions, batch, sb.Stage.TRAIN)
 
             # normalize the loss by gradient_accumulation step
-            self.scaler.scale(loss / self.hparams.gradient_accumulation).backward()
+            self.scaler.scale(
+                loss / self.hparams.gradient_accumulation).backward()
 
             if self.step % self.hparams.gradient_accumulation == 0:
                 # gradient clipping & early stop if loss is not fini
@@ -163,11 +168,14 @@ class W2VPretrain(AdvASRBrain):
         # Here we manage mixed precision
         if self.auto_mix_prec:
             with torch.cuda.amp.autocast():
-                predictions, _ = self.compute_forward_adversarial(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
+                predictions, _ = self.compute_forward_adversarial(
+                    batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(
+                    predictions, batch, sb.Stage.TRAIN)
 
             # normalize the loss by gradient_accumulation step
-            self.scaler.scale(loss / self.hparams.gradient_accumulation).backward()
+            self.scaler.scale(
+                loss / self.hparams.gradient_accumulation).backward()
 
             if self.step % self.hparams.gradient_accumulation == 0:
                 # gradient clipping & early stop if loss is not fini

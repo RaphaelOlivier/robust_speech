@@ -37,6 +37,10 @@ class CTCASR(AdvASRBrain):
         tokens_bos, _ = batch.tokens_bos
         # wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
         # Add augmentation if specified
+
+        if hasattr(self.hparams, "smoothing") and self.hparams.smoothing:
+            wavs = self.hparams.smoothing(wavs, wav_lens)
+
         if stage == sb.Stage.TRAIN:
             if hasattr(self.modules, "env_corrupt"):
                 wavs_noise = self.modules.env_corrupt(wavs, wav_lens)
@@ -83,7 +87,8 @@ class CTCASR(AdvASRBrain):
 
         if hasattr(self.modules, "env_corrupt") and stage == sb.Stage.TRAIN:
             tokens_eos = torch.cat([tokens_eos, tokens_eos], dim=0)
-            tokens_eos_lens = torch.cat([tokens_eos_lens, tokens_eos_lens], dim=0)
+            tokens_eos_lens = torch.cat(
+                [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
 
@@ -98,7 +103,8 @@ class CTCASR(AdvASRBrain):
                 self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
             ]
             target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ") for s in predicted_words]
+            predicted_words = ["".join(s).strip().split(" ")
+                               for s in predicted_words]
             target_words = [t.split(" ") for t in target_words]
             if adv:
                 if targeted:
@@ -109,11 +115,12 @@ class CTCASR(AdvASRBrain):
                         ids, predicted_words, target_words
                     )
                 else:
-                    self.adv_wer_metric.append(ids, predicted_words, target_words)
-                    self.adv_cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
 
         return loss
-

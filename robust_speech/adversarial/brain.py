@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 import robust_speech as rs
-from robust_speech.adversarial.attacks.attacker import Attacker
+from robust_speech.adversarial.attacks.attacker import Attacker, TrainableAttacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
 from robust_speech.adversarial.defenses.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
 
@@ -936,6 +936,9 @@ class AdvASRBrain(ASRBrain):
 
         if self.attacker is None:
             raise ValueError("No attacker to train!")
+        if not isinstance(self.attacker, TrainableAttacker):
+            raise ValueError("fit_attacker cannot be called for non-trainable attack %s" %
+                             self.attacker.__class__.__name__)
 
         self.attacker.on_fit_start()
 

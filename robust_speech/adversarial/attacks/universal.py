@@ -13,7 +13,7 @@ from robust_speech.models.seq2seq import S2SASR
 from robust_speech.models.ctc import CTCASR
 
 import robust_speech as rs
-from robust_speech.adversarial.attacks.attacker import Attacker
+from robust_speech.adversarial.attacks.attacker import TrainableAttacker
 from robust_speech.adversarial.utils import (
     l2_clamp_or_normalize,
     linf_clamp,
@@ -35,7 +35,7 @@ def reverse_bound_from_rel_bound(batch, rel, order=np.inf):
     return torch.tensor(epss).to(wavs.device)
 
 
-class UniversalAttack(Attacker):
+class UniversalAttack(TrainableAttacker):
     """
     Implementation of the Universal attack (https://arxiv.org/pdf/1905.03828.pdf)
     The attack performs nb_iter steps of size eps_iter, while always staying

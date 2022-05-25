@@ -20,7 +20,7 @@ target_brain_hparams_file: !ref model_configs/<model_name>.yaml
 # source_brain_hparams_file: null
 
 # Tokenizer information (compatible with target and source)
-pretrained_tokenizer_path: !ref <root>/trainings/<model_name>
+pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2-base-960h
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 # -------------------------------------------------------------
 

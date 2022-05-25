@@ -204,17 +204,3 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
       lm: !ref <pretrained_path>/lm.ckpt
       tokenizer: !ref <pretrained_path>/tokenizer.ckpt
     collect_in: !ref <output_folder>
-
-enable_eval_smoothing: True
-eval_smoothing_sigma: 0.02
-# filter config
-filter_config:
-  filter_package: robust_speech.adversarial.filters.ASNRWiener
-  filter_class: ASNRWiener
-  sr: 16000
-  hop: 160
-  nfft: 320
-voting_config:
-  voting: rover_freq
-  rover_iters: 3 
-  rover_path: /home/ubuntu/IDL/SCTK/bin/rover

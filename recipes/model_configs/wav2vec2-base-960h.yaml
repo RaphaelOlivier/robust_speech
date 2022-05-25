@@ -104,3 +104,4 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
       model: !ref <pretrained_path>/model.ckpt
       tokenizer: !ref <pretrained_path>/tokenizer.ckpt
     collect_in: !ref <output_folder>
+

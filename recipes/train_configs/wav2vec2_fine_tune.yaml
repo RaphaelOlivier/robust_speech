@@ -113,19 +113,6 @@ wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
 #    freeze: False
 #    save_path: !ref <save_folder>/wav2vec2_checkpoint/model.pt
 
-enable_train_smoothing: True
-train_smoothing_sigma: 0.01
-# filter config
-filter_config:
-  filter_package: robust_speech.adversarial.filters.ASNRWiener
-  filter_class: ASNRWiener
-  sr: 16000
-  hop: 160
-  nfft: 320
-voting_config:
-  voting: rover_freq
-  rover_iters: 3
-  rover_path: /home/ec2-user/SCTK/bin/rover
 
 ctc_lin: !new:speechbrain.nnet.linear.Linear
    input_size: !ref <dnn_neurons>

@@ -26,22 +26,6 @@ dnn_layers: 2
 dnn_neurons: 1024
 freeze_wav2vec: True
 
-# eval smoothing
-enable_eval_smoothing: True
-eval_smoothing_sigma: 0.01
-# filter config
-filter_config:
-  filter_package: robust_speech.adversarial.filters.ASNRWiener
-  filter_class: ASNRWiener
-  sr: 16000
-  hop: 160
-  nfft: 320
-voting_config:
-  voting: rover_freq
-  rover_iters: 16 
-  rover_path: /home/ec2-user/SCTK/bin/rover
-
-
 # Outputs
 output_neurons: 31  # BPE size, index(blank/eos/bos) = 0
 

@@ -14,20 +14,6 @@ train_log: !ref <output_folder>/train_log.txt
 
 pretrained_path: !ref speechbrain/<model_name>
 
-enable_eval_smoothing: True
-eval_smoothing_sigma: 0.02
-# filter config
-filter_config:
-  filter_package: robust_speech.adversarial.filters.ASNRWiener
-  filter_class: ASNRWiener
-  sr: 16000
-  hop: 160
-  nfft: 320
-voting_config:
-  voting: rover_freq
-  rover_iters: 3
-  rover_path: /home/ubuntu/SCTK/bin/rover
-
 # Feature parameters
 sample_rate: 16000
 n_fft: 400

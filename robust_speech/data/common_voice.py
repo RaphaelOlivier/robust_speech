@@ -81,15 +81,16 @@ def prepare_common_voice(
     else:
         logger.info("Data_preparation...")
 
-    tsv_splits = [os.path.join(data_folder,s+'.tsv') for s in splits]
+    tsv_splits = [os.path.join(data_folder, s+'.tsv') for s in splits]
 
-    save_csv_splits = [os.path.join(save_folder,s+'.csv') for s in splits]
+    save_csv_splits = [os.path.join(save_folder, s+'.csv') for s in splits]
 
     # Additional checks to make sure the data folder contains Common Voice
     check_commonvoice_folders(data_folder)
 
     for i in range(len(splits)):
-        assert os.path.exists(tsv_splits[i]), "tsv file must be available for data preparation"
+        assert os.path.exists(
+            tsv_splits[i]), "tsv file must be available for data preparation"
         create_csv(
             tsv_splits[i],
             save_csv_splits[i],
@@ -97,6 +98,7 @@ def prepare_common_voice(
             accented_letters,
             language,
         )
+
 
 def skip(splits, save_folder, conf):
     """
@@ -123,7 +125,7 @@ def skip(splits, save_folder, conf):
 
     for split in splits:
         if not os.path.isfile(os.path.join(save_folder, split + ".csv")):
-            skip = False 
+            skip = False
     return skip
 
 
@@ -164,33 +166,39 @@ def create_csv(
     logger.info(msg)
 
     csv_lines = [["ID", "duration", "wav", "spk_id", "wrd"]]
-
     # Start processing lines
     total_duration = 0.0
     for line in tzip(loaded_csv):
-
         line = line[0]
-
         # Path is at indice 1 in Common Voice tsv files. And .mp3 files
         # are located in datasets/lang/clips/
-        mp3_path = data_folder + "/clips/" + line.split("\t")[1]
+        mp3_path = os.path.join(data_folder, "clips", line.split("\t")[1])
         file_name = mp3_path.split(".")[-2].split("/")[-1]
         spk_id = line.split("\t")[0]
         snt_id = file_name
 
         # Setting torchaudio backend to sox-io (needed to read mp3 files)
         if torchaudio.get_audio_backend() != "sox_io":
-            logger.warning("This recipe needs the sox-io backend of torchaudio")
+            logger.warning(
+                "This recipe needs the sox-io backend of torchaudio")
             logger.warning("The torchaudio backend is changed to sox_io")
             torchaudio.set_audio_backend("sox_io")
 
         # Reading the signal (to retrieve duration in seconds)
         if os.path.isfile(mp3_path):
             info = torchaudio.info(mp3_path)
+            audio_path = mp3_path
         else:
-            msg = "\tError loading: %s" % (str(len(file_name)))
-            logger.info(msg)
-            continue
+            wav_path = os.path.join(
+                data_folder, "clips", "wav", line.split("\t")[1][:-4]+'.wav')
+            file_name = wav_path.split(".")[-2].split("/")[-1]
+            if os.path.isfile(wav_path):
+                info = torchaudio.info(wav_path)
+                audio_path = wav_path
+            else:
+                msg = "\tError loading: %s" % (file_name)
+                logger.info(msg)
+                continue
 
         duration = info.num_frames / info.sample_rate
         total_duration += duration
@@ -258,11 +266,10 @@ def create_csv(
             continue
 
         # Composition of the csv_line
-        csv_line = [snt_id, str(duration), mp3_path, spk_id, str(words)]
+        csv_line = [snt_id, str(duration), audio_path, spk_id, str(words)]
 
         # Adding this line to the csv_lines list
         csv_lines.append(csv_line)
-
     # Writing the csv lines
     with open(csv_file, mode="w", encoding="utf-8") as csv_f:
         csv_writer = csv.writer(
@@ -271,7 +278,6 @@ def create_csv(
 
         for line in csv_lines:
             csv_writer.writerow(line)
-
     # Final prints
     msg = "%s successfully created!" % (csv_file)
     logger.info(msg)

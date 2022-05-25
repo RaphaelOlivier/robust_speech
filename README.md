@@ -19,7 +19,9 @@ Several robustness-oriented packages already exist ([Advertorch](https://github.
 * Run an attack over multiple models at once
 * Transfer an attack from a source model to a target model.
 * Attacks on SpeechBrain models through the brain class over one file
-* (In development) Adversarial training
+* Defenses:
+    * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
+    * (In development) Adversarial training
 
 Supported attacks:
 * [PGD](https://arxiv.org/abs/1706.06083)
@@ -48,6 +50,15 @@ Before installing robust_speech you should have installed PyTorch (>=1.8.0,<=1.1
 git clone https://github.com/RaphaelOlivier/robust_speech.git
 cd robust_speech
 pip install .
+```
+
+Run the following lines to support [randomized smoothing with ROVER voting](https://arxiv.org/abs/2112.03000):
+
+```
+git clone https://github.com/RaphaelOlivier/SCTK.git
+cd SCTK
+make config && make all && make check && make install && make doc
+export ROVER_PATH=$(echo pwd)/bin/rover # Add this line to your .bash_profile
 ```
 
 ## Usage
@@ -133,8 +144,6 @@ You may change this at will in your custom `.yaml` files or with command line ar
     * [Common Voice](https://commonvoice.mozilla.org/en)
 * Attacks:
     * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
-* Defenses:
-    * Randomized [Smoothing for ASR](https://arxiv.org/abs/2112.03000)
 * Data poisoning
 * And more!
 

@@ -1,0 +1,75 @@
+# General information
+seed: 1001
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+root: !PLACEHOLDER
+tokenizers_folder: !ref <root>/tokenizers
+
+# Hyparameters below are dependant on the attack and model used 
+# and should be changed at the user's discretion
+# -------------------------------------------------------------
+# Attack information
+attack_class: null
+save_audio: False
+
+# Model information
+model_name: asr-wav2vec2-commonvoice-en
+attack_name: none
+target_brain_class: !name:robust_speech.models.wav2vec2_fine_tune.W2VASR
+target_brain_hparams_file: !ref model_configs/<model_name>.yaml
+# source_brain_class: null
+# source_brain_hparams_file: null
+
+# Tokenizer information (compatible with target and source)
+pretrained_tokenizer_path: !ref speechbrain/<model_name>
+tokenizer: !new:sentencepiece.SentencePieceProcessor
+# -------------------------------------------------------------
+
+# Pretrainer loading parameters
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+   collect_in: !ref <tokenizers_folder>/<model_name>
+   loadables:
+      tokenizer: !ref <tokenizer>
+   paths:
+      tokenizer: !ref <pretrained_tokenizer_path>/tokenizer.ckpt
+
+output_folder: !ref <root>/attacks/<attack_name>/<model_name>/<seed>
+wer_file: !ref <output_folder>/wer.txt
+save_folder: !ref <output_folder>
+log: !ref <output_folder>/log.txt
+save_audio_path: !ref <output_folder>/save
+
+dataset_prepare_fct: !name:robust_speech.data.common_voice.prepare_common_voice
+dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
+
+# Data files
+data_folder: !ref <root>/data/CommonVoice # e.g, /localscratch/LibriSpeech
+csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
+# If RIRS_NOISES dir exists in /localscratch/xxx_corpus/RIRS_NOISES
+# then data_folder_rirs should be /localscratch/xxx_corpus
+# otherwise the dataset will automatically be downloaded
+test_splits: ["test"]
+skip_prep: True
+ckpt_interval_minutes: 15 # save checkpoint every N min
+data_csv_name: test
+test_csv:
+   - !ref <data_folder>/csv/<data_csv_name>.csv
+batch_size: 1 # This works for 2x GPUs with 32GB
+avoid_if_longer_than: 12.0
+sorting: random
+
+# Feature parameters
+sample_rate: 16000
+n_fft: 400
+n_mels: 80
+
+# Decoding parameters (only for text_pipeline)
+blank_index: 0
+bos_index: 1
+eos_index: 2
+
+test_dataloader_opts:
+    batch_size: 1
+
+logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <log>
+    

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 OPT_FILE = "opt_librispeech_prepare.pkl"
 SAMPLERATE = 16000
 
+
 def dataio_prepare(hparams):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
@@ -51,7 +52,8 @@ def dataio_prepare(hparams):
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "descending":
-            train_data = train_data.filtered_sorted(sort_key="duration", reverse=True)
+            train_data = train_data.filtered_sorted(
+                sort_key="duration", reverse=True)
             # when sorting do not shuffle in dataloader ! otherwise is
             # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
@@ -60,7 +62,8 @@ def dataio_prepare(hparams):
             pass
 
         else:
-            raise NotImplementedError("sorting must be random, ascending or descending")
+            raise NotImplementedError(
+                "sorting must be random, ascending or descending")
 
     valid_data = None
     if "valid_csv" in hparams:
@@ -104,7 +107,7 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.takes("wav")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav):
-        
+
         info = torchaudio.info(wav)
         sig = sb.dataio.dataio.read_audio(wav)
         if info.num_channels > 1:
@@ -119,6 +122,7 @@ def dataio_prepare(hparams):
 
     # 3. Define text pipeline:
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):  # char encoder
+        tokenizer.add_unk()
 
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
@@ -130,7 +134,8 @@ def dataio_prepare(hparams):
             yield char_list
             tokens_list = tokenizer.encode_sequence(char_list)
             yield tokens_list
-            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor(
+                [hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos
@@ -143,7 +148,8 @@ def dataio_prepare(hparams):
             # tokenizer has already been loaded
             pass
         else:
-            lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+            lab_enc_file = os.path.join(
+                hparams["save_folder"], "label_encoder.txt")
 
             special_labels = {
                 "bos_label": hparams["bos_index"],
@@ -174,7 +180,8 @@ def dataio_prepare(hparams):
             yield wrd
             tokens_list = tokenizer.encode_as_ids(wrd)
             yield tokens_list
-            tokens_bos = torch.LongTensor([hparams["bos_index"]] + (tokens_list))
+            tokens_bos = torch.LongTensor(
+                [hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
             yield tokens_eos

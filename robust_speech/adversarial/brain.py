@@ -6,6 +6,9 @@ import logging
 import time
 import warnings
 import importlib
+import os
+from shutil import which
+from xml.dom import NotFoundErr
 
 import speechbrain as sb
 import torch
@@ -17,9 +20,7 @@ import numpy as np
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker
 from robust_speech.adversarial.utils import replace_tokens_in_batch
-from robust_speech.adversarial.smoothing import SpeechNoiseAugmentation
-from robust_speech.adversarial.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
-from speechbrain.pretrained import SpectralMaskEnhancement
+from robust_speech.adversarial.defenses.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
 
 
 import pdb
@@ -317,14 +318,9 @@ class AdvASRBrain(ASRBrain):
             run_opts=run_opts,
             attacker=attacker,
         )
-        self.filter = None
         self.voting_module = None
-        if 'filter_config' in hparams:
-            self.init_filter(hparams)
-        if 'voting_config' in hparams:
+        if 'voting_module' in hparams:
             self.init_voting(hparams)
-        self.init_smoothing(hparams=hparams)
-        self.init_enhancer(hparams=hparams)
         self.tokenizer = None
 
     def __setattr__(self, name, value, attacker_brain=True):
@@ -338,78 +334,20 @@ class AdvASRBrain(ASRBrain):
             super(AdvASRBrain, self.attacker.asr_brain).__setattr__(name, value)
         super(AdvASRBrain, self).__setattr__(name, value)
 
-    def init_filter(self, hparams):
-        filter_config = hparams['filter_config']
-        module = importlib.import_module(filter_config['filter_package'])
-        filter_class = getattr(module, filter_config['filter_class'])
-        self.filter = filter_class(filter_config)
-
     def init_voting(self, hparams):
-        voting_config = hparams['voting_config']
-        voting=voting_config["voting"]
-        rover_bin_path=voting_config["rover_path"]
-        if "rover_iters" in voting_config:
-            self.rover_iters = voting_config["rover_iters"]
+        if 'rover_path' in hparams:
+            rover_path = hparams['rover_path']
+        elif os.environ.get('ROVER_PATH') is not None:
+            rover_path = os.environ.get('ROVER_PATH')
+        elif which('rover') is not None:
+            rover_path = which('rover')
         else:
-            self.rover_iters = 1
-        vote_on_nbest=False
-        decoder_type="greedy"
-        use_alignments=False
-        use_confidence=False
-
-        assert (not vote_on_nbest) or (decoder_type=="beam"), "option vote_on_nbest is incompatible with greedy decoding"
-        assert (not use_confidence) or decoder_type=="beam" or voting=="majority", "use_confidence is currently not compatible with greedy search. You can use beam search with width 1"
-        if voting in ["rover","rover_freq"]: # Rover by Word frequency
-            # if self.niters_forward>ROVER_MAX_HYPS:
-            #     self.voting_module = VoteEnsemble(Rover(scheme='freq', exec_path=rover_bin_path, return_all=True),Rover(scheme='freq', exec_path=rover_bin_path))
-            # else:
-            self.voting_module=Rover(scheme='freq', exec_path=rover_bin_path)
-        elif voting=="rover_conf": # Rover by Average Confidence Scores 
-            self.voting_module=Rover(scheme='conf', exec_path=rover_bin_path)
-        elif voting=="rover_max": # Rover by Word Maximum Confidence Scores 
-            self.voting_module=Rover(scheme='max', exec_path=rover_bin_path)
+            return NotFoundErr('ROVER could not be found. Please follow instructions in README.md')
+        self.voting_module = hparams['voting_module'](exec_path=rover_path)
+        if "voting_iters" in hparams:
+            self.voting_iters = hparams["voting_iters"]
         else:
-            assert voting=="majority"
-            self.voting_module=MajorityVote()
-
-        self.transcription_output = not voting.startswith("probs")
-
-    def init_smoothing(self, hparams):
-        if 'enable_eval_smoothing' in hparams.keys():
-            if hparams['enable_eval_smoothing']:
-                self.enable_eval_smoothing = hparams['enable_eval_smoothing']
-                if 'eval_smoothing_sigma' not in hparams.keys():
-                    self.eval_smoothing_sigma = 0.01
-                else:
-                    self.eval_smoothing_sigma = hparams['eval_smoothing_sigma']
-                self.eval_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.eval_smoothing_sigma, apply_fit=True, apply_predict=True, filter=self.filter)
-        else:
-            self.enable_eval_smoothing = False
-
-        if 'enable_train_smoothing' in hparams.keys():
-            if hparams['enable_train_smoothing']:
-                self.enable_train_smoothing = hparams['enable_train_smoothing']
-                if 'train_smoothing_sigma' not in hparams.keys():
-                    self.train_smoothing_sigma = 0.01
-                else:
-                    self.train_smoothing_sigma = hparams['train_smoothing_sigma']
-                print(self.train_smoothing_sigma)
-                self.train_speech_noise_augmentation = SpeechNoiseAugmentation(sigma=self.train_smoothing_sigma, apply_fit=True, apply_predict=True, filter=self.filter)
-        else:
-            self.enable_train_smoothing = False
-
-    def init_enhancer(self, hparams):
-        self.enhancer = None
-        if 'enhancer_config' in hparams:
-            enhancer_config = hparams['enhancer_config']
-            # speechbrain/metricgan-plus-voicebank
-            enhancer_source = enhancer_config['source']
-            # pretrained_models/metricgan-plus-voicebank
-            enhancer_dir = enhancer_config['savedir']
-            self.enhancer = SpectralMaskEnhancement.from_hparams(
-                source=enhancer_source,
-                savedir=enhancer_dir)
-
+            self.voting_iters = 3
 
     def init_attacker(
         self, modules=None, opt_class=None, hparams=None, run_opts=None, attacker=None
@@ -586,6 +524,35 @@ class AdvASRBrain(ASRBrain):
 
         return loss.detach().cpu()
 
+    def evaluate_batch(self, batch, stage):
+        """Evaluate one batch, override for different procedure than train.
+
+        The default implementation depends on two methods being defined
+        with a particular behavior:
+
+        * ``compute_forward()``
+        * ``compute_objectives()``
+
+        Arguments
+        ---------
+        batch : list of torch.Tensors
+            Batch of data to use for evaluation. Default implementation assumes
+            this batch has two elements: inputs and targets.
+        stage : Stage
+            The stage of the experiment: Stage.VALID, Stage.TEST
+
+        Returns
+        -------
+        detached loss
+        """
+        if self.voting_module is not None:
+            out = self.compute_forward_with_voting(
+                batch, stage)
+        else:
+            out = self.compute_forward(batch, stage=stage)
+        loss = self.compute_objectives(out, batch, stage=stage)
+        return loss.detach().cpu()
+
     def evaluate_batch_adversarial(self, batch, stage, target=None):
         """Evaluate one batch on adversarial examples.
 
@@ -624,37 +591,26 @@ class AdvASRBrain(ASRBrain):
             batch_to_attack, stage=stage
         )
 
-        if self.voting_module is not None:
-            preds = []
-            # print("doing rover")
-            for i in range(self.rover_iters):
-                predictions, _ = self.compute_forward_adversarial(batch_to_attack, stage=stage)
-                predicted_tokens = predictions[-1][0]
-                predicted_tokens = [str(s) for s in predicted_tokens]
-                predicted_words = " ".join(predicted_tokens)
-                preds.append([predicted_words])
-            outs = self.voting_module.run(preds)
-            outs = outs[0].split(" ")
-            tokens = [int(token) for token in outs]
-
-            predictions = list(predictions)
-            #print(np.allclose(predictions[-1], [tokens]))
-            #print(predictions[-1])
-            #print()
-            #print()
-            #print(tokens)
-            predictions[-1] = [tokens]
-            predictions = tuple(predictions)
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted
+
+            if self.voting_module is not None:
+                batch_to_attack.sig = adv_wav, batch_to_attack.sig[1]
+                predictions = self.compute_forward_with_voting(
+                    batch_to_attack, stage)
+
             loss = self.compute_objectives(
                 predictions, batch_to_attack, stage=stage, adv=True, targeted=targeted
             ).detach()
             if targeted:
                 targetloss = loss
                 batch.sig = adv_wav, batch.sig[1]
-                predictions = self.compute_forward(batch, stage=stage)
+                if self.voting_module is not None:
+                    predictions = self.compute_forward_with_voting(
+                        batch, stage)
+                else:
+                    predictions = self.compute_forward(batch, stage=stage)
                 advloss = self.compute_objectives(
                     predictions, batch, stage=stage, adv=True, targeted=False
                 ).detach()
@@ -663,6 +619,26 @@ class AdvASRBrain(ASRBrain):
                 advloss = loss
 
         return advloss, targetloss
+
+    def compute_forward_with_voting(self, batch, stage):
+        preds = []
+        # print("doing rover")
+        for i in range(self.voting_iters):
+            predictions = self.compute_forward(
+                batch, stage=stage)
+            predicted_tokens = predictions[-1][0]
+            predicted_tokens = [str(s) for s in predicted_tokens]
+            predicted_words = " ".join(predicted_tokens)
+            preds.append([predicted_words])
+        outs = self.voting_module.run(preds)
+        outs = outs[0].split(" ")
+        tokens = [int(token) for token in outs]
+
+        predictions = list(predictions)
+        predictions[-1] = [tokens]
+        predictions = tuple(predictions)
+
+        return predictions
 
     def fit(
         self,
@@ -766,8 +742,6 @@ class AdvASRBrain(ASRBrain):
             ) as pbar:
                 for batch in pbar:
                     self.step += 1
-                    if (self.enable_train_smoothing and self.train_speech_noise_augmentation is not None):
-                        batch = self.train_speech_noise_augmentation(batch)
                     if self.attacker is not None:
                         loss = self.fit_batch_adversarial(batch)
                     else:
@@ -908,15 +882,6 @@ class AdvASRBrain(ASRBrain):
             self.step += 1
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)
-
-            if (self.enable_eval_smoothing and self.eval_speech_noise_augmentation is not None):
-                batch = self.eval_speech_noise_augmentation(batch)
-            
-            if self.enhancer is not None:
-                sigs, sig_lens = batch.sig
-                enh_sigs = self.enhancer.enhance_batch(sigs, lengths=sig_lens)
-                enh_sigs = enh_sigs.to(sigs.get_device())
-                batch.sig = enh_sigs, sig_lens
 
             if self.attacker is not None:
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(

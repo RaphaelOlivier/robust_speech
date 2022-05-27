@@ -8,7 +8,6 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-snr: 30
 nb_epochs: 10
 nb_iter: 20
 lr: 0.001
@@ -17,11 +16,10 @@ eps_item: 0.003
 time_universal: False
 
 delta: !new:robust_speech.adversarial.utils.TensorModule
-   size: (1,288000)
+   size: (288000,)
 
 attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
-  snr: !ref <snr>
   nb_epochs: !ref <nb_epochs>
   nb_iter: !ref <nb_iter>
   lr: !ref <lr>
@@ -29,7 +27,7 @@ attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   eps_item: !ref <eps_item>
   time_universal: !ref <time_universal>
   univ_perturb: !ref <delta>
-save_audio: True
+save_audio: False
 
 # Model information
 model_name: asr-crdnn-transformerlm-librispeech-ctc
@@ -72,7 +70,7 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
       delta: !ref <delta>
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech
@@ -83,12 +81,12 @@ csv_folder: !ref <data_folder>/csv # e.g, /localscratch/LibriSpeech
 test_splits: ["test-clean"]
 skip_prep: True
 ckpt_interval_minutes: 15 # save checkpoint every N min
-data_csv_name: test-clean-20
+data_csv_name: test-clean
 test_csv:
    - !ref <data_folder>/csv/<data_csv_name>.csv
-data_csv_name_train: dev-clean-20
+data_csv_name_train: dev-clean-100
 train_csv: !ref <data_folder>/csv/<data_csv_name_train>.csv
-batch_size: 1 # This works for 2x GPUs with 32GB
+batch_size: 4 # This works for 2x GPUs with 32GB
 avoid_if_longer_than: 24.0
 sorting: random
 
@@ -105,7 +103,7 @@ eos_index: 2
 test_dataloader_opts:
     batch_size: 1
 train_dataloader_opts:
-    batch_size: 1
+    batch_size: !ref <batch_size>
 
 logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <log>

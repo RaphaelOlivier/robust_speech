@@ -47,13 +47,24 @@ def make_batch_from_waveform(wavform, wrd, tokens, hparams):
     return PaddedBatch([dic])
 
 
-def find_closest_length_string(string, str_list):
+def find_closest_length_string(string, str_list, short_only=True):
     """Find the sentence in str_list whose length is the closest to string"""
     len_ref = len(string)
     dist = np.inf
     best = None
+    if short_only:
+        for idx, string in enumerate(str_list):
+            new_dist = len_ref - len(string)
+            if new_dist >= 0 and new_dist < dist:
+                dist = new_dist
+                best = idx
+        if best is not None:
+            return str_list[best]
+
+    dist = np.inf
+    best = None
     for idx, string in enumerate(str_list):
-        new_dist = abs(len(string) - len_ref)
+        new_dist = abs(len_ref - len(string))
         if new_dist < dist:
             dist = new_dist
             best = idx

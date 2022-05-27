@@ -8,7 +8,6 @@ tokenizers_folder: !ref <root>/tokenizers
 # and should be changed at the user's discretion
 # -------------------------------------------------------------
 # Attack information
-snr: 30
 nb_epochs: 10
 nb_iter: 20
 lr: 0.001
@@ -17,11 +16,10 @@ eps_item: 0.003
 time_universal: False
 
 delta: !new:robust_speech.adversarial.utils.TensorModule
-   size: (1,288000)
+   size: (288000,)
 
 attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   targeted: False
-  snr: !ref <snr>
   nb_epochs: !ref <nb_epochs>
   nb_iter: !ref <nb_iter>
   lr: !ref <lr>
@@ -29,7 +27,7 @@ attack_class: !name:robust_speech.adversarial.attacks.universal.UniversalAttack
   eps_item: !ref <eps_item>
   time_universal: !ref <time_universal>
   univ_perturb: !ref <delta>
-save_audio: True
+save_audio: False
 
 # Model information
 model_name: asr-crdnn-transformerlm-librispeech-ctc
@@ -66,13 +64,9 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
       delta: !ref <params_folder>/delta.ckpt
       
 
-checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
-   checkpoints_dir: !ref <output_folder>
-   recoverables:
-      delta: !ref <delta>
 
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Data files
 data_folder: !ref <root>/data/LibriSpeech # e.g, /localscratch/LibriSpeech

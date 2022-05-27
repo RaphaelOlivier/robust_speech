@@ -33,7 +33,7 @@ Supported attacks:
 * [Genetic](https://arxiv.org/abs/1801.00554)
 * [Self-supervised attacks](https://arxiv.org/abs/2111.04330) for Wav2Vec2-type models
 * [MGAA](https://arxiv.org/abs/2108.04204)
-* [Universal](https://arxiv.org/abs/1905.03828) (In development)
+* [Universal](https://arxiv.org/abs/1905.03828)
 
 
 The package provised model classes in the form of Speechbrain Brain classes, that are compatible with the attacks above. Currently implemented:
@@ -83,6 +83,18 @@ python evaluate.py attack_configs/LibriSpeech/pgd/s2s_1000bpe.yaml --root=/path/
 python train.py train_configs/LibriSpeech/transformer_train.yaml --root=/path/to/results/folder
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transformer-transformerlm-librispeech/
 python evaluate.py attack_configs/LibriSpeech/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
+```
+
+Some attacks may have trainable parameters. For instance the universal attack computes a perturbation on a training set, then simply applies it at inference time. For these attacks we provide the `fit_attacker.py` script. There should be two attack configuration files: one for fitting the attacker and one for evaluation. The former saves trained parameters with a checkpointer, and the latter loads them with a pretrainer.
+
+```
+# in ./recipes/
+
+# This will train a model first
+python fit_attacker.py attack_configs/LibriSpeech/universal/ctc_5000bpe_fit.yaml --root=/path/to/results/folder
+# Saves parameters in subfolder CKPT+mytimestamp
+mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transformer-transformerlm-librispeech/
+python evaluate.py attack_configs/LibriSpeech/universal/ctc_5000bpe.yaml --root=/path/to/results/folder --params_subfolder=CKPT+mytimestamp
 ```
 
 ### Computation time
@@ -141,7 +153,7 @@ You may change this at will in your custom `.yaml` files or with command line ar
 
 ## Incoming features
 * Attacks:
-    * [FAPG](https://www.aaai.org/AAAI21Papers/AAAI-7923.XieY.pdf)
+    * [Real-time](https://arxiv.org/abs/2112.07076)
 * Data poisoning
 * And more!
 

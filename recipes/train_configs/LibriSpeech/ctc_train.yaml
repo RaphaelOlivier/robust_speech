@@ -30,7 +30,7 @@ attack_class: null
 
 brain_class: !name:robust_speech.models.ctc.CTCASR
 dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
-dataio_prepare_fct: !name:robust_speech.data.librispeech.dataio_prepare
+dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 pretrained_tokenizer_path: !ref <root>/trainings/wav2vec2-base-960h
 

@@ -38,7 +38,7 @@ save_folder: !ref <output_folder>
 log: !ref <output_folder>/log.txt
 save_audio_path: !ref <output_folder>/save
 
-dataset_prepare_fct: !name:robust_speech.data.librispeech.prepare_librispeech
+dataset_prepare_fct: !name:robust_speech.data.speech_commands.prepare_speech_commands
 dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Data files
@@ -56,6 +56,7 @@ test_csv:
 batch_size: 1 # This works for 2x GPUs with 32GB
 avoid_if_longer_than: 2.0
 sorting: random
+
 
 # Feature parameters
 sample_rate: 16000

@@ -63,6 +63,7 @@ batch_size: 1 # This works for 2x GPUs with 32GB
 avoid_if_longer_than: 2.0
 sorting: random
 
+
 # Feature parameters
 sample_rate: 16000
 n_fft: 400

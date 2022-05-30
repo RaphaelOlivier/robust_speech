@@ -114,9 +114,12 @@ class TrfASR(AdvASRBrain):
             )
         loss_ctc = 0.0
         if self.hparams.ctc_weight > 0.0:
+            # print(p_ctc.size(), tokens.size(),
+            #      p_ctc[0].argmax(dim=-1), tokens[0])
             loss_ctc = self.hparams.ctc_cost(
                 p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
             )
+            #print(loss_ctc, p_ctc.size(), wav_lens, tokens_lens)
         loss = (
             self.hparams.ctc_weight * loss_ctc
             + (1 - self.hparams.ctc_weight) * loss_seq
@@ -127,9 +130,16 @@ class TrfASR(AdvASRBrain):
             valid_search_interval = self.hparams.valid_search_interval
             if current_epoch % valid_search_interval == 0 or (stage == sb.Stage.TEST):
                 # Decode token terms to words
-                predicted_words = [
-                    self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps
-                ]
+                if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):
+                    predicted_words = [
+                        self.tokenizer.decode_ndim(utt_seq) for utt_seq in hyps
+                    ]
+                    predicted_words = ["".join(s).strip().split(" ")
+                                       for s in predicted_words]
+                else:
+                    predicted_words = [
+                        self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps
+                    ]
                 target_words = [wrd.split(" ") for wrd in batch.wrd]
                 if adv:
                     if targeted:

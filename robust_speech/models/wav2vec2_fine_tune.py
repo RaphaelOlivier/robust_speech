@@ -106,14 +106,14 @@ class W2VASR(AdvASRBrain):
                 predicted_words = [
                     self.tokenizer.decode_ndim(utt_seq) for utt_seq in predicted_tokens
                 ]
+                predicted_words = ["".join(s).strip().split(" ")
+                                   for s in predicted_words]
             else:
                 predicted_words = [
-                    self.tokenizer.decode_ids(utt_seq) for utt_seq in predicted_tokens
+                    self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in predicted_tokens
                 ]
-            target_words = [wrd for wrd in batch.wrd]
-            predicted_words = ["".join(s).strip().split(" ")
-                               for s in predicted_words]
-            target_words = [t.split(" ") for t in target_words]
+            target_words = [wrd.split(" ") for wrd in batch.wrd]
+
             if adv:
                 if targeted:
                     self.adv_wer_metric_target.append(

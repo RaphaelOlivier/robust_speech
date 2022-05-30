@@ -12,6 +12,7 @@ from speechbrain.utils.metric_stats import MetricStats
 
 warnings.simplefilter("once", RuntimeWarning)
 
+
 def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     """
     Signal to Noise Ratio computation
@@ -28,9 +29,10 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     num = torch.max(audio, dim=1)
     den = torch.max(perturbation, dim=1)
     ratio = num[0]/den[0]
-    
+
     snr = 20. * torch.log10(ratio)
     return torch.round(snr).long()
+
 
 class SNRComputer(MetricStats):
     """Tracks Signal to Noise Ratio"""
@@ -73,14 +75,17 @@ class AudioSaver:
             self.save_wav(audio_id, wav, adv_wav)
 
     def load_wav(self, audio_id):
+        """Load an adversarial example from a file saved in a previous iteration of the attack.
+        This avoid recomputing attacks, when recovering an interrupted experiment or applying the perturbations to a different model."""
         adv_path = audio_id + "_adv.wav"
-        adv_path=os.path.join(self.save_audio_path, adv_path)
+        adv_path = os.path.join(self.save_audio_path, adv_path)
         if os.path.exists(adv_path):
             adv_wav, sr = torchaudio.load(adv_path)
             assert sr == self.sample_rate
             return adv_wav
         else:
-            warnings.warn("Audio file not found: computing the attack", RuntimeWarning)
+            warnings.warn(
+                "Audio file not found: computing the attack", RuntimeWarning)
             return None
 
     def save_wav(self, audio_id, wav, adv_wav):
@@ -91,7 +96,8 @@ class AudioSaver:
             os.path.join(self.save_audio_path, nat_path), wav, self.sample_rate
         )
         torchaudio.save(
-            os.path.join(self.save_audio_path, adv_path), adv_wav, self.sample_rate
+            os.path.join(self.save_audio_path,
+                         adv_path), adv_wav, self.sample_rate
         )
 
     def load(self, audio_ids, batch):
@@ -103,5 +109,5 @@ class AudioSaver:
             adv_wav = self.load_wav(audio_id)
             if adv_wav is None:
                 return None
-            adv_sig[i,:lengths[i]] = adv_wav
+            adv_sig[i, :lengths[i]] = adv_wav
         return adv_sig

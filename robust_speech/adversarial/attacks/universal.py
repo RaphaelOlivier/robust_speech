@@ -48,14 +48,16 @@ class UniversalAttack(TrainableAttacker):
     ---------
     asr_brain: rs.adversarial.brain.ASRBrain
        brain object.
-    snr: float
-       maximum distortion.
     eps: float
        maximum distortion.
+    eps_item: float
+       maximum additional distortion per batch.
     nb_iter: int
-       number of iterations.
-    eps_iter: float
-       attack step size.
+       number of iterations per batch.
+    nb_epochs: int
+       number of epochs over the loader.
+    lr: float
+       learning rate of the attack.
     rand_init: (optional bool)
        random initialization.
     clip_min: (optional) float
@@ -64,6 +66,10 @@ class UniversalAttack(TrainableAttacker):
        maximum value per input dimension.
     order: (optional) int
        the order of maximum distortion (inf or 2).
+    time_universal: bool
+       whether to use time translation during training
+    univ_perturb: rs.adversarial.utils.tensorModule
+       initial value of the univ_perturb parameter
     targeted: bool
        if the attack is targeted.
     train_mode_for_backward: bool
@@ -81,11 +87,11 @@ class UniversalAttack(TrainableAttacker):
         clip_min=None,
         clip_max=None,
         order=np.inf,
-        targeted=False,
-        train_mode_for_backward=True,
         lr=0.001,
         time_universal=False,
-        univ_perturb=None
+        univ_perturb=None,
+        targeted=False,
+        train_mode_for_backward=True
     ):
         self.clip_min = clip_min
         self.clip_max = clip_max
@@ -111,6 +117,13 @@ class UniversalAttack(TrainableAttacker):
             self.eps, float)
 
     def fit(self, loader):
+        """
+        Fitting the parameters of the attacker, if applicable (generative attack, universal attack, etc)
+        Arguments
+        ---------
+        loader:
+            data loader to use to fit the attacker
+        """
         return self._compute_universal_perturbation(loader)
 
     def _compute_universal_perturbation(self, loader):

@@ -23,6 +23,24 @@ def prepare_speech_commands(
     skip_prep=False,
     **kwargs
 ):
+    """
+    Prepares the csv files for the Google Speech Command dataset.
+    Arguments
+    ---------
+    data_folder : str
+        Path to the folder where the original Common Voice dataset is stored.
+        This path should include the lang: /datasets/CommonVoice/en/
+    save_folder : str
+        The directory where to store the csv files.
+    tr_splits : list, optional
+        Path to the Train Common Voice .tsv file(s) (cs)
+    dev_splits : list, optional
+        Path to the Dev Common Voice .tsv file(s) (cs)
+    te_splits : list, optional
+        Path to the Test Common Voice .tsv file(s) (cs)
+    skip_prep: bool
+        If True, skip data preparation.
+    """
 
     splits = tr_splits + dev_splits + te_splits
 

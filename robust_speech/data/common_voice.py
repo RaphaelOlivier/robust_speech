@@ -36,12 +36,12 @@ def prepare_common_voice(
         This path should include the lang: /datasets/CommonVoice/en/
     save_folder : str
         The directory where to store the csv files.
-    train_tsv_file : str, optional
-        Path to the Train Common Voice .tsv file (cs)
-    dev_tsv_file : str, optional
-        Path to the Dev Common Voice .tsv file (cs)
-    test_tsv_file : str, optional
-        Path to the Test Common Voice .tsv file (cs)
+    tr_splits : list, optional
+        Path to the Train Common Voice .tsv file(s) (cs)
+    dev_splits : list, optional
+        Path to the Dev Common Voice .tsv file(s) (cs)
+    te_splits : list, optional
+        Path to the Test Common Voice .tsv file(s) (cs)
     accented_letters : bool, optional
         Defines if accented letters will be kept as individual letters or
         transformed to the closest non-accented letters.

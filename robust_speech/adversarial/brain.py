@@ -621,6 +621,26 @@ class AdvASRBrain(ASRBrain):
         return advloss, targetloss
 
     def compute_forward_with_voting(self, batch, stage):
+        """Forward pass, iterated multiple times with a voting phase.
+        Used for randomized smoothing
+
+        Arguments
+        ---------
+        batch : torch.Tensor or tensors
+            An element from the dataloader, including inputs for processing.
+        stage : Union[sb.Stage, rs.Stage]
+            The stage of the experiment:
+            sb.Stage.TRAIN, sb.Stage.VALID, sb.Stage.TEST, rs.Stage.ATTACK
+
+        Returns
+        -------
+        torch.Tensor or Tensors
+            The outputs after all processing is complete.
+            Directly passed to ``compute_objectives()``.
+            In VALID or TEST stage, this should contain the predicted tokens.
+            In ATTACK stage, batch.sig should be in the computation graph
+            (no device change, no .detach())
+        """
         preds = []
         # print("doing rover")
         for i in range(self.voting_iters):
@@ -921,6 +941,28 @@ class AdvASRBrain(ASRBrain):
         progressbar=None,
         loader_kwargs={},
     ):
+        """Train the parameters of a TrainableAttacker over an already trained model.
+        ---------
+        fit_set : Dataset, DataLoader
+            If a DataLoader is given, it is iterated directly. Otherwise passed
+            to ``self.make_dataloader()``.
+        max_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        min_key : str
+            Key to use for finding best checkpoint, passed to
+            ``on_evaluate_start()``.
+        progressbar : bool
+            Whether to display the progress in a progressbar.
+        loader_kwargs : dict
+            Kwargs passed to ``make_dataloader()`` if ``test_set`` is not a
+            DataLoader. NOTE: ``loader_kwargs["ckpt_prefix"]`` gets
+            automatically overwritten to ``None`` (so that the test DataLoader
+            is not added to the checkpointer).
+        Returns
+        -------
+        average test loss
+        """
         if progressbar is None:
             progressbar = not self.noprogressbar
 

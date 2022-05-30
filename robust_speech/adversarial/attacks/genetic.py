@@ -56,6 +56,18 @@ class GeneticAttack(Attacker):
         self.targeted = targeted
 
     def perturb(self, batch):
+        """
+        Compute an adversarial perturbation
+
+        Arguments
+        ---------
+        batch : sb.PaddedBatch
+            The input batch to perturb
+
+        Returns
+        -------
+        the tensor of the perturbed batch
+        """
         self.mutation_prob = MUTATION_PROB_INIT
         self.prev_score = None
         pop_batch, max_wavs, min_wavs = self._gen_population(batch)

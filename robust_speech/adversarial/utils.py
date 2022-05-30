@@ -167,6 +167,8 @@ def linf_clamp(tensor, eps):
 
 
 class TensorModule(nn.Module):
+    """A module wrapper for a single tensor. Useful for saving some parameters in speechbrain checkpoints"""
+
     def __init__(self, size):
         super(TensorModule, self).__init__()
         self.tensor = nn.Parameter(torch.zeros(size=size))

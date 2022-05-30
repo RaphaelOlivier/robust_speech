@@ -116,9 +116,17 @@ class TrainableAttacker(Attacker):
     """
 
     def on_fit_start(self):
+        """
+        Method to run at the beginning of an attacker fitting phase.
+
+        """
         pass
 
     def on_fit_end(self):
+        """
+        Method to run at the end of an attacker fitting phase.
+
+        """
         pass
 
     def fit(self, loader):

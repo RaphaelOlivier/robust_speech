@@ -21,6 +21,7 @@ def prepare_speech_commands(
     dev_splits=[],
     te_splits=[],
     skip_prep=False,
+    **kwargs
 ):
 
     splits = tr_splits + dev_splits + te_splits

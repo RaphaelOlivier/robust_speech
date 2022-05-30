@@ -24,6 +24,7 @@ def prepare_common_voice(
     accented_letters=False,
     language="en",
     skip_prep=False,
+    **kwargs,
 ):
     """
     Prepares the csv files for the Mozilla Common Voice dataset.

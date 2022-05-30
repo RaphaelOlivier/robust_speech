@@ -335,6 +335,12 @@ class AdvASRBrain(ASRBrain):
         super(AdvASRBrain, self).__setattr__(name, value)
 
     def init_voting(self, hparams):
+        if "voting_iters" in hparams:
+            if hparams["voting_iters"] <= 1:
+                return
+            self.voting_iters = hparams["voting_iters"]
+        else:
+            self.voting_iters = 3
         if 'rover_path' in hparams:
             rover_path = hparams['rover_path']
         elif os.environ.get('ROVER_PATH') is not None:
@@ -344,10 +350,6 @@ class AdvASRBrain(ASRBrain):
         else:
             return NotFoundErr('ROVER could not be found. Please follow instructions in README.md')
         self.voting_module = hparams['voting_module'](exec_path=rover_path)
-        if "voting_iters" in hparams:
-            self.voting_iters = hparams["voting_iters"]
-        else:
-            self.voting_iters = 3
 
     def init_attacker(
         self, modules=None, opt_class=None, hparams=None, run_opts=None, attacker=None

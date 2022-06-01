@@ -25,6 +25,7 @@ from speechbrain.utils.distributed import run_on_main
 
 import robust_speech as rs
 from robust_speech.adversarial.brain import AdvASRBrain
+from robust_speech.adversarial.utils import TargetGeneratorFromFixedTargets
 
 
 def read_brains(
@@ -34,7 +35,7 @@ def read_brains(
     run_opts={},
     overrides={},
     tokenizer=None,
-): 
+):
     if isinstance(brain_classes, list):
         brain_list = []
         assert len(brain_classes) == len(brain_hparams)
@@ -60,7 +61,8 @@ def read_brains(
         )
         if "pretrainer" in brain_hparams:
             run_on_main(brain_hparams["pretrainer"].collect_files)
-            brain_hparams["pretrainer"].load_collected(device=run_opts["device"])
+            brain_hparams["pretrainer"].load_collected(
+                device=run_opts["device"])
         brain.tokenizer = tokenizer
     return brain
 
@@ -134,7 +136,12 @@ def evaluate(hparams_file, run_opts, overrides):
     target_brain.logger = hparams["logger"]
     target_brain.hparams.train_logger = hparams["logger"]
 
-    target = hparams["target_sentence"] if "target_sentence" in hparams else None
+    target = None
+    if "target_generator" in hparams:
+        target = hparams["target_generator"]
+    elif "target_sentence" in hparams:
+        target = TargetGeneratorFromFixedTargets(
+            target=hparams["target_sentence"])
     load_audio = hparams["load_audio"] if "load_audio" in hparams else None
     save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None
     # Evaluation
@@ -145,7 +152,7 @@ def evaluate(hparams_file, run_opts, overrides):
         target_brain.evaluate(
             test_datasets[k],
             test_loader_kwargs=hparams["test_dataloader_opts"],
-            load_audio = load_audio,
+            load_audio=load_audio,
             save_audio_path=save_audio_path,
             sample_rate=hparams["sample_rate"],
             target=target,
@@ -161,4 +168,3 @@ if __name__ == "__main__":
     sb.utils.distributed.ddp_init_group(run_opts)
 
     evaluate(hparams_file, run_opts, overrides)
-

@@ -19,7 +19,6 @@ from tqdm import tqdm
 import numpy as np
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker, TrainableAttacker
-from robust_speech.adversarial.utils import replace_tokens_in_batch
 from robust_speech.adversarial.defenses.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
 
 
@@ -583,8 +582,8 @@ class AdvASRBrain(ASRBrain):
                 self, "tokenizer") else self.hparams.tokenizer
         )
         if target is not None and self.attacker.targeted:
-            batch_to_attack = replace_tokens_in_batch(
-                batch, target, tokenizer, self.hparams
+            batch_to_attack = target.replace_tokens_in_batch(
+                batch, tokenizer, self.hparams
             )
         else:
             batch_to_attack = batch

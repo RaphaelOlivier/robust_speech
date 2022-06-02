@@ -301,7 +301,6 @@ class ImperceptibleASRAttack(Attacker):
             # Get sign of the gradients
             self.global_optimal_delta.grad = torch.sign(
                 self.global_optimal_delta.grad)
-
             # Do optimization
             self.optimizer_1.step()
 

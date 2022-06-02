@@ -99,7 +99,6 @@ class W2VASR(AdvASRBrain):
             p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
         )
         loss = loss_ctc
-
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             # Decode token terms to words
             if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):

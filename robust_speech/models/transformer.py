@@ -44,7 +44,8 @@ class TrfASR(AdvASRBrain):
                 tokens_bos = torch.cat([tokens_bos, tokens_bos], dim=0)
 
         # compute features
-        feats = self.hparams.compute_features(wavs)
+        feats = self.hparams.compute_features(
+            wavs) if self.hparams.compute_features is not None else wavs
         current_epoch = self.hparams.epoch_counter.current
         feats = self.modules.normalize(feats, wav_lens, epoch=current_epoch)
 

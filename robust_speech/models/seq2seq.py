@@ -43,7 +43,8 @@ class S2SASR(AdvASRBrain):
             if hasattr(self.hparams, "augmentation"):
                 wavs = self.hparams.augmentation(wavs, wav_lens)
         # Forward pass
-        feats = self.hparams.compute_features(wavs)
+        feats = self.hparams.compute_features(
+            wavs) if self.hparams.compute_features is not None else wavs
         if stage == sb.Stage.TRAIN:
             feats = self.modules.normalize(feats, wav_lens)
         else:

@@ -53,13 +53,20 @@ cd robust_speech
 pip install .
 ```
 
-Run the following lines to support [randomized smoothing with ROVER voting](https://arxiv.org/abs/2112.03000):
+Additionally, some recipes may require the following lines.
 
 ```
+# the following lines are required to support [randomized smoothing with ROVER voting](https://arxiv.org/abs/2112.03000):
 git clone https://github.com/RaphaelOlivier/SCTK.git
 cd SCTK
 make config && make all && make check && make install && make doc
 export ROVER_PATH=$(echo pwd)/bin/rover # Add this line to your .bash_profile
+
+# the following lines are required to use wav2vec2 models with the fairseq backend. WARNING: Some attacks seem to raise gradient errors with some versions of Pytorch or CUDA. Use the huggingface backend if possible.
+git clone https://github.com/pytorch/fairseq
+cd fairseq
+pip install --editable ./
+
 ```
 
 ## Usage

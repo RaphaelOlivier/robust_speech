@@ -1013,8 +1013,11 @@ class AdvASRBrain(ASRBrain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
-            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            if hasattr(self.hparams, "lr_annealing"):
+                old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
+                sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            else:
+                old_lr = self.optimizer.param_groups[0]["lr"]
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": old_lr},
                 train_stats=self.train_stats,

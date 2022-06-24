@@ -118,11 +118,6 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
         loss = self.asr_brain.compute_objectives(
             predictions, batch, rs.Stage.ATTACK)
-        #print(loss.item(),end = " ")
-        #predictions2 = self.other_asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        #loss2 = self.other_asr_brain.compute_objectives(
-        #    predictions2, batch, rs.Stage.ATTACK)
-        #print(loss2.item(),end = ",")
         loss_backward = loss + self.reg_const * torch.norm(local_delta_rescale)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
@@ -130,6 +125,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
 
         loss_eval = self.asr_brain.compute_objectives(
             val_predictions, batch, sb.Stage.TRAIN, reduction="batch")
+        # print(loss_eval.item())
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
         return loss_backward, loss_eval, local_delta, decoded_output, masked_adv_input, local_delta_rescale

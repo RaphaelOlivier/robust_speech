@@ -1,3 +1,4 @@
-torch>=1.8.0,<=1.10.1
-speechbrain>=0.5.11
-transformers>=4.15.0
+torch>=1.8.0,<=1.11
+transformers>=4.20.0
+git+https://github.com/RaphaelOlivier/pyaudlib.git
+git+https://github.com/RaphaelOlivier/speechbrain.git

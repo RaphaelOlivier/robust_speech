@@ -50,13 +50,6 @@ class W2VPretrain(AdvASRBrain):
     Wav2Vec 2.0 base model for pretraining
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.checkpointer and not hasattr(self.hparams, "pretrainer"):
-            # model was loaded from HuggingFace but not preloaded with
-            # SpeechBrain: saving it at initialization
-            self.checkpointer.save_checkpoint()
-
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the w2v2 loss."""
         wavs, wav_lens = batch.sig
@@ -217,6 +210,7 @@ class W2VPretrain(AdvASRBrain):
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
     ):
+        num_to_keep = self.hparams.num_to_keep if "num_to_keep" in self.hparams.__dict__ else 1
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
@@ -257,6 +251,7 @@ class W2VPretrain(AdvASRBrain):
             self.checkpointer.save_and_keep_only(
                 meta={"acc": stage_stats["acc"], "epoch": epoch},
                 max_keys=["acc"],
+                num_to_keep=num_to_keep,
             )
 
         elif stage == sb.Stage.TEST:

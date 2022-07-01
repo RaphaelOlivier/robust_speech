@@ -116,7 +116,7 @@ class PredictionEnsemble:
 
     def __init__(self, predictions, ensemble_brain):
         self.predictions = predictions
-        self.ensemble_brain=ensemble_brain
+        self.ensemble_brain = ensemble_brain
 
     def __getitem__(self, i):
         return self.predictions[i]
@@ -923,6 +923,7 @@ class AdvASRBrain(ASRBrain):
             self.checkpointer.save_and_keep_only(
                 meta={"WER": stage_stats["WER"]},
                 min_keys=["WER"],
+                num_to_keep=self.hparams.num_to_keep if "num_to_keep" in self.hparams.__dict__ else 1
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -1026,7 +1027,7 @@ class EnsembleASRBrain(AdvASRBrain):
             return self.asr_brains[self.ref_attack].compute_forward(batch, stage)
         elif stage == sb.Stage.TRAIN and self.ref_train is not None:
             return self.asr_brains[self.ref_train].compute_forward(batch, stage)
-        elif stage in [sb.Stage.VALID,sb.Stage.TEST] and self.ref_valid_test is not None:
+        elif stage in [sb.Stage.VALID, sb.Stage.TEST] and self.ref_valid_test is not None:
             return self.asr_brains[self.ref_valid_test].compute_forward(batch, stage)
         predictions = []
         for asr_brain in self.asr_brains:
@@ -1044,7 +1045,7 @@ class EnsembleASRBrain(AdvASRBrain):
         :param model_idx: which model to extract tokens from
         (defaults to self.ref_train, self.ref_attack or self.valid_test depending on stage)
         """
-        if isinstance(predictions, PredictionEnsemble) and predictions.ensemble_brain==self:
+        if isinstance(predictions, PredictionEnsemble) and predictions.ensemble_brain == self:
             assert len(predictions) == self.nmodels
             if all:
                 return [
@@ -1074,7 +1075,8 @@ class EnsembleASRBrain(AdvASRBrain):
         """
         # concatenate of average objectives
         if (
-            isinstance(predictions, PredictionEnsemble) and predictions.ensemble_brain==self
+            isinstance(
+                predictions, PredictionEnsemble) and predictions.ensemble_brain == self
         ):  # many predictions
             assert len(predictions) == self.nmodels
             losses = []
@@ -1115,7 +1117,6 @@ class EnsembleASRBrain(AdvASRBrain):
                 brain.__setattr__(name, value)
         super(EnsembleASRBrain, self).__setattr__(name, value)
 
-    
     def module_train(self):
         """
         Set PyTorch modules to training mode

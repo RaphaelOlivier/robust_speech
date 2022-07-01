@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from typing import Iterable
+import numpy as np
 import torch.nn.functional as F
 import speechbrain as sb
 import torch
@@ -277,6 +278,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         mask_prob=0.65,
         mask_length=10,
         normalize_wav=True,
+        load_pretrained_weights=False
     ):
         super(AdvHuggingFaceWav2Vec2Pretrain, self).__init__(
             source,
@@ -285,7 +287,18 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             mask_length=mask_length,
             normalize_wav=normalize_wav,
         )
-        self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
+        if load_pretrained_weights:
+            self.model = AdvWav2Vec2ForPreTraining.from_pretrained(
+                source, load_weight=load_pretrained_weights)
+        else:
+            self.config = Wav2Vec2PretrainConfig.from_pretrained(
+                source, cache_dir=save_path
+            )
+            self.config.output_hidden_states = (
+                True  # We want the hidden states as well!
+            )
+
+            self.model = AdvWav2Vec2ForPreTraining(self.config)
 
     def forward(self, wav, quantized_representation=None):
         """Takes an input waveform and return its corresponding wav2vec encoding.
@@ -324,7 +337,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         # print(np.sum(mask_time_indices, axis=1))
         negative_sample_indices = torch.tensor(
             transformers.models.wav2vec2.modeling_wav2vec2._sample_negative_indices(
-                (batch_size, sequence_length),
+                (batch_size, sequence_length.numpy()),
                 num_negatives=self.config.num_negatives,
                 mask_time_indices=full_sentence_indices,
             ),
@@ -442,7 +455,6 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         dropout=None,
     ):
         nn.Module.__init__(self)
-
         # Download the extractor from HuggingFace.
         # The extractor is only used to retrieve the normalisation information
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
@@ -505,25 +517,27 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
                 return
             else:
                 override_dropout(config.__dict__, dropout)
-        is_sb, ckpt_file = self._check_model_source(source)
         config = config.from_pretrained(source, cache_dir=save_path)
         if dropout:
             override_dropout(config, dropout)
 
         if not load_weights:
             self.model = model(config)
-        elif is_sb:
-            self.model = model(config)
-            self.model.gradient_checkpointing_disable()  # Required by DDP
-            # fetch the checkpoint file
-            ckpt_full_path = fetch(
-                filename=ckpt_file, source=source, savedir=save_path
-            )
-            # We transfer the parameters from the checkpoint.
-            self._load_sb_pretrained_w2v2_parameters(ckpt_full_path)
+            return
         else:
-            self.model = model.from_pretrained(
-                source, config=config, cache_dir=save_path)
+            is_sb, ckpt_file = self._check_model_source(source)
+            if is_sb:
+                self.model = model(config)
+                self.model.gradient_checkpointing_disable()  # Required by DDP
+                # fetch the checkpoint file
+                ckpt_full_path = fetch(
+                    filename=ckpt_file, source=source, savedir=save_path
+                )
+                # We transfer the parameters from the checkpoint.
+                self._load_sb_pretrained_w2v2_parameters(ckpt_full_path)
+            else:
+                self.model = model.from_pretrained(
+                    source, config=config, cache_dir=save_path)
 
     def extract_features(self, wav):
         """Takes an input waveform and return its corresponding wav2vec encoding.
@@ -542,5 +556,4 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         # We normalize the output if required
         if self.output_norm:
             out = F.layer_norm(out, out.shape)
-
         return out

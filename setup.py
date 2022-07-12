@@ -30,7 +30,7 @@ setup(
         "audlib",
         "torch>=1.7,<=1.11",
         "speechbrain @ git+https://github.com/RaphaelOlivier/speechbrain.git",
-        "audlib @ git+https://github.com/RaphaelOlivier/pyaudlib.git"
+        "audlib @ git+https://github.com/RaphaelOlivier/pyaudlib.git",
         "transformers>=4.18.0",
         "torchvision",
     ],

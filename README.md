@@ -167,15 +167,12 @@ Snippets of code have been copy-pasted from packages [SpeechBrain](https://githu
 If you are using robust_speeech for your experiments please cite [this paper](https://arxiv.org/abs/2203.16536):
 
 ```bibtex
-@misc{https://doi.org/10.48550/arxiv.2203.16536,
-  doi = {10.48550/ARXIV.2203.16536},
+@article{Olivier2022RI,
   url = {https://arxiv.org/abs/2203.16536},
   author = {Olivier, Raphael and Raj, Bhiksha},
-  keywords = {Cryptography and Security (cs.CR), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), Sound (cs.SD), Audio and Speech Processing (eess.AS), FOS: Computer and information sciences, FOS: Computer and information sciences, FOS: Electrical engineering, electronic engineering, information engineering, FOS: Electrical engineering, electronic engineering, information engineering},
   title = {Recent improvements of ASR models in the face of adversarial attacks},
-  publisher = {arXiv},
+  journal = {Interspeech},
   year = {2022},  
-  copyright = {arXiv.org perpetual, non-exclusive license}
 }
 
 ```

@@ -162,16 +162,25 @@ class W2VASR(AdvASRBrain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            current_lr = self.hparams.noam_annealing.current_lr
-            steps = self.hparams.noam_annealing.n_steps
-            self.hparams.train_logger.log_stats(
-                stats_meta={
-                    "epoch": epoch,
-                    "lr_model": current_lr,
-                },
-                train_stats=self.train_stats,
-                valid_stats=stage_stats,
-            )
+            if hasattr(self.hparams, "noam_annealing"):
+                current_lr = self.hparams.noam_annealing.current_lr
+                steps = self.hparams.noam_annealing.n_steps
+                self.hparams.train_logger.log_stats(
+                    stats_meta={
+                        "epoch": epoch,
+                        "lr_model": current_lr,
+                    },
+                    train_stats=self.train_stats,
+                    valid_stats=stage_stats,
+                )
+            else:
+                self.hparams.train_logger.log_stats(
+                    stats_meta={
+                        "epoch": epoch,
+                    },
+                    train_stats=self.train_stats,
+                    valid_stats=stage_stats,
+                )
             self.checkpointer.save_and_keep_only(
                 meta={"WER": stage_stats["WER"]},
                 min_keys=["WER"]
@@ -216,5 +225,6 @@ class W2VASR(AdvASRBrain):
             self.optimizer.zero_grad()
 
             # anneal lr every update
-            self.hparams.noam_annealing(self.optimizer)
+            if hasattr(self.hparams, "noam_annealing"):
+                self.hparams.noam_annealing(self.optimizer)
         return loss.detach()

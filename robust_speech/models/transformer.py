@@ -44,7 +44,8 @@ class TrfASR(AdvASRBrain):
                 tokens_bos = torch.cat([tokens_bos, tokens_bos], dim=0)
 
         # compute features
-        feats = self.hparams.compute_features(wavs)
+        feats = self.hparams.compute_features(
+            wavs) if self.hparams.compute_features is not None else wavs
         current_epoch = self.hparams.epoch_counter.current
         feats = self.modules.normalize(feats, wav_lens, epoch=current_epoch)
 
@@ -65,10 +66,10 @@ class TrfASR(AdvASRBrain):
             p_ctc = self.hparams.log_softmax(logits)
 
         p_seq = None
-        # if self.hparams.ctc_weight<1.:
-        # output layer for seq2seq log-probabilities
-        pred = self.modules.seq_lin(pred)
-        p_seq = self.hparams.log_softmax(pred)
+        if self.hparams.ctc_weight < 1.:
+            # output layer for seq2seq log-probabilities
+            pred = self.modules.seq_lin(pred)
+            p_seq = self.hparams.log_softmax(pred)
         # Compute outputs
         hyps = None
         if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
@@ -158,18 +159,6 @@ class TrfASR(AdvASRBrain):
                     self.wer_metric.append(ids, predicted_words, target_words)
                     self.cer_metric.append(ids, predicted_words, target_words)
 
-            # compute the accuracy of the one-step-forward prediction
-            if adv:
-                if targeted:
-                    self.adv_acc_metric_target.append(
-                        p_seq, tokens_eos, tokens_eos_lens
-                    )
-                else:
-                    self.adv_acc_metric.append(
-                        p_seq, tokens_eos, tokens_eos_lens)
-            else:
-                self.acc_metric.append(p_seq, tokens_eos, tokens_eos_lens)
-
         return loss
 
     def fit_batch(self, batch):
@@ -243,100 +232,9 @@ class TrfASR(AdvASRBrain):
     def on_stage_start(self, stage, epoch):
         # Gets called at the beginning of each epoch
         if stage != sb.Stage.TRAIN:
-            self.acc_metric = self.hparams.acc_computer()
             self.wer_metric = self.hparams.error_rate_computer()
             self.cer_metric = self.hparams.cer_computer()
-            self.adv_acc_metric = self.hparams.acc_computer()
             self.adv_cer_metric = self.hparams.cer_computer()
             self.adv_wer_metric = self.hparams.error_rate_computer()
-            self.adv_acc_metric_target = self.hparams.acc_computer()
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
-
-    def on_stage_end(
-        self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
-    ):
-        # Gets called at the end of a epoch.
-        # Compute/store important stats
-        stage_stats = {"loss": stage_loss}
-        if stage_adv_loss is not None:
-            stage_stats["adv loss"] = stage_adv_loss
-        if stage_adv_loss_target is not None:
-            stage_stats["adv loss target"] = stage_adv_loss_target
-        if stage == sb.Stage.TRAIN:
-            self.train_stats = stage_stats
-        else:
-            stage_stats["ACC"] = self.acc_metric.summarize()
-            if stage_adv_loss is not None:
-                stage_stats["adv ACC"] = self.adv_acc_metric.summarize()
-            if stage_adv_loss_target is not None:
-                stage_stats["adv ACC target"] = self.adv_acc_metric_target.summarize()
-            current_epoch = self.hparams.epoch_counter.current
-            valid_search_interval = self.hparams.valid_search_interval
-            if current_epoch % valid_search_interval == 0 or stage == sb.Stage.TEST:
-                stage_stats["WER"] = self.wer_metric.summarize("error_rate")
-                stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-
-                if stage_adv_loss is not None:
-                    stage_stats["adv CER"] = self.adv_cer_metric.summarize(
-                        "error_rate")
-                    stage_stats["adv WER"] = self.adv_wer_metric.summarize(
-                        "error_rate")
-                if stage_adv_loss_target is not None:
-                    stage_stats[
-                        "adv CER target"
-                    ] = self.adv_cer_metric_target.summarize("error_rate")
-                    stage_stats[
-                        "adv WER target"
-                    ] = self.adv_wer_metric_target.summarize("error_rate")
-
-        # log stats and save checkpoint at end-of-epoch
-        if stage == sb.Stage.VALID and sb.utils.distributed.if_main_process():
-
-            # report different epoch stages according current stage
-            current_epoch = self.hparams.epoch_counter.current
-            if current_epoch <= self.hparams.stage_one_epochs:
-                current_lr = self.hparams.noam_annealing.current_lr
-                steps = self.hparams.noam_annealing.n_steps
-                optimizer = self.optimizer.__class__.__name__
-            else:
-                current_lr = self.hparams.lr_sgd
-                steps = -1
-                optimizer = self.optimizer.__class__.__name__
-
-            epoch_stats = {
-                "epoch": epoch,
-                "lr": current_lr,
-                "steps": steps,
-                "optimizer": optimizer,
-            }
-            self.hparams.train_logger.log_stats(
-                stats_meta=epoch_stats,
-                train_stats=self.train_stats,
-                valid_stats=stage_stats,
-            )
-            if self.checkpointer is not None:
-                self.checkpointer.save_and_keep_only(
-                    meta={"ACC": stage_stats["ACC"], "epoch": epoch},
-                    max_keys=["ACC"],
-                    num_to_keep=5,
-                )
-
-        elif stage == sb.Stage.TEST:
-            self.hparams.train_logger.log_stats(
-                stats_meta={"Evaluation stage": "TEST"},
-                test_stats=stage_stats,
-            )
-            with open(self.hparams.wer_file, "w") as wer:
-                self.wer_metric.write_stats(wer)
-
-            # save the averaged checkpoint at the end of the evaluation stage
-            # delete the rest of the intermediate checkpoints
-            # ACC is set to 1.1 so checkpointer only keeps the averaged
-            # checkpoint
-            if self.checkpointer is not None:
-                self.checkpointer.save_and_keep_only(
-                    meta={"ACC": 1.1, "epoch": epoch},
-                    max_keys=["ACC"],
-                    num_to_keep=1,
-                )

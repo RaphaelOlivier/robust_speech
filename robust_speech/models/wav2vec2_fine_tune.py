@@ -50,7 +50,7 @@ class W2VASR(AdvASRBrain):
         if hasattr(self.hparams, "smoothing") and self.hparams.smoothing:
             wavs = self.hparams.smoothing(wavs, wav_lens)
 
-        if stage == sb.Stage.TRAIN:
+        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
             if hasattr(self.modules, "env_corrupt"):
                 wavs_noise = self.modules.env_corrupt(wavs, wav_lens)
                 wavs = torch.cat([wavs, wavs_noise], dim=0)
@@ -63,6 +63,9 @@ class W2VASR(AdvASRBrain):
         if stage == rs.Stage.ATTACK:
             feats = self.modules.wav2vec2.extract_features(wavs)
             encoded = self.modules.enc(feats)
+        elif stage == sb.Stage.TRAIN:
+            feats = self.modules.wav2vec2(wavs)
+            encoded = self.modules.enc(feats)
         else:
             feats = self.modules.wav2vec2(wavs)
             encoded = self.modules.enc(feats.detach())
@@ -70,7 +73,6 @@ class W2VASR(AdvASRBrain):
         p_tokens = None
         logits = self.modules.ctc_lin(encoded)
         p_ctc = self.hparams.log_softmax(logits)
-
         if stage not in [sb.Stage.TRAIN, rs.Stage.ATTACK]:
             p_tokens = sb.decoders.ctc_greedy_decode(
                 p_ctc, wav_lens, blank_id=self.hparams.blank_index
@@ -94,12 +96,10 @@ class W2VASR(AdvASRBrain):
                 [tokens_eos_lens, tokens_eos_lens], dim=0)
             tokens = torch.cat([tokens, tokens], dim=0)
             tokens_lens = torch.cat([tokens_lens, tokens_lens], dim=0)
-
         loss_ctc = self.hparams.ctc_cost(
             p_ctc, tokens, wav_lens, tokens_lens, reduction=reduction
         )
         loss = loss_ctc
-
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             # Decode token terms to words
             if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):
@@ -130,7 +130,6 @@ class W2VASR(AdvASRBrain):
             else:
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
-
         return loss
 
     def on_stage_end(
@@ -163,19 +162,29 @@ class W2VASR(AdvASRBrain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            current_lr = self.hparams.noam_annealing.current_lr
-            steps = self.hparams.noam_annealing.n_steps
-            self.hparams.train_logger.log_stats(
-                stats_meta={
-                    "epoch": epoch,
-                    "lr_model": current_lr,
-                },
-                train_stats=self.train_stats,
-                valid_stats=stage_stats,
-            )
+            if hasattr(self.hparams, "noam_annealing"):
+                current_lr = self.hparams.noam_annealing.current_lr
+                steps = self.hparams.noam_annealing.n_steps
+                self.hparams.train_logger.log_stats(
+                    stats_meta={
+                        "epoch": epoch,
+                        "lr_model": current_lr,
+                    },
+                    train_stats=self.train_stats,
+                    valid_stats=stage_stats,
+                )
+            else:
+                self.hparams.train_logger.log_stats(
+                    stats_meta={
+                        "epoch": epoch,
+                    },
+                    train_stats=self.train_stats,
+                    valid_stats=stage_stats,
+                )
             self.checkpointer.save_and_keep_only(
                 meta={"WER": stage_stats["WER"]},
-                min_keys=["WER"],
+                min_keys=["WER"]
+
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -209,9 +218,13 @@ class W2VASR(AdvASRBrain):
             # gradient clipping & early stop if loss is not fini
             self.check_gradients(loss)
 
+            for p in self.optimizer.param_groups[0]['params']:
+                1
+                #print(p.data.size(), p.grad)
             self.optimizer.step()
             self.optimizer.zero_grad()
 
             # anneal lr every update
-            self.hparams.noam_annealing(self.optimizer)
+            if hasattr(self.hparams, "noam_annealing"):
+                self.hparams.noam_annealing(self.optimizer)
         return loss.detach()

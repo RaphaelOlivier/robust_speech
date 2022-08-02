@@ -19,7 +19,6 @@ from tqdm import tqdm
 import numpy as np
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker, TrainableAttacker
-from robust_speech.adversarial.utils import replace_tokens_in_batch
 from robust_speech.adversarial.defenses.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
 
 
@@ -115,117 +114,15 @@ class PredictionEnsemble:
     Iterable of predictions returned by EnsembleASRBrain
     """
 
-    def __init__(self, predictions):
+    def __init__(self, predictions, ensemble_brain):
         self.predictions = predictions
+        self.ensemble_brain = ensemble_brain
 
     def __getitem__(self, i):
         return self.predictions[i]
 
     def __len__(self):
         return len(self.predictions)
-
-
-class EnsembleASRBrain(ASRBrain):
-    """
-    Ensemble of multiple brains.
-    This class is used for attacks that compute adversarial noise
-    simultaneously on multiple models.
-    """
-
-    def __init__(self, asr_brains, ref_tokens=0):
-        self.asr_brains = asr_brains
-        self.ref_tokens = ref_tokens  # use this model to return tokens
-
-    @property
-    def nmodels(self):
-        """Number of models in the ensemble"""
-        return len(self.asr_brains)
-
-    def compute_forward(self, batch, stage, model_idx=None):
-        """
-        forward pass of all  or one model(s)
-        """
-        # concatenate predictions
-        if model_idx is not None:
-            return self.asr_brains[model_idx].compute_forward(batch, stage)
-        predictions = []
-        for asr_brain in self.asr_brains:
-            pred = asr_brain.compute_forward(batch, stage)
-            predictions.append(pred)
-        return PredictionEnsemble(predictions)
-
-    def get_tokens(self, predictions, all_models=False, model_idx=None):
-        """
-        Extract tokens from predictions.
-
-        :param predictions: model predictions
-        :param all: whether to extract all tokens or just one
-        :param model_idx: which model to extract tokens from
-        (defaults to self.ref_tokens)
-        """
-        if isinstance(predictions, PredictionEnsemble):
-            assert len(predictions) == self.nmodels
-            if all:
-                return [
-                    self.asr_brains[i].get_tokens(pred)
-                    for i, pred in enumerate(predictions)
-                ]
-            if model_idx is not None:
-                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
-            return self.asr_brains[self.ref_tokens].get_tokens(
-                predictions[self.ref_tokens]
-            )
-        return self.asr_brains[self.ref_tokens].get_tokens(predictions)
-
-    def compute_objectives(
-        self,
-        predictions,
-        batch,
-        stage,
-        adv=False,
-        targeted=False,
-        reduction="mean",
-        average=True,
-        model_idx=None,
-    ):
-        """
-        Compute the losses of all or one model
-        """
-        # concatenate of average objectives
-        if (
-            isinstance(predictions, PredictionEnsemble) or model_idx is None
-        ):  # many predictions
-            assert len(predictions) == self.nmodels
-            losses = []
-            for i in range(self.nmodels):
-                # one pred per model or n pred per model
-                asr_brain = (
-                    self.asr_brains[i]
-                    if model_idx is None
-                    else self.asr_brains[model_idx]
-                )
-                pred = (
-                    predictions[i]
-                    if isinstance(predictions, PredictionEnsemble)
-                    else predictions
-                )
-                loss = asr_brain.compute_objectives(
-                    pred, batch, stage, adv=adv, reduction=reduction
-                )
-                losses.append(loss)
-            losses = torch.stack(losses, dim=0)
-            if average:
-                return torch.mean(loss, dim=0)
-            return losses
-        return self.asr_brains[model_idx].compute_objectives(
-            predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction
-        )
-
-    def __setattr__(self, name, value):  # useful to set tokenizer
-        if name != "asr_brains" and name != "ref_tokens":
-            for brain in self.asr_brains:
-                brain.__setattr__(name, value)
-        super(EnsembleASRBrain, self).__setattr__(name, value)
 
 
 class AdvASRBrain(ASRBrain):
@@ -583,8 +480,8 @@ class AdvASRBrain(ASRBrain):
                 self, "tokenizer") else self.hparams.tokenizer
         )
         if target is not None and self.attacker.targeted:
-            batch_to_attack = replace_tokens_in_batch(
-                batch, target, tokenizer, self.hparams
+            batch_to_attack = target.replace_tokens_in_batch(
+                batch, tokenizer, self.hparams
             )
         else:
             batch_to_attack = batch
@@ -624,7 +521,6 @@ class AdvASRBrain(ASRBrain):
 
     def compute_forward_with_voting(self, batch, stage):
         preds = []
-        # print("doing rover")
         for i in range(self.voting_iters):
             predictions = self.compute_forward(
                 batch, stage=stage)
@@ -1014,8 +910,11 @@ class AdvASRBrain(ASRBrain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
-            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            if hasattr(self.hparams, "lr_annealing"):
+                old_lr, new_lr = self.hparams.lr_annealing(stage_stats["WER"])
+                sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            else:
+                old_lr = self.optimizer.param_groups[0]["lr"]
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": old_lr},
                 train_stats=self.train_stats,
@@ -1024,6 +923,7 @@ class AdvASRBrain(ASRBrain):
             self.checkpointer.save_and_keep_only(
                 meta={"WER": stage_stats["WER"]},
                 min_keys=["WER"],
+                num_to_keep=self.hparams.num_to_keep if "num_to_keep" in self.hparams.__dict__ else 1
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -1096,3 +996,141 @@ class AdvASRBrain(ASRBrain):
             A tensor with the computed loss.
         """
         raise NotImplementedError
+
+
+class EnsembleASRBrain(AdvASRBrain):
+    """
+    Ensemble of multiple brains.
+    This class is used for attacks that compute adversarial noise
+    simultaneously on multiple models.
+    """
+
+    def __init__(self, asr_brains, ref_valid_test=-1, ref_attack=None, ref_train=None):
+        self.asr_brains = asr_brains
+        self.ref_valid_test = ref_valid_test  # use this model to return tokens
+        self.ref_attack = ref_attack
+        self.ref_train = ref_train
+
+    @property
+    def nmodels(self):
+        """Number of models in the ensemble"""
+        return len(self.asr_brains)
+
+    def compute_forward(self, batch, stage, model_idx=None):
+        """
+        forward pass of all  or one model(s)
+        """
+        # concatenate predictions
+        if model_idx is not None:
+            return self.asr_brains[model_idx].compute_forward(batch, stage)
+        elif stage == rs.Stage.ATTACK and self.ref_attack is not None:
+            return self.asr_brains[self.ref_attack].compute_forward(batch, stage)
+        elif stage == sb.Stage.TRAIN and self.ref_train is not None:
+            return self.asr_brains[self.ref_train].compute_forward(batch, stage)
+        elif stage in [sb.Stage.VALID, sb.Stage.TEST] and self.ref_valid_test is not None:
+            return self.asr_brains[self.ref_valid_test].compute_forward(batch, stage)
+        predictions = []
+        for asr_brain in self.asr_brains:
+            pred = asr_brain.compute_forward(batch, stage)
+            predictions.append(pred)
+        predictions = PredictionEnsemble(predictions, ensemble_brain=self)
+        return predictions
+
+    def get_tokens(self, predictions, all_models=False, model_idx=None):
+        """
+        Extract tokens from predictions.
+
+        :param predictions: model predictions
+        :param all: whether to extract all tokens or just one
+        :param model_idx: which model to extract tokens from
+        (defaults to self.ref_train, self.ref_attack or self.valid_test depending on stage)
+        """
+        if isinstance(predictions, PredictionEnsemble) and predictions.ensemble_brain == self:
+            assert len(predictions) == self.nmodels
+            if all:
+                return [
+                    self.asr_brains[i].get_tokens(pred)
+                    for i, pred in enumerate(predictions)
+                ]
+            if model_idx is not None:
+                return self.asr_brains[model_idx].get_tokens(predictions[model_idx])
+            return self.asr_brains[self.ref_valid_test].get_tokens(
+                predictions[self.ref_valid_test]
+            )
+        return self.asr_brains[self.ref_valid_test].get_tokens(predictions)
+
+    def compute_objectives(
+        self,
+        predictions,
+        batch,
+        stage,
+        adv=False,
+        targeted=False,
+        reduction="mean",
+        average=True,
+        model_idx=None,
+    ):
+        """
+        Compute the losses of all or one model
+        """
+        # concatenate of average objectives
+        if (
+            isinstance(
+                predictions, PredictionEnsemble) and predictions.ensemble_brain == self
+        ):  # many predictions
+            assert len(predictions) == self.nmodels
+            losses = []
+            for i in range(self.nmodels):
+                # one pred per model or n pred per model
+                asr_brain = (
+                    self.asr_brains[i]
+                    if model_idx is None
+                    else self.asr_brains[model_idx]
+                )
+                pred = (
+                    predictions[i]
+                    if isinstance(predictions, PredictionEnsemble)
+                    else predictions
+                )
+                loss = asr_brain.compute_objectives(
+                    pred, batch, stage, adv=adv, reduction=reduction
+                )
+                losses.append(loss)
+            losses = torch.stack(losses, dim=0)
+            if average:
+                return torch.mean(losses, dim=0)
+            return losses
+        if model_idx is None:
+            if stage == rs.Stage.ATTACK and self.ref_attack is not None:
+                model_idx = self.ref_attack
+            elif stage == sb.Stage.TRAIN and self.ref_train is not None:
+                model_idx = self.ref_train
+            elif (stage == sb.Stage.VALID or stage == sb.Stage.TEST) and self.ref_train is not None:
+                model_idx = self.ref_valid_test
+        return self.asr_brains[model_idx].compute_objectives(
+            predictions, batch, stage, adv=adv, targeted=targeted, reduction=reduction
+        )
+
+    def __setattr__(self, name, value):  # useful to set tokenizer
+        if name not in ["asr_brains", "ref_attack", "ref_train", "ref_valid_test"]:
+            for brain in self.asr_brains:
+                brain.__setattr__(name, value)
+        super(EnsembleASRBrain, self).__setattr__(name, value)
+
+    def module_train(self):
+        """
+        Set PyTorch modules to training mode
+        """
+        for brain in self.asr_brains:
+            brain.module_train()
+
+    def module_eval(self):
+        """
+        Set PyTorch modules to eval mode
+        """
+        for brain in self.asr_brains:
+            brain.module_eval()
+
+    @property
+    def device(self):
+        return self.asr_brains[0].device

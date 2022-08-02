@@ -71,34 +71,49 @@ def find_closest_length_string(string, str_list, short_only=True):
     return str_list[best]
 
 
-def replace_tokens_in_batch(batch, sent, tokenizer, hparams):
-    """Make a padded batch from a raw waveform, words and tokens"""
-    assert batch.batchsize == 1, "targeted attacks only support batch size 1"
-    if isinstance(sent, list):  # list of possible targets to choose from
-        sent = find_closest_length_string(batch.wrd[0], sent)
-    if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
-        tokens = tokenizer.encode_sequence(list(sent))
-    else:
-        tokens = tokenizer.encode_as_ids(sent)
+class TargetGenerator:
+    def replace_tokens_in_batch(self, batch, tokenizer, hparams):
+        """Make a padded batch from a raw waveform, words and tokens"""
+        assert batch.batchsize == 1, "targeted attacks only support batch size 1"
+        sent = self.generate_targets(batch, hparams)
+        if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
+            tokens = tokenizer.encode_sequence(list(sent))
+        else:
+            tokens = tokenizer.encode_as_ids(sent)
 
-    tokens_list = tokens
-    tokens_bos = torch.LongTensor([hparams.bos_index] + (tokens_list))
-    tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index])
-    tokens = torch.LongTensor(tokens_list)
-    dic = {
-        "id": batch.id[0],
-        "sig": batch.sig[0][0],
-        "tokens_list": tokens_list,
-        "tokens_bos": tokens_bos,
-        "tokens_eos": tokens_eos,
-        "tokens": tokens,
-    }
-    if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
-        dic["char_list"] = list(sent)
+        tokens_list = tokens
+        tokens_bos = torch.LongTensor([hparams.bos_index] + (tokens_list))
+        tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index])
+        tokens = torch.LongTensor(tokens_list)
+        dic = {
+            "id": batch.id[0],
+            "sig": batch.sig[0][0],
+            "tokens_list": tokens_list,
+            "tokens_bos": tokens_bos,
+            "tokens_eos": tokens_eos,
+            "tokens": tokens,
+        }
+        if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
+            dic["char_list"] = list(sent)
 
-    dic["wrd"] = sent
-    new_batch = PaddedBatch([dic])
-    return new_batch
+        dic["wrd"] = sent
+        new_batch = PaddedBatch([dic])
+        return new_batch\
+
+
+    def generate_targets(self, batch, hparams):
+        raise NotImplementedError
+
+
+class TargetGeneratorFromFixedTargets(TargetGenerator):
+    def __init__(self, target):
+        self.target = target
+
+    def generate_targets(self, batch, hparams):
+        if isinstance(self.target, list):  # list of possible targets to choose from
+            sent = find_closest_length_string(batch.wrd[0], self.target)
+            return sent
+        return self.target
 
 
 def transcribe_batch(asr_brain, batch):

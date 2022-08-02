@@ -1,7 +1,9 @@
 import logging
 import os
 import sys
-
+from typing import Iterable
+import numpy as np
+import torch.nn.functional as F
 import speechbrain as sb
 import torch
 import torch.nn as nn
@@ -10,13 +12,15 @@ from transformers import (
     HubertConfig,
     HubertModel,
     Wav2Vec2Config,
+    Wav2Vec2ConformerConfig,
     Wav2Vec2FeatureExtractor,
     Wav2Vec2Model,
+    Wav2Vec2ConformerModel,
     Data2VecAudioConfig,
     Data2VecAudioModel,
 )
 from transformers.models.data2vec.modeling_data2vec_audio import Data2VecAudioFeatureEncoder
-
+from speechbrain.pretrained.fetching import fetch
 import transformers
 from speechbrain.lobes.models.huggingface_wav2vec import HuggingFaceWav2Vec2Pretrain, HF_models, HF_config
 from transformers import Wav2Vec2ForPreTraining
@@ -70,6 +74,7 @@ class AdvWav2Vec2FeatureEncoder(Wav2Vec2PretrainFeatureExtractor):
 
         return hidden_states
 
+
 class AdvData2VecAudioFeatureEncoder(Data2VecAudioFeatureEncoder):
     def forward(self, input_values):
         hidden_states = input_values[:, None]
@@ -95,6 +100,7 @@ class AdvData2VecAudioFeatureEncoder(Data2VecAudioFeatureEncoder):
                 hidden_states = conv_layer(hidden_states)
 
         return hidden_states
+
 
 class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
     """
@@ -195,7 +201,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             # 5. if a negative vector is identical to the positive
             # (i.e. when codebook utilization is low),
             # its cosine similarity will be masked
-            neg_is_pos = (quantized_features == negative_quantized_features).all(-1)
+            neg_is_pos = (quantized_features ==
+                          negative_quantized_features).all(-1)
 
             if neg_is_pos.any():
                 logits[1:][neg_is_pos] = float("-inf")
@@ -203,7 +210,8 @@ class AdvWav2Vec2ForPreTraining(Wav2Vec2ForPreTraining):
             # 6. compute contrastive loss \mathbf{L}_m = cross_entropy(logs) =
             # -log(exp(sim(c_t, q_t)/\kappa) / \sum_{\sim{q}} exp(sim(c_t, \sim{q})/\kappa))
             logits = logits.transpose(0, 2).reshape(-1, logits.size(0))
-            target = ((1 - mask_time_indices.long()) * -100).transpose(0, 1).flatten()
+            target = ((1 - mask_time_indices.long())
+                      * -100).transpose(0, 1).flatten()
 
             contrastive_loss = torch.nn.functional.cross_entropy(
                 logits.float(), target, reduction="sum"
@@ -270,6 +278,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         mask_prob=0.65,
         mask_length=10,
         normalize_wav=True,
+        load_pretrained_weights=False
     ):
         super(AdvHuggingFaceWav2Vec2Pretrain, self).__init__(
             source,
@@ -278,7 +287,18 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             mask_length=mask_length,
             normalize_wav=normalize_wav,
         )
-        self.model = AdvWav2Vec2ForPreTraining.from_pretrained(source)
+        if load_pretrained_weights:
+            self.model = AdvWav2Vec2ForPreTraining.from_pretrained(
+                source, load_weight=load_pretrained_weights)
+        else:
+            self.config = Wav2Vec2PretrainConfig.from_pretrained(
+                source, cache_dir=save_path
+            )
+            self.config.output_hidden_states = (
+                True  # We want the hidden states as well!
+            )
+
+            self.model = AdvWav2Vec2ForPreTraining(self.config)
 
     def forward(self, wav, quantized_representation=None):
         """Takes an input waveform and return its corresponding wav2vec encoding.
@@ -317,7 +337,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
         # print(np.sum(mask_time_indices, axis=1))
         negative_sample_indices = torch.tensor(
             transformers.models.wav2vec2.modeling_wav2vec2._sample_negative_indices(
-                (batch_size, sequence_length),
+                (batch_size, sequence_length.numpy()),
                 num_negatives=self.config.num_negatives,
                 mask_time_indices=full_sentence_indices,
             ),
@@ -334,6 +354,7 @@ class AdvHuggingFaceWav2Vec2Pretrain(HuggingFaceWav2Vec2Pretrain):
             torch_mask_time_indices,
         )
 
+
 class AdvWav2Vec2Model(Wav2Vec2Model):
     """
     This class modifies the transformers Wav2Vec2 module
@@ -344,6 +365,18 @@ class AdvWav2Vec2Model(Wav2Vec2Model):
         super().__init__(config)
         self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
 
+
+class AdvWav2Vec2ConformerModel(Wav2Vec2ConformerModel):
+    """
+    This class modifies the transformers Wav2Vec2 module
+     in order to replace the Feature Extractor with AdvWav2Vec2FeatureEncoder
+    """
+
+    def __init__(self, config: Wav2Vec2ConformerConfig):
+        super().__init__(config)
+        self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
+
+
 class AdvHubertModel(HubertModel):
     """
     This class modifies the transformers Wav2Vec2 module
@@ -353,6 +386,7 @@ class AdvHubertModel(HubertModel):
     def __init__(self, config: HubertConfig):
         super().__init__(config)
         self.feature_extractor = AdvWav2Vec2FeatureEncoder(config)
+
 
 class AdvData2VecAudioModel(Data2VecAudioModel):
     """
@@ -367,9 +401,19 @@ class AdvData2VecAudioModel(Data2VecAudioModel):
 
 Adv_HF_models = {
     "wav2vec2": AdvWav2Vec2Model,
+    "wav2vec2-conformer": AdvWav2Vec2ConformerModel,
     "hubert": AdvHubertModel,
     "data2vec": AdvData2VecAudioModel
 }
+
+
+Adv_HF_config = {
+    "wav2vec2": Wav2Vec2Config,
+    "hubert": HubertConfig,
+    "wav2vec2-conformer": Wav2Vec2ConformerConfig,
+    "data2vec": Data2VecAudioConfig
+}
+
 
 class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
     """This class inherits the SpeechBrain Wav2Vec2 lobe and
@@ -408,9 +452,9 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
         freeze_feature_extractor=False,
         apply_spec_augment=False,
         load_pretrained_weights=True,
+        dropout=None,
     ):
         nn.Module.__init__(self)
-
         # Download the extractor from HuggingFace.
         # The extractor is only used to retrieve the normalisation information
         self.feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
@@ -419,21 +463,24 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
 
         # Select specific self-supervised loader (eg. Wav2Vec2, Hubert)
         if "hubert" in source:
-            config = HF_config.get("hubert")
+            config = Adv_HF_config.get("hubert")
             model = Adv_HF_models.get("hubert")
         elif "data2vec" in source:
-            config = HF_config.get("data2vec")
+            config = Adv_HF_config.get("data2vec")
             model = Adv_HF_models.get("data2vec")
+        elif "wav2vec2-conformer" in source:
+            config = Adv_HF_config.get("wav2vec2-conformer")
+            model = Adv_HF_models.get("wav2vec2-conformer")
         else:
-            config = HF_config.get("wav2vec2")
+            config = Adv_HF_config.get("wav2vec2")
             model = Adv_HF_models.get("wav2vec2")
 
         # Download and load the model
-        self._from_pretrained(source, config=config, model=model, save_path=save_path, load_weights=load_pretrained_weights)
+        self._from_pretrained(source, config=config, model=model,
+                              save_path=save_path, load_weights=load_pretrained_weights, dropout=dropout)
 
         # set apply_spec_augment
         self.model.config.apply_spec_augment = apply_spec_augment
-
         # We check if inputs need to be normalized w.r.t pretrained wav2vec2
         self.normalize_wav = self.feature_extractor.do_normalize
 
@@ -452,3 +499,61 @@ class AdvHuggingFaceWav2Vec2(HuggingFaceWav2Vec2):
             if self.freeze_feature_extractor:
                 self.model.feature_extractor._freeze_parameters()
 
+    def _from_pretrained(self, source, config, model, save_path, load_weights, dropout=None):
+        """This function manages the source checking and loading of the params.
+        # 1. Is the model from HF or a local path
+        # 2. Is the model pretrained with HF or SpeechBrain
+        # 3. Download (if appropriate) and load with respect to 1. and 2.
+        """
+
+        def override_dropout(config, dropout):
+            if isinstance(config, dict):
+                for key in config:
+                    if isinstance(config[key], dict):
+                        override_dropout(config[key], dropout)
+                    elif isinstance(key, str) and "dropout" in key and config[key] > 0:
+                        config[key] = dropout
+            elif isinstance(config, list):
+                return
+            else:
+                override_dropout(config.__dict__, dropout)
+        config = config.from_pretrained(source, cache_dir=save_path)
+        if dropout:
+            override_dropout(config, dropout)
+
+        if not load_weights:
+            self.model = model(config)
+            return
+        else:
+            is_sb, ckpt_file = self._check_model_source(source)
+            if is_sb:
+                self.model = model(config)
+                self.model.gradient_checkpointing_disable()  # Required by DDP
+                # fetch the checkpoint file
+                ckpt_full_path = fetch(
+                    filename=ckpt_file, source=source, savedir=save_path
+                )
+                # We transfer the parameters from the checkpoint.
+                self._load_sb_pretrained_w2v2_parameters(ckpt_full_path)
+            else:
+                self.model = model.from_pretrained(
+                    source, config=config, cache_dir=save_path)
+
+    def extract_features(self, wav):
+        """Takes an input waveform and return its corresponding wav2vec encoding.
+
+        Arguments
+        ---------
+        wav : torch.Tensor (signal)
+            A batch of audio signals to transform to features.
+        """
+
+        if self.normalize_wav:
+            wav = F.layer_norm(wav, wav.shape)
+
+        # Extract wav2vec output
+        out = self.model(wav)[0]
+        # We normalize the output if required
+        if self.output_norm:
+            out = F.layer_norm(out, out.shape)
+        return out

@@ -275,6 +275,9 @@ class ImperceptibleASRAttack(Attacker):
         # Optimization loop
         successful_adv_input: List[Optional["torch.Tensor"]] = [
             None] * local_batch_size
+        best_adv_input: List[Optional["torch.Tensor"]] = [
+            None] * local_batch_size
+        best_loss_1st_stage = [np.inf] * local_batch_size
         trans = [None] * local_batch_size
 
         for iter_1st_stage_idx in range(self.max_iter_1):
@@ -284,6 +287,7 @@ class ImperceptibleASRAttack(Attacker):
             # Call to forward pass
             (
                 loss,
+                loss_eval,
                 local_delta,
                 decoded_output,
                 masked_adv_input,
@@ -301,7 +305,6 @@ class ImperceptibleASRAttack(Attacker):
             # Get sign of the gradients
             self.global_optimal_delta.grad = torch.sign(
                 self.global_optimal_delta.grad)
-
             # Do optimization
             self.optimizer_1.step()
 
@@ -336,7 +339,6 @@ class ImperceptibleASRAttack(Attacker):
                         if num_decrease_eps < self.max_num_decrease_eps:
                             rescale[local_batch_size_idx] *= self.decrease_factor_eps
                             num_decrease_eps += 1
-
                         # Save the best adversarial example
                         successful_adv_input[local_batch_size_idx] = masked_adv_input[
                             local_batch_size_idx
@@ -345,11 +347,16 @@ class ImperceptibleASRAttack(Attacker):
                             local_batch_size_idx
                         ]
 
+                    else:
+                        if loss_eval[local_batch_size_idx].item() < best_loss_1st_stage[local_batch_size_idx]:
+                            best_loss_1st_stage[local_batch_size_idx] = loss_eval[local_batch_size_idx].item()
+                            best_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx].clone()
+
             # If attack is unsuccessful
             if iter_1st_stage_idx == self.max_iter_1 - 1:
                 for local_batch_size_idx in range(local_batch_size):
                     if successful_adv_input[local_batch_size_idx] is None:
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                        successful_adv_input[local_batch_size_idx] = best_adv_input[
                             local_batch_size_idx
                         ]
                         trans[local_batch_size_idx] = decoded_output[
@@ -389,14 +396,17 @@ class ImperceptibleASRAttack(Attacker):
         # Compute loss and decoded output
         batch.sig = masked_adv_input, batch.sig[1]
         predictions = self.asr_brain.compute_forward(batch, rs.Stage.ATTACK)
-        loss = self.asr_brain.compute_objectives(
+        loss_backward = self.asr_brain.compute_objectives(
             predictions, batch, rs.Stage.ATTACK)
         self.asr_brain.module_eval()
         val_predictions = self.asr_brain.compute_forward(batch, sb.Stage.VALID)
         decoded_output = self.asr_brain.get_tokens(val_predictions)
         if self.train_mode_for_backward:
             self.asr_brain.module_train()
-        return loss, local_delta, decoded_output, masked_adv_input, local_delta_rescale
+
+        loss_eval = self.asr_brain.compute_objectives(
+            val_predictions, batch, sb.Stage.TRAIN, reduction="batch")
+        return loss_backward, loss_eval, local_delta, decoded_output, masked_adv_input, local_delta_rescale
 
     def _attack_2nd_stage(
         self,
@@ -459,6 +469,7 @@ class ImperceptibleASRAttack(Attacker):
             # Call to forward pass of the first stage
             (
                 loss_1st_stage,
+                loss_eval,
                 _,
                 decoded_output,
                 masked_adv_input,

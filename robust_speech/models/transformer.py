@@ -77,10 +77,9 @@ class TrfASR(AdvASRBrain):
         elif stage == sb.Stage.VALID:
             hyps = None
             current_epoch = self.hparams.epoch_counter.current
-            if current_epoch % self.hparams.valid_search_interval == 0:
-                # for the sake of efficiency, we only perform beamsearch with limited capacity
-                # and no LM to give user some idea of how the AM is doing
-                hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
+            # for the sake of efficiency, we only perform beamsearch with limited capacity
+            # and no LM to give user some idea of how the AM is doing
+            hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
         else:
             hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
 
@@ -128,36 +127,35 @@ class TrfASR(AdvASRBrain):
 
         if stage != sb.Stage.TRAIN and stage != rs.Stage.ATTACK:
             current_epoch = self.hparams.epoch_counter.current
-            valid_search_interval = self.hparams.valid_search_interval
-            if current_epoch % valid_search_interval == 0 or (stage == sb.Stage.TEST):
-                # Decode token terms to words
-                if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):
-                    predicted_words = [
-                        self.tokenizer.decode_ndim(utt_seq) for utt_seq in hyps
-                    ]
-                    predicted_words = ["".join(s).strip().split(" ")
-                                       for s in predicted_words]
+            # Decode token terms to words
+            if isinstance(self.tokenizer, sb.dataio.encoder.CTCTextEncoder):
+                predicted_words = [
+                    self.tokenizer.decode_ndim(utt_seq) for utt_seq in hyps
+                ]
+                predicted_words = ["".join(s).strip().split(" ")
+                                    for s in predicted_words]
+            else:
+                predicted_words = [
+                    self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps
+                ]
+            target_words = [wrd.split(" ") for wrd in batch.wrd]
+            if adv:
+                if targeted:
+                    self.adv_wer_metric_target.append(
+                        ids, predicted_words, target_words
+                    )
+                    self.adv_cer_metric_target.append(
+                        ids, predicted_words, target_words
+                    )
                 else:
-                    predicted_words = [
-                        self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps
-                    ]
-                target_words = [wrd.split(" ") for wrd in batch.wrd]
-                if adv:
-                    if targeted:
-                        self.adv_wer_metric_target.append(
-                            ids, predicted_words, target_words
-                        )
-                        self.adv_cer_metric_target.append(
-                            ids, predicted_words, target_words
-                        )
-                    else:
-                        self.adv_wer_metric.append(
-                            ids, predicted_words, target_words)
-                        self.adv_cer_metric.append(
-                            ids, predicted_words, target_words)
-                else:
-                    self.wer_metric.append(ids, predicted_words, target_words)
-                    self.cer_metric.append(ids, predicted_words, target_words)
+                    self.adv_wer_metric.append(
+                        ids, predicted_words, target_words)
+                    self.adv_cer_metric.append(
+                        ids, predicted_words, target_words)
+            else:
+                print(predicted_words, target_words)
+                self.wer_metric.append(ids, predicted_words, target_words)
+                self.cer_metric.append(ids, predicted_words, target_words)
 
         return loss
 

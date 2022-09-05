@@ -37,6 +37,6 @@ setup(
 =======
 >>>>>>> dev
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     url="https://github.com/RaphaelOlivier/robust_speech",
 )

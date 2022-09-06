@@ -31,11 +31,6 @@ setup(
         "transformers>=4.20.0",
         "speechbrain @ git+https://github.com/RaphaelOlivier/speechbrain.git",
         "audlib @ git+https://github.com/RaphaelOlivier/pyaudlib.git",
-<<<<<<< HEAD
-        "transformers>=4.18.0",
-        "torchvision",
-=======
->>>>>>> dev
     ],
     python_requires=">=3.8",
     url="https://github.com/RaphaelOlivier/robust_speech",

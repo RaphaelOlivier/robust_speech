@@ -153,7 +153,7 @@ class TrfASR(AdvASRBrain):
                     self.adv_cer_metric.append(
                         ids, predicted_words, target_words)
             else:
-                print(predicted_words, target_words)
+                #print(predicted_words, target_words)
                 self.wer_metric.append(ids, predicted_words, target_words)
                 self.cer_metric.append(ids, predicted_words, target_words)
 

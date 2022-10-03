@@ -121,7 +121,7 @@ For the Wav2Vec2 models things are slightly trickier. robust_speech can load Hug
 # in ./recipes/
 
 # This will train a model first
-python train_model.py train_configs/LibriSpeech/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub: facebook/wav2vec2-base-100h
+python train_model.py train_configs/LibriSpeech/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub=facebook/wav2vec2-base-100h
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/wav2vec2-base-100h/
 python evaluate.py attack_configs/LibriSpeech/pgd/w2v2_base_100h.yaml --root=/path/to/results/folder --snr=25
 ```

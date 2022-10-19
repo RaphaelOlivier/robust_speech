@@ -12,6 +12,7 @@ import torchaudio
 from speechbrain.dataio.batch import PaddedBatch  # noqa
 from speechbrain.dataio.preprocess import AudioNormalizer
 from speechbrain.pretrained import EncoderDecoderASR
+import sentencepiece
 from speechbrain.pretrained.fetching import fetch
 from speechbrain.utils.data_utils import split_path
 
@@ -78,12 +79,14 @@ class TargetGenerator:
         sent = self.generate_targets(batch, hparams)
         if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):
             tokens = tokenizer.encode_sequence(list(sent))
-        else:
+        elif isinstance(tokenizer, sentencepiece.SentencePieceProcessor):
             tokens = tokenizer.encode_as_ids(sent)
+        else:
+            tokens = tokenizer.encode(sent)
 
         tokens_list = tokens
-        tokens_bos = torch.LongTensor([hparams.bos_index] + (tokens_list))
-        tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index])
+        tokens_bos = torch.LongTensor([hparams.bos_index] + (tokens_list)) if "bos_index" in vars(hparams) else torch.LongTensor(tokens)
+        tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index]) if "eos_index" in vars(hparams) else torch.LongTensor(tokens)
         tokens = torch.LongTensor(tokens_list)
         dic = {
             "id": batch.id[0],
@@ -98,7 +101,7 @@ class TargetGenerator:
 
         dic["wrd"] = sent
         new_batch = PaddedBatch([dic])
-        return new_batch\
+        return new_batch
 
 
     def generate_targets(self, batch, hparams):

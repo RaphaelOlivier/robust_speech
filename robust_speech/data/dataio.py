@@ -21,7 +21,7 @@ import torch
 import torchaudio
 from speechbrain.dataio.dataio import load_pkl, merge_csvs, save_pkl
 from speechbrain.utils.data_utils import download_file, get_all_files
-
+import transformers 
 logger = logging.getLogger(__name__)
 OPT_FILE = "opt_librispeech_prepare.pkl"
 SAMPLERATE = 16000
@@ -169,8 +169,7 @@ def dataio_prepare(hparams):
             datasets,
             ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
         )
-    else:
-        assert isinstance(tokenizer, sentencepiece.SentencePieceProcessor)
+    elif isinstance(tokenizer, sentencepiece.SentencePieceProcessor):
 
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
@@ -184,6 +183,33 @@ def dataio_prepare(hparams):
                 [hparams["bos_index"]] + (tokens_list))
             yield tokens_bos
             tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])
+            yield tokens_eos
+            tokens = torch.LongTensor(tokens_list)
+            yield tokens
+
+        sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+
+        # 4. Set output:
+        sb.dataio.dataset.set_output_keys(
+            datasets,
+            ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+        )
+
+    else:
+        assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(tokenizer, transformers.PreTrainedTokenizer)
+        @sb.utils.data_pipeline.takes("wrd")
+        @sb.utils.data_pipeline.provides(
+            "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
+        )
+        def text_pipeline(wrd):
+            wrd = wrd
+            yield wrd
+            tokens_list = tokenizer.encode(wrd)
+            yield tokens_list
+            tokens_bos = torch.LongTensor(
+                [hparams["bos_index"]] + (tokens_list)) if "bos_index" in hparams else torch.LongTensor(tokens_list)
+            yield tokens_bos
+            tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])  if "eos_index" in hparams else torch.LongTensor(tokens_list)
             yield tokens_eos
             tokens = torch.LongTensor(tokens_list)
             yield tokens

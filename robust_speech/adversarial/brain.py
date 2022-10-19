@@ -485,17 +485,17 @@ class AdvASRBrain(ASRBrain):
             )
         else:
             batch_to_attack = batch
-
+        #print("original input",adv_wav.mean())
         predictions, adv_wav = self.compute_forward_adversarial(
             batch_to_attack, stage=stage
         )
-
+        #print("generated or loaded adv",adv_wav.mean())
         advloss, targetloss = None, None
         with torch.no_grad():
             targeted = target is not None and self.attacker.targeted
+            batch_to_attack.sig = adv_wav, batch_to_attack.sig[1]
 
             if self.voting_module is not None:
-                batch_to_attack.sig = adv_wav, batch_to_attack.sig[1]
                 predictions = self.compute_forward_with_voting(
                     batch_to_attack, stage)
 
@@ -865,6 +865,10 @@ class AdvASRBrain(ASRBrain):
             self.adv_wer_metric = self.hparams.error_rate_computer()
             self.adv_cer_metric_target = self.hparams.cer_computer()
             self.adv_wer_metric_target = self.hparams.error_rate_computer()
+            try:
+                self.adv_ser_metric_target = self.hparams.ser_computer()
+            except:
+                self.adv_ser_metric_target = None
 
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
@@ -907,6 +911,10 @@ class AdvASRBrain(ASRBrain):
                 stage_stats["adv WER target"] = self.adv_wer_metric_target.summarize(
                     "error_rate"
                 )
+                if self.adv_ser_metric_target is not None:
+                    stage_stats["adv SER target"] = self.adv_ser_metric_target.summarize(
+                        "error_rate"
+                    )
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:

@@ -253,6 +253,7 @@ class ImperceptibleASRAttack(Attacker):
         num_decrease_eps = 0
         # Compute local shape
         local_batch_size = batch.batchsize
+        assert local_batch_size==1, "Only batch size 1 is supported"
         real_lengths = (
             (batch.sig[1] * batch.sig[0].size(1)).long().detach().cpu().numpy()
         )
@@ -311,46 +312,50 @@ class ImperceptibleASRAttack(Attacker):
             # Save the best adversarial example and adjust the rescale
             # coefficient if successful
             if iter_1st_stage_idx % self.num_iter_decrease_eps == 0:
-                for local_batch_size_idx in range(local_batch_size):
-                    tokens = (
-                        batch.tokens[local_batch_size_idx]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                        .reshape(-1)
-                    )
-                    pred = np.array(
-                        decoded_output[local_batch_size_idx]).reshape(-1)
-                    if len(pred) == len(tokens) and (pred == tokens).all():
-                        # print("Found one")
-                        # Adjust the rescale coefficient
-                        max_local_delta = np.max(
-                            np.abs(
-                                local_delta[local_batch_size_idx].detach(
-                                ).cpu().numpy()
-                            )
+                local_batch_size_idx=0
+                tokens = (
+                    batch.tokens[local_batch_size_idx]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                    .reshape(-1)
+                )
+                pred = np.array(
+                    decoded_output[local_batch_size_idx]).reshape(-1)
+                if len(pred) == len(tokens) and (pred == tokens).all():
+                    # print("Found one")
+                    # Adjust the rescale coefficient
+                    max_local_delta = np.max(
+                        np.abs(
+                            local_delta[local_batch_size_idx].detach(
+                            ).cpu().numpy()
                         )
+                    )
 
-                        if (
-                            rescale[local_batch_size_idx][0] * self.eps
-                            > max_local_delta
-                        ):
-                            rescale[local_batch_size_idx] = max_local_delta / self.eps
-                        if num_decrease_eps < self.max_num_decrease_eps:
-                            rescale[local_batch_size_idx] *= self.decrease_factor_eps
-                            num_decrease_eps += 1
-                        # Save the best adversarial example
-                        successful_adv_input[local_batch_size_idx] = masked_adv_input[
-                            local_batch_size_idx
-                        ]
-                        trans[local_batch_size_idx] = decoded_output[
-                            local_batch_size_idx
-                        ]
-
+                    if (
+                        rescale[local_batch_size_idx][0] * self.eps
+                        > max_local_delta
+                    ):
+                        rescale[local_batch_size_idx] = max_local_delta / self.eps
+                    # Save the best adversarial example
+                    successful_adv_input[local_batch_size_idx] = masked_adv_input[
+                        local_batch_size_idx
+                    ]
+                    trans[local_batch_size_idx] = decoded_output[
+                        local_batch_size_idx
+                    ]
+                    if num_decrease_eps < self.max_num_decrease_eps:
+                        rescale[local_batch_size_idx] *= self.decrease_factor_eps
+                        num_decrease_eps += 1
+                        print("decrease",iter_1st_stage_idx)
                     else:
-                        if loss_eval[local_batch_size_idx].item() < best_loss_1st_stage[local_batch_size_idx]:
-                            best_loss_1st_stage[local_batch_size_idx] = loss_eval[local_batch_size_idx].item()
-                            best_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx].clone()
+                        print("early stopping",iter_1st_stage_idx)
+                        break
+
+                else:
+                    if loss_eval[local_batch_size_idx].item() < best_loss_1st_stage[local_batch_size_idx]:
+                        best_loss_1st_stage[local_batch_size_idx] = loss_eval[local_batch_size_idx].item()
+                        best_adv_input[local_batch_size_idx] = masked_adv_input[local_batch_size_idx].clone()
 
             # If attack is unsuccessful
             if iter_1st_stage_idx == self.max_iter_1 - 1:

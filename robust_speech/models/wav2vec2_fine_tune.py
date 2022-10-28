@@ -208,7 +208,8 @@ class W2VASR(AdvASRBrain):
         """Train the parameters given a single batch in input"""
         # check if we need to switch optimizer
         # if so change the optimizer from Adam to SGD
-
+        if not hasattr(self.hparams,"gradient_accumulation"):
+            self.hparams.gradient_accumulation=1
         predictions = self.compute_forward(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 

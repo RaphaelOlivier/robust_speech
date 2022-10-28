@@ -87,7 +87,7 @@ python evaluate.py attack_configs/LibriSpeech/pgd/s2s_1000bpe.yaml --root=/path/
 # in ./recipes/
 
 # This will train a model first
-python train.py train_configs/LibriSpeech/transformer_train.yaml --root=/path/to/results/folder
+python train_model.py train_configs/LibriSpeech/transformer_train.yaml --root=/path/to/results/folder
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/asr-transformer-transformerlm-librispeech/
 python evaluate.py attack_configs/LibriSpeech/pgd/trf_5000bpe.yaml --root=/path/to/results/folder --snr=25
 ```
@@ -121,7 +121,7 @@ For the Wav2Vec2 models things are slightly trickier. robust_speech can load Hug
 # in ./recipes/
 
 # This will train a model first
-python train.py train_configs/LibriSpeech/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub: facebook/wav2vec2-base-100h
+python train_model.py train_configs/LibriSpeech/wav2vec2_fine_tune.yaml --root=/path/to/results/folder --wav2vec2_hub=facebook/wav2vec2-base-100h
 mv /path/to/training/outputs/folder/*.ckpt /path/to/models/folder/wav2vec2-base-100h/
 python evaluate.py attack_configs/LibriSpeech/pgd/w2v2_base_100h.yaml --root=/path/to/results/folder --snr=25
 ```
@@ -174,15 +174,12 @@ Snippets of code have been copy-pasted from packages [SpeechBrain](https://githu
 If you are using robust_speeech for your experiments please cite [this paper](https://arxiv.org/abs/2203.16536):
 
 ```bibtex
-@misc{https://doi.org/10.48550/arxiv.2203.16536,
-  doi = {10.48550/ARXIV.2203.16536},
+@article{Olivier2022RI,
   url = {https://arxiv.org/abs/2203.16536},
   author = {Olivier, Raphael and Raj, Bhiksha},
-  keywords = {Cryptography and Security (cs.CR), Artificial Intelligence (cs.AI), Machine Learning (cs.LG), Sound (cs.SD), Audio and Speech Processing (eess.AS), FOS: Computer and information sciences, FOS: Computer and information sciences, FOS: Electrical engineering, electronic engineering, information engineering, FOS: Electrical engineering, electronic engineering, information engineering},
   title = {Recent improvements of ASR models in the face of adversarial attacks},
-  publisher = {arXiv},
+  journal = {Interspeech},
   year = {2022},  
-  copyright = {arXiv.org perpetual, non-exclusive license}
 }
 
 ```

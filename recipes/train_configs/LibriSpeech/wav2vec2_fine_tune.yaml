@@ -90,7 +90,7 @@ augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
    speeds: [95, 100, 105]
 
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, null, 1024]
+   input_shape: [null, null, !ref <dnn_neurons>]
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>

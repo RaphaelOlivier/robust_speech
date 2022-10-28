@@ -134,15 +134,16 @@ model: !new:torch.nn.ModuleList
 
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
-opt_class: null
+
+wav2vec_opt_class: !name:torch.optim.Adam
+   lr: !ref <lr_wav2vec>
+
+opt_class: !ref <wav2vec_opt_class>
 
 model_opt_class: !name:torch.optim.Adadelta
    lr: !ref <lr>
    rho: 0.95
    eps: 1.e-8
-
-wav2vec_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wav2vec>
 
 lr_annealing_model: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>

@@ -187,9 +187,10 @@ class W2VASR(AdvASRBrain):
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
-        self.optimizer = self.hparams.opt_class(
-            self.hparams.model.parameters()
-        )
+        if hasattr(self.hparams,"opt_class"):
+            self.optimizer = self.hparams.opt_class(
+                self.hparams.model.parameters()
+            )
 
         if self.checkpointer is not None:
             self.checkpointer.add_recoverable("optimizer", self.optimizer)

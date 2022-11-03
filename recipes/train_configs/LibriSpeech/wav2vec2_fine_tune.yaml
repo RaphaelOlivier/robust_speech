@@ -41,7 +41,7 @@ dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Training parameters
 number_of_epochs: 1
-lr: 0.9
+lr: 0.001
 lr_wav2vec: 0.0001
 sorting: ascending
 auto_mix_prec: False

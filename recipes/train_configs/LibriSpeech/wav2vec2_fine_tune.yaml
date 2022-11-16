@@ -41,7 +41,7 @@ dataio_prepare_fct: !name:robust_speech.data.dataio.dataio_prepare
 
 # Training parameters
 number_of_epochs: 1
-lr: 0.9
+lr: 0.001
 lr_wav2vec: 0.0001
 sorting: ascending
 auto_mix_prec: False
@@ -51,7 +51,7 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 8
+batch_size: 1
 val_batch_size: 2
 test_batch_size: 1
 
@@ -90,7 +90,7 @@ augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
    speeds: [95, 100, 105]
 
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, null, 1024]
+   input_shape: [null, null, !ref <dnn_neurons>]
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
@@ -134,15 +134,16 @@ model: !new:torch.nn.ModuleList
 
 tokenizer: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
-opt_class: null
+
+wav2vec_opt_class: !name:torch.optim.Adam
+   lr: !ref <lr_wav2vec>
+
+opt_class: !ref <wav2vec_opt_class>
 
 model_opt_class: !name:torch.optim.Adadelta
    lr: !ref <lr>
    rho: 0.95
    eps: 1.e-8
-
-wav2vec_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wav2vec>
 
 lr_annealing_model: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>

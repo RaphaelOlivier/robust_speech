@@ -136,7 +136,6 @@ def dataio_prepare(hparams):
 
     # 3. Define text pipeline:
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):  # char encoder
-        tokenizer.add_unk()
 
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
@@ -177,6 +176,8 @@ def dataio_prepare(hparams):
                 special_labels=special_labels,
                 sequence_input=True,
             )
+            tokenizer.add_unk()
+            tokenizer.save(path=lab_enc_file)
 
         # 4. Set output:
         sb.dataio.dataset.set_output_keys(

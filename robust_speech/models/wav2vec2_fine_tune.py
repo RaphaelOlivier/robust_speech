@@ -196,9 +196,10 @@ class W2VASR(AdvASRBrain):
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
-        self.optimizer = self.hparams.opt_class(
-            self.hparams.model.parameters()
-        )
+        if hasattr(self.hparams,"opt_class"):
+            self.optimizer = self.hparams.opt_class(
+                self.hparams.model.parameters()
+            )
 
         if self.checkpointer is not None:
             self.checkpointer.add_recoverable("optimizer", self.optimizer)
@@ -207,7 +208,8 @@ class W2VASR(AdvASRBrain):
         """Train the parameters given a single batch in input"""
         # check if we need to switch optimizer
         # if so change the optimizer from Adam to SGD
-
+        if not hasattr(self.hparams,"gradient_accumulation"):
+            self.hparams.gradient_accumulation=1
         predictions = self.compute_forward(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
 

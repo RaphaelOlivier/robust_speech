@@ -21,7 +21,7 @@ import torch
 import torchaudio
 from speechbrain.dataio.dataio import load_pkl, merge_csvs, save_pkl
 from speechbrain.utils.data_utils import download_file, get_all_files
-import transformers 
+import transformers
 logger = logging.getLogger(__name__)
 OPT_FILE = "opt_librispeech_prepare.pkl"
 SAMPLERATE = 16000
@@ -31,6 +31,9 @@ def dataio_prepare(hparams):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
     data_folder = hparams["data_folder"]
+    for k in "num_train_points", "num_valid_points", "num_test_points":
+        if k not in hparams:
+            hparams[k] = None
 
     train_data = None
     if "train_csv" in hparams:
@@ -46,20 +49,27 @@ def dataio_prepare(hparams):
         if hparams["sorting"] == "ascending":
             # we sort training data to speed up training and get better
             # results.
-            train_data = train_data.filtered_sorted(sort_key="duration")
+            train_data = train_data.filtered_sorted(
+                sort_key="duration",
+                select_n=hparams["num_train_points"])
             # when sorting do not shuffle in dataloader ! otherwise is
             # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "descending":
             train_data = train_data.filtered_sorted(
-                sort_key="duration", reverse=True)
+                sort_key="duration", reverse=True,
+                select_n=hparams["num_train_points"])
             # when sorting do not shuffle in dataloader ! otherwise is
             # pointless
             hparams["train_dataloader_opts"]["shuffle"] = False
 
         elif hparams["sorting"] == "random":
-            pass
+            train_data = train_data.filtered_sorted(
+                select_n=hparams["num_train_points"])
+            # when sorting do not shuffle in dataloader ! otherwise is
+            # pointless
+            hparams["train_dataloader_opts"]["shuffle"] = True
 
         else:
             raise NotImplementedError(
@@ -74,7 +84,8 @@ def dataio_prepare(hparams):
         # valid_data = valid_data.filtered_sorted(sort_key="duration")
 
         valid_data = valid_data.filtered_sorted(
-            key_max_value={"duration": hparams["avoid_if_longer_than"]}
+            key_max_value={"duration": hparams["avoid_if_longer_than"]},
+            select_n=hparams["num_valid_points"]
         )
 
     # test is separate
@@ -92,6 +103,9 @@ def dataio_prepare(hparams):
                 test_datasets[name] = test_datasets[name].filtered_sorted(
                     key_max_value={"duration": hparams["avoid_if_longer_than"]}
                 )
+            test_datasets[name] = test_datasets[name].filtered_sorted(
+                select_n=hparams["num_test_points"]
+            )
     datasets = []
     if train_data:
         datasets.append(train_data)
@@ -196,7 +210,9 @@ def dataio_prepare(hparams):
         )
 
     else:
-        assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(tokenizer, transformers.PreTrainedTokenizer)
+        assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(
+            tokenizer, transformers.PreTrainedTokenizer)
+
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(
             "wrd", "tokens_list", "tokens_bos", "tokens_eos", "tokens"
@@ -209,7 +225,8 @@ def dataio_prepare(hparams):
             tokens_bos = torch.LongTensor(
                 [hparams["bos_index"]] + (tokens_list)) if "bos_index" in hparams else torch.LongTensor(tokens_list)
             yield tokens_bos
-            tokens_eos = torch.LongTensor(tokens_list + [hparams["eos_index"]])  if "eos_index" in hparams else torch.LongTensor(tokens_list)
+            tokens_eos = torch.LongTensor(
+                tokens_list + [hparams["eos_index"]]) if "eos_index" in hparams else torch.LongTensor(tokens_list)
             yield tokens_eos
             tokens = torch.LongTensor(tokens_list)
             yield tokens

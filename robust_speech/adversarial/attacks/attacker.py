@@ -22,7 +22,7 @@ class Attacker:
         if the attack is targeted.
     """
 
-    def on_evaluation_start(self, load_audio=False, save_audio_path=None, sample_rate=16000):
+    def on_evaluation_start(self, load_audio=False, save_audio_path=None, sample_rate=16000, log_snr=True):
         """
         Method to run at the beginning of an evaluation phase with adverersarial attacks.
 
@@ -38,7 +38,8 @@ class Attacker:
         if self.load_audio and (save_audio_path is None):
             raise ValueError(
                 "save_audio_path must be provided in order to load audio files")
-        self.snr_metric = SNRComputer()
+        if log_snr:
+            self.snr_metric = SNRComputer()
         self.save_audio_path = save_audio_path
         if self.save_audio_path:
             self.audio_saver = AudioSaver(save_audio_path, sample_rate)
@@ -52,16 +53,17 @@ class Attacker:
         logger: sb.utils,train_logger.FileLogger
             path to the folder in which to save audio files
         """
-        snr = self.snr_metric.summarize()
-        snr = {
-            "average": snr["average"],
-            "min_score": snr["min_score"],
-            "max_score": snr["max_score"],
-        }
-        logger.log_stats(
-            stats_meta={},
-            test_stats={"Adversarial SNR": snr},
-        )
+        if hasattr(self, "snr_metric"):
+            snr = self.snr_metric.summarize()
+            snr = {
+                "average": snr["average"],
+                "min_score": snr["min_score"],
+                "max_score": snr["max_score"],
+            }
+            logger.log_stats(
+                stats_meta={},
+                test_stats={"Adversarial SNR": snr},
+            )
 
     def perturb_and_log(self, batch, target=None):
         """
@@ -83,7 +85,8 @@ class Attacker:
             adv_wav = self.perturb(batch)
             if self.save_audio_path:
                 self.audio_saver.save(batch.id, batch, adv_wav)
-        self.snr_metric.append(batch.id, batch, adv_wav)
+        if hasattr(self, "snr_metric"):
+            self.snr_metric.append(batch.id, batch, adv_wav)
         return adv_wav
 
     def perturb(self, batch):

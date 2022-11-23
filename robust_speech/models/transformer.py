@@ -70,18 +70,20 @@ class TrfASR(AdvASRBrain):
             # output layer for seq2seq log-probabilities
             pred = self.modules.seq_lin(pred)
             p_seq = self.hparams.log_softmax(pred)
+            
         # Compute outputs
-        hyps = None
-        if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
+        with torch.no_grad():
             hyps = None
-        elif stage == sb.Stage.VALID:
-            hyps = None
-            current_epoch = self.hparams.epoch_counter.current
-            # for the sake of efficiency, we only perform beamsearch with limited capacity
-            # and no LM to give user some idea of how the AM is doing
-            hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
-        else:
-            hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
+            if stage == sb.Stage.TRAIN or stage == rs.Stage.ATTACK:
+                hyps = None
+            elif stage == sb.Stage.VALID:
+                hyps = None
+                current_epoch = self.hparams.epoch_counter.current
+                # for the sake of efficiency, we only perform beamsearch with limited capacity
+                # and no LM to give user some idea of how the AM is doing
+                hyps, _ = self.hparams.valid_search(enc_out.detach(), wav_lens)
+            else:
+                hyps, _ = self.hparams.test_search(enc_out.detach(), wav_lens)
 
         return p_ctc, p_seq, wav_lens, hyps
 

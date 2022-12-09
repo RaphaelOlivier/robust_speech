@@ -85,8 +85,10 @@ class TargetGenerator:
             tokens = tokenizer.encode(sent)
 
         tokens_list = tokens
-        tokens_bos = torch.LongTensor([hparams.bos_index] + (tokens_list)) if "bos_index" in vars(hparams) else torch.LongTensor(tokens)
-        tokens_eos = torch.LongTensor(tokens_list + [hparams.eos_index]) if "eos_index" in vars(hparams) else torch.LongTensor(tokens)
+        tokens_bos = torch.LongTensor([hparams.bos_index] + (
+            tokens_list)) if "bos_index" in vars(hparams) else torch.LongTensor(tokens)
+        tokens_eos = torch.LongTensor(
+            tokens_list + [hparams.eos_index]) if "eos_index" in vars(hparams) else torch.LongTensor(tokens)
         tokens = torch.LongTensor(tokens_list)
         dic = {
             "id": batch.id[0],
@@ -102,7 +104,6 @@ class TargetGenerator:
         dic["wrd"] = sent
         new_batch = PaddedBatch([dic])
         return new_batch
-
 
     def generate_targets(self, batch, hparams):
         raise NotImplementedError
@@ -170,10 +171,10 @@ def rand_assign(delta, order, eps):
 def l2_clamp_or_normalize(tensor, eps=None):
     """Clamp tensor to eps in L2 norm (or normalize if eps is None"""
     xnorm = torch.norm(tensor, dim=list(range(1, tensor.dim())))
-    if eps:
+    if eps is not None:
         coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
     else:
-        coeff = 1.0 / xnorm
+        coeff = (1.0 / xnorm).unsqueeze(1)
     return coeff * tensor
 
 

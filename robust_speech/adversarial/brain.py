@@ -298,7 +298,7 @@ class AdvASRBrain(ASRBrain):
             Directly passed to ``compute_objectives()``.
         """
 
-        assert stage != rs.Stage.ATTACK
+        # assert stage != rs.Stage.ATTACK
         wavs = batch.sig[0]
         if self.attacker is not None:
             if stage == sb.Stage.TEST:

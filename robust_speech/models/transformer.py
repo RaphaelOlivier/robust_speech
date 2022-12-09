@@ -27,8 +27,7 @@ class TrfASR(AdvASRBrain):
 
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
-        if not stage == rs.Stage.ATTACK:
-            batch = batch.to(self.device)
+        batch = batch.to(self.device)
         wavs, wav_lens = batch.sig
         tokens_bos, _ = batch.tokens_bos
 
@@ -70,7 +69,7 @@ class TrfASR(AdvASRBrain):
             # output layer for seq2seq log-probabilities
             pred = self.modules.seq_lin(pred)
             p_seq = self.hparams.log_softmax(pred)
-            
+
         # Compute outputs
         with torch.no_grad():
             hyps = None
@@ -135,7 +134,7 @@ class TrfASR(AdvASRBrain):
                     self.tokenizer.decode_ndim(utt_seq) for utt_seq in hyps
                 ]
                 predicted_words = ["".join(s).strip().split(" ")
-                                    for s in predicted_words]
+                                   for s in predicted_words]
             else:
                 predicted_words = [
                     self.tokenizer.decode_ids(utt_seq).split(" ") for utt_seq in hyps

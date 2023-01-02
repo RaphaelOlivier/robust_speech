@@ -10,7 +10,7 @@ import os
 import random
 from collections import Counter
 from pathlib import Path
-
+from tqdm.contrib import tzip
 import sentencepiece
 import speechbrain as sb
 import torch
@@ -94,40 +94,40 @@ def prepare_librispeech(
     # Check if this phase is already done (if so, skip it)
     if skip(splits, save_folder, conf) and skip_prep:
         logger.info("Skipping preparation, completed in previous run.")
-        return
+        
     else:
         logger.info("Data_preparation...")
 
-    # Additional checks to make sure the data folder contains Librispeech
-    check_librispeech_folders(data_folder, splits)
+        # Additional checks to make sure the data folder contains Librispeech
+        check_librispeech_folders(data_folder, splits)
 
-    # create csv files for each split
-    all_texts = {}
-    for split_index in range(len(splits)):
+        # create csv files for each split
+        all_texts = {}
+        for split_index in range(len(splits)):
 
-        split = splits[split_index]
+            split = splits[split_index]
 
-        wav_lst = get_all_files(os.path.join(data_folder, split), match_and=[".flac"])
+            wav_lst = get_all_files(os.path.join(data_folder, split), match_and=[".flac"])
 
-        text_lst = get_all_files(
-            os.path.join(data_folder, split), match_and=["trans.txt"]
-        )
+            text_lst = get_all_files(
+                os.path.join(data_folder, split), match_and=["trans.txt"]
+            )
 
-        text_dict = text_to_dict(text_lst)
-        all_texts.update(text_dict)
+            text_dict = text_to_dict(text_lst)
+            all_texts.update(text_dict)
 
-        if select_n_sentences is not None:
-            n_sentences = select_n_sentences[split_index]
-        else:
-            n_sentences = len(wav_lst)
+            if select_n_sentences is not None:
+                n_sentences = select_n_sentences[split_index]
+            else:
+                n_sentences = len(wav_lst)
 
-        create_csv(
-            save_folder,
-            wav_lst,
-            text_dict,
-            split,
-            n_sentences,
-        )
+            create_csv(
+                save_folder,
+                wav_lst,
+                text_dict,
+                split,
+                n_sentences,
+            )
 
     # Merging csv file if needed
     if merge_lst and merge_name is not None:
@@ -291,8 +291,8 @@ def create_csv(
 
     snt_cnt = 0
     # Processing all the wav files in wav_lst
-    for wav_file in wav_lst:
-
+    for wav_file in tzip(wav_lst):
+        wav_file = wav_file[0]
         snt_id = os.path.basename(wav_file).replace(".flac", "")
         spk_id = "-".join(snt_id.split("-")[0:2])
         wrds = text_dict[snt_id]

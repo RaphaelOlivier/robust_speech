@@ -89,7 +89,7 @@ def pgd_loop(
             predictions, batch, rs.Stage.ATTACK)
         if minimize:
             loss = -loss
-        loss.backward()
+        loss.backward(inputs = delta)
         if order == np.inf:
             grad_sign = delta.grad.data.sign()
             delta.data = delta.data + eps_iter * grad_sign

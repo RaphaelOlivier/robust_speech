@@ -161,8 +161,11 @@ def dataio_prepare(hparams):
             # tokenizer has already been loaded
             pass
         else:
-            lab_enc_file = os.path.join(
-                hparams["save_folder"], "label_encoder.txt")
+            if "pretrained_tokenizer_path" in hparams:
+                lab_enc_file = hparams["pretrained_tokenizer_path"]
+            else:
+                lab_enc_file = os.path.join(
+                    hparams["save_folder"], "label_encoder.txt")
 
             special_labels = {
                 "bos_label": hparams["bos_index"],
@@ -176,7 +179,10 @@ def dataio_prepare(hparams):
                 special_labels=special_labels,
                 sequence_input=True,
             )
-            tokenizer.add_unk()
+            try:
+                tokenizer.add_unk()
+            except KeyError:
+                logger.info("Tokenizer already contains an unk label")
             tokenizer.save(path=lab_enc_file)
 
         # 4. Set output:

@@ -227,13 +227,3 @@ class TrfASR(AdvASRBrain):
             self.hparams.noam_annealing(self.optimizer)
 
         return loss.detach()
-
-    def on_stage_start(self, stage, epoch):
-        # Gets called at the beginning of each epoch
-        if stage != sb.Stage.TRAIN:
-            self.wer_metric = self.hparams.error_rate_computer()
-            self.cer_metric = self.hparams.cer_computer()
-            self.adv_cer_metric = self.hparams.cer_computer()
-            self.adv_wer_metric = self.hparams.error_rate_computer()
-            self.adv_cer_metric_target = self.hparams.cer_computer()
-            self.adv_wer_metric_target = self.hparams.error_rate_computer()

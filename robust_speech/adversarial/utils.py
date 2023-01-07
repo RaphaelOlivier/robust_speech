@@ -161,6 +161,8 @@ def load_audio(path, hparams, savedir="."):
 def rand_assign(delta, order, eps):
     """Randomly set the data of parameter delta with uniform sampling"""
     delta.data.uniform_(-1, 1)
+    if isinstance(eps, torch.Tensor):
+        eps = eps.view(-1, 1)
     if order == np.inf:
         delta.data = eps * delta.data
     elif order == 2:

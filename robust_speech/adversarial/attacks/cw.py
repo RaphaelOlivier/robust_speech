@@ -124,7 +124,7 @@ class ASRCarliniWagnerAttack(ImperceptibleASRAttack):
         decoded_output = self.asr_brain.get_tokens(val_predictions)
 
         loss_eval = self.asr_brain.compute_objectives(
-            val_predictions, batch, sb.Stage.TRAIN, reduction="batch")
+            val_predictions, batch, sb.Stage.VALID, reduction="batch")
         # print(loss_eval.item())
         if self.train_mode_for_backward:
             self.asr_brain.module_train()

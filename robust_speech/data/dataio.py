@@ -106,6 +106,7 @@ def dataio_prepare(hparams):
             test_datasets[name] = test_datasets[name].filtered_sorted(
                 select_n=hparams["num_test_points"]
             )
+            
     datasets = []
     if train_data:
         datasets.append(train_data)
@@ -133,7 +134,15 @@ def dataio_prepare(hparams):
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
+    
+    if hparams["has_target_in_csv"]:
+        @sb.utils.data_pipeline.takes("tgt")
+        @sb.utils.data_pipeline.provides("tgt")
+        def text_pipeline(tgt):
+            return tgt
 
+        sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
+    
     # 3. Define text pipeline:
     if isinstance(tokenizer, sb.dataio.encoder.CTCTextEncoder):  # char encoder
 
@@ -154,7 +163,7 @@ def dataio_prepare(hparams):
             yield tokens_eos
             tokens = torch.LongTensor(tokens_list)
             yield tokens
-
+            
         sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
         if "pretrainer" in hparams and "tokenizer" in hparams["pretrainer"].loadables:
@@ -186,10 +195,16 @@ def dataio_prepare(hparams):
             tokenizer.save(path=lab_enc_file)
 
         # 4. Set output:
-        sb.dataio.dataset.set_output_keys(
-            datasets,
-            ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
-        )
+        if hparams["has_target_in_csv"]:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "tgt", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
+            )
+        else:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "wrd", "char_list", "tokens_bos", "tokens_eos", "tokens"],
+            )
     elif isinstance(tokenizer, sentencepiece.SentencePieceProcessor):
 
         @sb.utils.data_pipeline.takes("wrd")
@@ -207,14 +222,20 @@ def dataio_prepare(hparams):
             yield tokens_eos
             tokens = torch.LongTensor(tokens_list)
             yield tokens
-
+            
         sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
-
+            
         # 4. Set output:
-        sb.dataio.dataset.set_output_keys(
-            datasets,
-            ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
-        )
+        if hparams["has_target_in_csv"]:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "tgt", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+            )
+        else:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+            )
 
     else:
         assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(
@@ -237,14 +258,20 @@ def dataio_prepare(hparams):
             yield tokens_eos
             tokens = torch.LongTensor(tokens_list)
             yield tokens
+            
 
         sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
-
         # 4. Set output:
-        sb.dataio.dataset.set_output_keys(
-            datasets,
-            ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
-        )
+        if hparams["has_target_in_csv"]:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "tgt", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+            )
+        else:
+            sb.dataio.dataset.set_output_keys(
+                datasets,
+                ["id", "sig", "wrd", "tokens_bos", "tokens_eos", "tokens"],
+            )
 
     train_batch_sampler = None
     valid_batch_sampler = None

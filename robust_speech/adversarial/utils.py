@@ -5,6 +5,7 @@ Various auxliary functions and classes.
 from enum import Enum, auto
 
 import numpy as np
+import pandas as pd
 import speechbrain as sb
 import torch
 import torch.nn as nn
@@ -118,8 +119,14 @@ class TargetGeneratorFromFixedTargets(TargetGenerator):
             sent = find_closest_length_string(batch.wrd[0], self.target)
             return sent
         return self.target
+    
+    
+class TargetGeneratorFromCSVFile(TargetGenerator):
 
-
+    def generate_targets(self, batch, hparams):
+        return batch.tgt[0]
+        
+        
 def transcribe_batch(asr_brain, batch):
     """Outputs transcriptions from an input batch"""
     out = asr_brain.compute_forward(batch, stage=sb.Stage.TEST)

@@ -25,7 +25,7 @@ from speechbrain.utils.distributed import run_on_main
 
 import robust_speech as rs
 from robust_speech.adversarial.brain import AdvASRBrain
-from robust_speech.adversarial.utils import TargetGeneratorFromFixedTargets
+from robust_speech.adversarial.utils import TargetGeneratorFromFixedTargets, TargetGeneratorFromCSVFile
 
 
 def read_brains(
@@ -70,6 +70,7 @@ def read_brains(
 def evaluate(hparams_file, run_opts, overrides):
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
+    
 
     # Create experiment directory
     sb.create_experiment_directory(
@@ -137,26 +138,35 @@ def evaluate(hparams_file, run_opts, overrides):
     target_brain.hparams.train_logger = hparams["logger"]
 
     target = None
-    if "target_generator" in hparams:
-        target = hparams["target_generator"]
-    elif "target_sentence" in hparams:
-        target = TargetGeneratorFromFixedTargets(
-            target=hparams["target_sentence"])
+    if hparams["has_target_in_csv"]:
+        target = TargetGeneratorFromCSVFile()
+    else:
+        if "target_generator" in hparams:
+            target = hparams["target_generator"]
+        elif "target_sentence" in hparams:
+            target = TargetGeneratorFromFixedTargets(
+                target=hparams["target_sentence"])
+            
     load_audio = hparams["load_audio"] if "load_audio" in hparams else None
     save_audio_path = hparams["save_audio_path"] if hparams["save_audio"] else None
     # Evaluation
-    for k in test_datasets.keys():  # keys are test_clean, test_other etc
-        target_brain.hparams.wer_file = os.path.join(
-            hparams["output_folder"], "wer_{}.txt".format(k)
-        )
-        target_brain.evaluate(
-            test_datasets[k],
-            test_loader_kwargs=hparams["test_dataloader_opts"],
-            load_audio=load_audio,
-            save_audio_path=save_audio_path,
-            sample_rate=hparams["sample_rate"],
-            target=target,
-        )
+    try:
+        for k in test_datasets.keys():  # keys are test_clean, test_other etc
+            target_brain.hparams.wer_file = os.path.join(
+                hparams["output_folder"], "wer_{}.txt".format(k)
+            )
+            
+            target_brain.evaluate(
+                test_datasets[k],
+                test_loader_kwargs=hparams["test_dataloader_opts"],
+                load_audio=load_audio,
+                save_audio_path=save_audio_path,
+                sample_rate=hparams["sample_rate"],
+                target=target,
+                progressbar=True
+            )
+    except KeyError as e:
+        raise Exception("Don't have {} field in CSV file!".format(e))
 
 
 if __name__ == "__main__":

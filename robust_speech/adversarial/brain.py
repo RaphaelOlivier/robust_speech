@@ -20,7 +20,7 @@ import numpy as np
 import robust_speech as rs
 from robust_speech.adversarial.attacks.attacker import Attacker, TrainableAttacker
 from robust_speech.adversarial.defenses.vote import ROVER_MAX_HYPS, ROVER_RECOMMENDED_HYPS, VoteEnsemble, Rover, MajorityVote
-
+from robust_speech.adversarial.write_result import print_wer_summary, print_alignments, print_log_csv
 
 import pdb
 from copy import deepcopy
@@ -28,6 +28,26 @@ from copy import deepcopy
 warnings.simplefilter("once", RuntimeWarning)
 
 logger = logging.getLogger(__name__)
+
+# Define write result procedure
+
+class CustomErrorRateStats(sb.utils.metric_stats.ErrorRateStats):
+    
+    def write_stats(self, filestream, id = -1, batch = False):
+        """Write all relevant info (e.g., error rate alignments) to file.
+        * See MetricStats.write_stats()
+        """
+        
+        # id = -1 for all audio in test set
+        # batch = True write Log for each batch
+        if not self.summary:
+            self.summarize()
+            
+        if batch:
+            print_log_csv(self.scores, id, filestream)
+        else:
+            print_wer_summary(self.summary, filestream)
+            print_alignments(self.scores, filestream) 
 
 # Define training procedure
 
@@ -764,24 +784,26 @@ class AdvASRBrain(ASRBrain):
             test_set = self.make_dataloader(
                 test_set, sb.Stage.TEST, **test_loader_kwargs
             )
+            
         self.on_evaluate_start(max_key=max_key, min_key=min_key)
         self.on_stage_start(sb.Stage.TEST, epoch=None)
         self.modules.eval()
         avg_test_loss = 0.0
         avg_test_adv_loss = None
         avg_test_adv_loss_target = None
-
         if self.attacker is not None:
             avg_test_adv_loss = 0.0
             self.attacker.on_evaluation_start(
                 load_audio=load_audio, save_audio_path=save_audio_path)
-
+            
         for batch in tqdm(test_set, dynamic_ncols=True, disable=not progressbar):
             self.step += 1
+            # Calculate the loss after attacking (Ground truth and Predict)
             loss = self.evaluate_batch(batch, stage=sb.Stage.TEST)
             avg_test_loss = self.update_average(loss, avg_test_loss)
 
             if self.attacker is not None:
+                # Loop through the number of iterations
                 adv_loss, adv_loss_target = self.evaluate_batch_adversarial(
                     batch, stage=sb.Stage.TEST, target=target
                 )
@@ -799,6 +821,14 @@ class AdvASRBrain(ASRBrain):
                 break
 
             # Only run evaluation "on_stage_end" on main process
+            run_on_main(
+                self.on_batch_end,
+                args=[sb.Stage.TEST, avg_test_loss, batch.id[0], None],
+                kwargs={
+                    "stage_adv_loss": avg_test_adv_loss,
+                    "stage_adv_loss_target": avg_test_adv_loss_target,
+                },
+            )
         run_on_main(
             self.on_stage_end,
             args=[sb.Stage.TEST, avg_test_loss, None],
@@ -860,16 +890,26 @@ class AdvASRBrain(ASRBrain):
         """
         if stage != sb.Stage.TRAIN:
             self.cer_metric = self.hparams.cer_computer()
-            self.wer_metric = self.hparams.error_rate_computer()
+            self.wer_metric = CustomErrorRateStats()
+            # self.wer_metric = self.hparams.error_rate_computer()
             self.adv_cer_metric = self.hparams.cer_computer()
-            self.adv_wer_metric = self.hparams.error_rate_computer()
+            self.adv_wer_metric = CustomErrorRateStats()
+            # self.adv_wer_metric = self.hparams.error_rate_computer()
             self.adv_cer_metric_target = self.hparams.cer_computer()
-            self.adv_wer_metric_target = self.hparams.error_rate_computer()
+            self.adv_wer_metric_target = CustomErrorRateStats()
+            # self.adv_wer_metric_target = self.hparams.error_rate_computer()
             try:
                 self.adv_ser_metric_target = self.hparams.ser_computer()
             except:
                 self.adv_ser_metric_target = None
 
+    def on_batch_end(self, state, stage_loss, id, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
+        log_csv = self.hparams.wer_file.split('.')[0] + '.csv'
+        with open(log_csv, "a") as log:
+            self.wer_metric.write_stats(log, id=id, batch=True)
+            # self.adv_wer_metric.write_stats(log, id=id, batch=True)
+            # self.adv_wer_metric_target.write_stats(log, id=id, batch=True)
+    
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
     ):
@@ -940,6 +980,8 @@ class AdvASRBrain(ASRBrain):
             )
             with open(self.hparams.wer_file, "w") as wer:
                 self.wer_metric.write_stats(wer)
+                # self.adv_wer_metric.write_stats(wer)
+                # self.adv_wer_metric_target.write_stats(wer)
 
     def on_evaluate_start(self, max_key=None, min_key=None):
         """Run at the beginning of evlauation.

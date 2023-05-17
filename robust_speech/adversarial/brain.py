@@ -904,12 +904,14 @@ class AdvASRBrain(ASRBrain):
                 self.adv_ser_metric_target = None
 
     def on_batch_end(self, state, stage_loss, id, epoch, stage_adv_loss=None, stage_adv_loss_target=None):
-        log_csv = self.hparams.wer_file.split('.')[0] + '.csv'
-        with open(log_csv, "a") as log:
+        # log_csv = self.hparams.wer_file.split('.')[0] + '.csv'
+        log_csv = os.path.splitext(self.hparams.wer_file)[0] + '.wer.csv'
+        with open(log_csv, "a+") as log:
             self.wer_metric.write_stats(log, id=id, batch=True)
             # self.adv_wer_metric.write_stats(log, id=id, batch=True)
             # self.adv_wer_metric_target.write_stats(log, id=id, batch=True)
-    
+        self.attacker.on_batch_end(self.hparams)
+        
     def on_stage_end(
         self, stage, stage_loss, epoch, stage_adv_loss=None, stage_adv_loss_target=None
     ):

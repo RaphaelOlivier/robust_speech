@@ -303,6 +303,12 @@ class ImperceptibleASRAttack(Attacker):
                 real_lengths=real_lengths,
             )
             loss.backward()
+            self.on_iteration_end(
+                ids = batch.id,
+                iter = iter_1st_stage_idx + 1,
+                origin_wav=original_input,
+                adv_wav=masked_adv_input
+            )
             # Get sign of the gradients
             self.global_optimal_delta.grad = torch.sign(
                 self.global_optimal_delta.grad)
@@ -495,6 +501,13 @@ class ImperceptibleASRAttack(Attacker):
                 theta_batch=theta_batch,
                 original_max_psd_batch=original_max_psd_batch,
                 real_lengths=real_lengths,
+            )
+
+            self.on_iteration_end(
+                ids = batch.id,
+                iter = iter_2nd_stage_idx + self.max_iter_1 + 1,
+                origin_wav=original_input,
+                adv_wav=masked_adv_input
             )
 
             # Total loss

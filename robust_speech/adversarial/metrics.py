@@ -10,6 +10,8 @@ import torchaudio
 from speechbrain.utils.edit_distance import accumulatable_wer_stats
 from speechbrain.utils.metric_stats import MetricStats
 
+from robust_speech.adversarial.write_result import print_snr_csv
+
 warnings.simplefilter("once", RuntimeWarning)
 
 
@@ -33,6 +35,17 @@ def snr(audio, perturbation, rel_length=torch.tensor([1.0])):
     snr = 20. * torch.log10(ratio)
     return torch.round(snr).long()
 
+class SNRComputerIter(MetricStats):
+    def __init__(self, **kwargs):
+        def metric(batch, adv_wav):
+            return snr(batch, adv_wav - batch)
+        
+        super().__init__(metric, **kwargs)
+
+    def write_stats(self, filestream, verbose=False):
+
+        print_snr_csv(zip(self.scores, self.ids), filestream)
+        
 
 class SNRComputer(MetricStats):
     """Tracks Signal to Noise Ratio"""

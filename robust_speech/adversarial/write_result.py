@@ -1,3 +1,4 @@
+import os
 import sys
 from speechbrain.utils import edit_distance
 from jiwer import wer
@@ -203,22 +204,41 @@ def print_log_csv(details_by_utterance, id, file=sys.stdout):
                     results['prediction'] = []
                 results['prediction'].append(' '.join(det['hyp_tokens']))
                 
-    if os.stat(log_csv).st_size == 0:
+    # if os.stat(file).st_size == 0:
+    file.seek(0)
+    is_file_empty = len(file.read()) == 0
+    file.seek(0,2)
+    if is_file_empty:
         header = ['id', 'iter', 'ground_truth', 'target', 
-                'prediction', 'gt_wer', 'tg_wer', 'snr'
+                'prediction', 'gt_wer', 'tg_wer'
             ]
     
-        print(",".join(header), file=log)
+        print(",".join(header), file=file)
     
     for it, pre in enumerate(results['prediction']):
-        print("{},{},{},{},{},{},{},{}".format(
+        print("{},{},{},{},{},{},{}".format(
             id,
             it,
             results['ground_truth'],
             results['target'],
             pre,
             wer(results['ground_truth'], pre)*100,
-            wer(results['target'], pre)*100,
-            '',
+            wer(results['target'], pre)*100
         ), file=file)
         
+
+def print_snr_csv(metrics_detail, file=sys.stdout):
+    file.seek(0)
+    is_file_empty = len(file.read()) == 0
+    file.seek(0,2)
+    if is_file_empty:
+        header = ['id', 'iter', 'snr']
+    
+        print(",".join(header), file=file)
+
+    for score, (id,iter_idx) in metrics_detail:
+        print("{},{},{}".format(
+            id,
+            iter_idx,
+            score
+        ), file=file)

@@ -2,11 +2,12 @@
 An abstract attack class and a simple baseline attack.
 """
 
+import os
 import numpy as np
 import torch
 import torch.nn as nn
 
-from robust_speech.adversarial.metrics import AudioSaver, SNRComputer
+from robust_speech.adversarial.metrics import AudioSaver, SNRComputer, SNRComputerIter
 from robust_speech.adversarial.utils import rand_assign
 
 
@@ -40,6 +41,7 @@ class Attacker:
                 "save_audio_path must be provided in order to load audio files")
         if log_snr:
             self.snr_metric = SNRComputer()
+            self.snr_metric_iter = SNRComputerIter()
         self.save_audio_path = save_audio_path
         if self.save_audio_path:
             self.audio_saver = AudioSaver(save_audio_path, sample_rate)
@@ -65,6 +67,18 @@ class Attacker:
                 test_stats={"Adversarial SNR": snr},
             )
 
+    def on_batch_end(self, hparams):
+        if hasattr(self, "snr_metric_iter"):
+            log_csv = os.path.splitext(hparams.wer_file)[0] + '.snr.csv'
+            with open(log_csv, "a+") as f:
+                self.snr_metric_iter.write_stats(f)
+            self.snr_metric_iter.clear()
+
+    def on_iteration_end(self, ids, iter, origin_wav, adv_wav, target=None):
+        metric_ids = list(zip(ids, [iter]*len([ids])))
+        if hasattr(self, "snr_metric_iter"):
+            self.snr_metric_iter.append(metric_ids, origin_wav, adv_wav)
+
     def perturb_and_log(self, batch, target=None):
         """
         Compute an adversarial perturbation and log results
@@ -87,6 +101,8 @@ class Attacker:
                 self.audio_saver.save(batch.id, batch, adv_wav)
         if hasattr(self, "snr_metric"):
             self.snr_metric.append(batch.id, batch, adv_wav)
+        
+                
         return adv_wav
 
     def perturb(self, batch):

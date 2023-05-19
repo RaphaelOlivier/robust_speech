@@ -174,9 +174,9 @@ def l2_clamp_or_normalize(tensor, eps=None):
     """Clamp tensor to eps in L2 norm (or normalize if eps is None"""
     xnorm = torch.norm(tensor, dim=list(range(1, tensor.dim())))
     if eps is not None:
-        coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).unsqueeze(1)
+        coeff = torch.minimum(eps / xnorm, torch.ones_like(xnorm)).view(-1, 1)
     else:
-        coeff = (1.0 / xnorm).unsqueeze(1)
+        coeff = (1.0 / xnorm).view(-1, 1)
     return coeff * tensor
 
 

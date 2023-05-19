@@ -217,8 +217,8 @@ def dataio_prepare(hparams):
         )
 
     else:
-        assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(
-            tokenizer, transformers.PreTrainedTokenizer)
+        # assert isinstance(tokenizer, transformers.PreTrainedTokenizerFast) or isinstance(
+        #    tokenizer, transformers.PreTrainedTokenizer)
 
         @sb.utils.data_pipeline.takes("wrd")
         @sb.utils.data_pipeline.provides(

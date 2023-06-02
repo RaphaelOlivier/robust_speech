@@ -410,7 +410,7 @@ class ImperceptibleASRAttack(Attacker):
             self.asr_brain.module_train()
 
         loss_eval = self.asr_brain.compute_objectives(
-            val_predictions, batch, sb.Stage.TRAIN, reduction="batch")
+            val_predictions, batch, sb.Stage.VALID, reduction="batch")
         return loss_backward, loss_eval, local_delta, decoded_output, masked_adv_input, local_delta_rescale
 
     def _attack_2nd_stage(
